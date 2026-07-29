@@ -68,6 +68,20 @@ The path must be writable and outside the public web document root. Uploads rema
 - The source no longer derives the active encryption key from WordPress salts.
 - The upload path no longer reads the entire PDF into memory.
 
+## Automated GitHub quality gate
+
+The corrective head commit passed the File 12 Quality Gate:
+
+- source checksums;
+- PHP 7.4 and PHP 8.3 syntax validation;
+- multi-chunk encryption, reordering, and tamper rejection tests;
+- legacy unsafe-pattern rejection;
+- JavaScript syntax validation;
+- installable ZIP creation and artifact upload.
+
+Artifact: `file-12-pdf-library-0.2.0`  
+Artifact digest: `sha256:6e6cddece78d9da1375b13cf743ed80cb9e0d09e0332474fab263e4427ddef19`
+
 ## Remaining acceptance boundary
 
 The corrective code is **not production-complete** until the exact package passes:
