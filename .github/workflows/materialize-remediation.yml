@@ -10,11 +10,13 @@ permissions:
 
 jobs:
   materialize:
-    if: ${{ hashFiles('remediation-source.tar.gz') != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out remediation branch
         uses: actions/checkout@v4
+
+      - name: Verify transfer archive exists
+        run: test -f remediation-source.tar.gz
 
       - name: Verify transfer archive
         run: echo '9f2cff2c63eeffa455f185c39e31c4d8c4f06750f2f0c00deadd82737e165fa5  remediation-source.tar.gz' | sha256sum --check -
