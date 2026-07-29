@@ -70,7 +70,7 @@ The path must be writable and outside the public web document root. Uploads rema
 
 ## Automated GitHub quality gate
 
-The corrective head commit passed the File 12 Quality Gate:
+The corrective branch passed the File 12 Quality Gate:
 
 - source checksums;
 - PHP 7.4 and PHP 8.3 syntax validation;
@@ -79,8 +79,9 @@ The corrective head commit passed the File 12 Quality Gate:
 - JavaScript syntax validation;
 - installable ZIP creation and artifact upload.
 
-Artifact: `file-12-pdf-library-0.2.0`  
-Artifact digest: `sha256:6e6cddece78d9da1375b13cf743ed80cb9e0d09e0332474fab263e4427ddef19`
+Artifact: `file-12-pdf-library-0.2.0`
+
+The current artifact identifier and digest remain attached to the corresponding GitHub Actions run rather than being frozen in source documentation.
 
 ## Remaining acceptance boundary
 
