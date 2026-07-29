@@ -21,17 +21,18 @@ The original 0.1.0 baseline is preserved in repository history. The current corr
 
 ## GitHub quality gate completed
 
-The File 12 Quality Gate passed on the corrective head commit:
+The File 12 Quality Gate passed on the corrective branch:
 
 - source checksum verification passed;
 - PHP 7.4 lint and standalone encryption/tamper test passed;
 - PHP 8.3 lint and standalone encryption/tamper test passed;
 - legacy unsafe-pattern rejection passed;
 - JavaScript syntax validation passed;
-- reproducible installable ZIP creation and artifact upload passed.
+- installable ZIP creation and artifact upload passed.
 
-Artifact: `file-12-pdf-library-0.2.0`  
-Artifact digest: `sha256:6e6cddece78d9da1375b13cf743ed80cb9e0d09e0332474fab263e4427ddef19`
+Artifact: `file-12-pdf-library-0.2.0`
+
+The artifact identifier and digest are recorded by the corresponding GitHub Actions run rather than frozen in source documentation, because each workflow execution creates a new artifact envelope.
 
 ## Staging gates not yet established
 
