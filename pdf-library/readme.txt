@@ -11,3 +11,4 @@ Features include sixteen fixed document types, sixteen categories, genuine-PDF v
 Keep Files 02, 03, 04, 07, 09, and 10 active. Upload and activate this ZIP, test an online-reading-only PDF and a downloadable PDF, then review PDF Library Management before public launch.
 
 Online-only mode removes the download permission and direct public file path, but no browser-based system can honestly guarantee that readable content can never be copied or captured.
+
