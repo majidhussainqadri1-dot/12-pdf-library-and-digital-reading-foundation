@@ -1,2 +1,76 @@
-document.addEventListener("DOMContentLoaded",function(){var f=document.querySelector(".spl-form");if(f){var l=document.createElement("label");l.className="wide";l.innerHTML="<input type=\"checkbox\" name=\"patient_case\" value=\"1\"> If this is a Patient Case, all identifying information is removed and valid publication consent has been obtained.";f.insertBefore(l,f.querySelector("button"));}});document.addEventListener('click',async function(e){var b=e.target.closest('[data-spl]');if(b){var box=b.closest('[data-document]'),d=new URLSearchParams({action:'spl_action',nonce:splData.nonce,document:box.dataset.document,kind:b.dataset.spl});await fetch(splData.url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:d});location.reload();}var f=e.target.closest('[data-spl-form]');if(f&&e.target.closest('button')){e.preventDefault();var box=f.closest('[data-document]'),d=new FormData(f);d.append('action','spl_action');d.append('nonce',splData.nonce);d.append('document',box.dataset.document);var r=await fetch(splData.url,{method:'POST',body:d}),j=await r.json();alert(j.data&&j.data.message?j.data.message:'Saved.');}});
+(function () {
+  "use strict";
 
+  async function request(body) {
+    const response = await fetch(splData.url, {
+      method: "POST",
+      credentials: "same-origin",
+      body: body,
+    });
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      throw new Error("The server returned an invalid response.");
+    }
+    if (!response.ok || !payload.success) {
+      const message = payload && payload.data && payload.data.message
+        ? payload.data.message
+        : "The action could not be completed.";
+      throw new Error(message);
+    }
+    return payload.data || {};
+  }
+
+  document.addEventListener("click", async function (event) {
+    const actionButton = event.target.closest("[data-spl]");
+    if (actionButton) {
+      event.preventDefault();
+      if (actionButton.disabled) return;
+      const container = actionButton.closest("[data-document]");
+      if (!container) return;
+
+      actionButton.disabled = true;
+      const body = new URLSearchParams({
+        action: "spl_action",
+        nonce: splData.nonce,
+        document: container.dataset.document,
+        kind: actionButton.dataset.spl,
+      });
+
+      try {
+        const data = await request(body);
+        if (data.reload) window.location.reload();
+      } catch (error) {
+        window.alert(error.message);
+        actionButton.disabled = false;
+      }
+      return;
+    }
+
+    const submitButton = event.target.closest("[data-spl-form] button[type='submit']");
+    if (!submitButton) return;
+    event.preventDefault();
+    if (submitButton.disabled) return;
+
+    const form = submitButton.closest("[data-spl-form]");
+    const container = form ? form.closest("[data-document]") : null;
+    if (!form || !container) return;
+
+    submitButton.disabled = true;
+    const body = new FormData(form);
+    body.append("action", "spl_action");
+    body.append("nonce", splData.nonce);
+    body.append("document", container.dataset.document);
+
+    try {
+      const data = await request(body);
+      window.alert(data.message || "Saved.");
+      form.reset();
+    } catch (error) {
+      window.alert(error.message);
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+})();

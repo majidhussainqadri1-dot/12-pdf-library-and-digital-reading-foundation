@@ -2,44 +2,92 @@
 
 File 12 of the **Sabri Social Homeopathy Platform**.
 
-This repository preserves the original source baseline for **PDF Library and Digital Reading Foundation 0.1.0**. The WordPress plugin provides the first-stage PDF library and digital reading foundation, including encrypted document storage, searchable discovery, controlled inline reading, optional downloads, private reading progress, page bookmarks, notes, reactions, comments, reports, privacy callbacks, structured data, and moderation workflows.
+This repository contains the preserved original File 12 baseline and the corrective **0.2.0 remediation work** for a secure WordPress PDF library and digital reading foundation.
+
+## Current corrective scope
+
+Version 0.2.0 addresses the defects found during the post-import review:
+
+- replaces WordPress-salt-derived encryption with an explicit, backed-up key ring and per-file key IDs;
+- encrypts and decrypts PDFs in authenticated 1 MiB chunks instead of loading entire files into PHP memory;
+- writes encrypted files atomically and removes posts, attachments, and files when a submission fails;
+- removes expiring public nonces from published reader URLs while retaining authorization and nonces for non-public documents;
+- adds schema versioning, idempotent migrations, duplicate-state cleanup, a unique state index, moderation audit records, and counter migration;
+- implements real title, author, ISBN, and keyword search, pagination, most-read sorting, and most-saved sorting;
+- prevents duplicate progress state while allowing multiple notes and page-specific bookmarks;
+- validates report reasons, page ranges, publication metadata, required patient-case consent, upload identity, and genuine PDF structure;
+- adds paginated privacy export and erasure, private-page no-cache/noindex controls, upload/report rate limits, and system-health gates;
+- records moderation notes, reviewer identity, timestamps, and report-status audit transitions;
+- adds a reproducible GitHub quality gate and standalone chunked-encryption tamper test.
 
 ## Repository layout
 
-- `pdf-library/` — original installable WordPress plugin source.
-- `SOURCE-PROVENANCE.md` — source origin and integrity record.
-- `MANIFEST.md` — package inventory.
-- `CHECKSUMS.sha256` — SHA-256 integrity checksums for the preserved source.
-- `STATUS.md` — current verification and release status.
+- `pdf-library/` — WordPress plugin source, currently version 0.2.0 on the corrective branch.
+- `tests/test-crypto.php` — standalone encryption round-trip and tamper-detection smoke test.
+- `SOURCE-PROVENANCE.md` — original 0.1.0 archive identity and baseline boundary.
+- `REMEDIATION.md` — defect-to-fix traceability record.
+- `STATUS.md` — present QA and release state.
+- `MANIFEST.md` — current source inventory.
+- `CHECKSUMS.sha256` — SHA-256 checksums for plugin source and the crypto smoke test.
 
-## Requirements
+## Runtime requirements
 
 - WordPress 6.0 or later.
-- PHP 7.4 or later.
-- Companion Files 02, 03, 04, 07, 09, and 10 should remain active, as stated by the original package documentation.
+- PHP 7.4 or later, with OpenSSL and AES-256-GCM support.
+- A writable private directory outside the public document root.
+- A securely generated and independently backed-up 32-byte key ring configured in `wp-config.php`.
+- Companion Files 02, 03, 04, 07, 09, and 10 for the complete planned integration.
 
-## Baseline verification
+## Mandatory encryption configuration
 
-The imported package has passed:
+Use a cryptographically random 32-byte key. Keep an offline backup before uploading any PDF.
 
-- ZIP integrity and path-safety inspection before extraction.
-- PHP syntax validation for all PHP files under PHP 8.4.16.
-- JavaScript syntax validation with Node.js.
-- Suspicious executable-pattern scan for common high-risk PHP constructs.
-- SHA-256 generation for the original ZIP and every source file.
+```php
+define('SPL_PDF_MASTER_KEYS', array(
+    'v1' => 'base64:REPLACE_WITH_A_32_BYTE_BASE64_KEY',
+));
+define('SPL_PDF_ACTIVE_KEY_ID', 'v1');
+```
 
-These checks establish archive and source integrity only. WordPress activation, database migration, permissions, encryption-key deployment, browser behavior, integration, upgrade, rollback, and staging acceptance remain separate release gates.
+An older key must remain in the key ring while any encrypted file still carries that key ID. Removing or losing a required key makes the corresponding PDF unreadable.
 
-## Installation
+An explicit storage path may be configured:
 
-Create an installable ZIP whose top-level directory is `pdf-library/`, upload it through the WordPress plugin installer, activate it on staging, and test both an online-reading-only PDF and a downloadable PDF before public release.
+```php
+define('SPL_PDF_STORAGE_DIR', '/absolute/private/path/pdf-library');
+```
 
-## Original package checksum
+The path must be writable and outside the public web document root. Uploads remain blocked when encryption or private-storage health checks fail.
 
-`12-pdf-library-and-digital-reading-foundation-0.1.0.zip`
+## Validation completed locally
 
-SHA-256: `5f9f9b16e714365fc4eb4a49b40d1eec8a895cf1045747ad4dfae7fc1cb6856d`
+- All PHP source and test files pass `php -l` under PHP 8.4.16.
+- JavaScript passes `node --check`.
+- The SPL2 encryption test passes multi-chunk round-trip verification.
+- A modified ciphertext is rejected by AES-GCM authentication.
+- The source no longer derives the active encryption key from WordPress salts.
+- The upload path no longer reads the entire PDF into memory.
+
+## Remaining acceptance boundary
+
+The corrective code is **not production-complete** until the exact package passes:
+
+- fresh and upgrade installation on Hostinger staging;
+- database migration and duplicate-state migration tests;
+- key backup, loss-prevention, rotation, and restore exercises;
+- online-reading-only and downloadable-PDF workflows with small and large files;
+- Founder, administrator, verified-doctor, reviewer, patient, and public-user permission tests;
+- integration with companion modules;
+- privacy export/erasure, moderation, reporting, caching, responsive, accessibility, browser, backup, rollback, and recovery acceptance.
+
+## Original package identity
+
+- Archive: `12-pdf-library-and-digital-reading-foundation-0.1.0.zip`
+- SHA-256: `5f9f9b16e714365fc4eb4a49b40d1eec8a895cf1045747ad4dfae7fc1cb6856d`
+- Original extracted files: 13
+
+The exact unmodified import remains represented by the baseline history. The corrective branch intentionally changes source and increments the plugin version to 0.2.0.
 
 ## License
 
-GPL-2.0-or-later, as declared by the plugin header and original readme.
+GPL-2.0-or-later, as declared by the plugin header and readme.

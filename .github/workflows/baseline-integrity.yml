@@ -1,15 +1,20 @@
-name: Baseline Integrity
+name: File 12 Quality Gate
 
 on:
-  push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  integrity:
+  php-quality:
+    name: PHP ${{ matrix.php }} quality
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.3']
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -20,11 +25,33 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php }}
           coverage: none
 
-      - name: Lint PHP source
-        run: find pdf-library -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Lint PHP source and tests
+        run: find pdf-library tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Run chunked encryption smoke test
+        run: php tests/test-crypto.php
+
+      - name: Reject legacy salt-derived encryption and full-file PDF loading
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = "\n".join(path.read_text(errors="ignore") for path in Path("pdf-library").rglob("*.php"))
+          assert "wp_salt('auth').'|spl-pdf'" not in source
+          assert "file_get_contents($file['tmp_name'])" not in source
+          PY
+
+  frontend-package:
+    name: JavaScript and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify recorded source checksums
+        run: sha256sum --check CHECKSUMS.sha256
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -33,3 +60,16 @@ jobs:
 
       - name: Check JavaScript syntax
         run: node --check pdf-library/assets/library.js
+
+      - name: Build installable ZIP
+        run: |
+          mkdir -p dist
+          zip -qr dist/12-pdf-library-and-digital-reading-foundation-0.2.0.zip pdf-library
+          sha256sum dist/12-pdf-library-and-digital-reading-foundation-0.2.0.zip
+
+      - name: Upload installable ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-12-pdf-library-0.2.0
+          path: dist/12-pdf-library-and-digital-reading-foundation-0.2.0.zip
+          if-no-files-found: error
