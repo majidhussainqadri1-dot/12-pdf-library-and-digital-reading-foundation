@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Corrective source 0.2.0 prepared — automated quality gate and staging acceptance required before merge or release.**
+**Corrective source 0.2.0 prepared — automated quality gate passed; staging acceptance remains required before merge or release.**
 
 The original 0.1.0 baseline is preserved in repository history. The current corrective source intentionally resolves the defects recorded in `REMEDIATION.md`.
 
@@ -19,16 +19,19 @@ The original 0.1.0 baseline is preserved in repository history. The current corr
 - PDF encryption/decryption uses bounded chunks rather than full-file memory loading.
 - Defect-to-fix traceability is recorded.
 
-## GitHub quality gate required
+## GitHub quality gate completed
 
-The branch must pass:
+The File 12 Quality Gate passed on the corrective head commit:
 
-- source checksum verification;
-- PHP lint;
-- standalone encryption and tamper test;
-- legacy unsafe-pattern rejection;
-- JavaScript syntax validation;
-- reproducible installable ZIP creation.
+- source checksum verification passed;
+- PHP 7.4 lint and standalone encryption/tamper test passed;
+- PHP 8.3 lint and standalone encryption/tamper test passed;
+- legacy unsafe-pattern rejection passed;
+- JavaScript syntax validation passed;
+- reproducible installable ZIP creation and artifact upload passed.
+
+Artifact: `file-12-pdf-library-0.2.0`  
+Artifact digest: `sha256:6e6cddece78d9da1375b13cf743ed80cb9e0d09e0332474fab263e4427ddef19`
 
 ## Staging gates not yet established
 
@@ -50,4 +53,4 @@ The branch must pass:
 
 ## Release judgment
 
-The corrective code may proceed to automated CI and controlled staging. It must not be called production-complete, merged as an accepted release, or deployed live until every blocking gate above is tested and formally accepted.
+The corrective code has passed automated CI and may proceed to controlled staging. It must not be called production-complete, merged as an accepted release, or deployed live until every blocking gate above is tested and formally accepted.
