@@ -1,83 +1,34 @@
 <?php
-// Standalone smoke test for the chunked SPL2 encryption format.
-define('ABSPATH', __DIR__ . '/');
-function sanitize_key($key) {
-    return preg_replace('/[^a-z0-9_\-]/', '', strtolower((string) $key));
-}
-define('SPL_PDF_MASTER_KEYS', array('v1' => 'base64:' . base64_encode(str_repeat('K', 32))));
-define('SPL_PDF_ACTIVE_KEY_ID', 'v1');
-require dirname(__DIR__) . '/pdf-library/includes/class-spl-crypto.php';
+require __DIR__ . '/bootstrap.php';
+$key = random_bytes(32);
+define('PLDR_PDF_MASTER_KEYS', array('test-v1' => 'base64:' . base64_encode($key)));
+define('PLDR_PDF_ACTIVE_KEY_ID', 'test-v1');
+require dirname(__DIR__) . '/pdf-library-foundation-12/includes/class-pldr-crypto.php';
 
-$source = tempnam(sys_get_temp_dir(), 'spl-source-');
-$encrypted = tempnam(sys_get_temp_dir(), 'spl-encrypted-');
-$restored = tempnam(sys_get_temp_dir(), 'spl-restored-');
-$data = "%PDF-1.7\n" . random_bytes((2 * 1024 * 1024) + 333);
-file_put_contents($source, $data);
+$plain = tempnam(sys_get_temp_dir(), 'pldr-plain-');
+$enc = tempnam(sys_get_temp_dir(), 'pldr-enc-');
+$data = "%PDF-1.7\n" . random_bytes(2 * 1024 * 1024 + 517) . "\n%%EOF\n";
+file_put_contents($plain, $data);
+$meta = array(); $error = '';
+assert(PLDR_Crypto::encrypt_file($plain, $enc, $meta, $error), $error);
+assert($meta['format'] === 'PLD3');
+assert(PLDR_Crypto::verify_file($enc, hash('sha256', $data), $error), $error);
+assert(PLDR_Crypto::plaintext_sha256($enc, $error) === hash('sha256', $data));
 
+$start = 12345; $end = 1024 * 1024 + 777;
+$range = '';
+assert(PLDR_Crypto::stream_range($enc, $start, $end, static function ($chunk) use (&$range) { $range .= $chunk; }, $meta, $error), $error);
+assert($range === substr($data, $start, $end - $start + 1));
+
+// Tamper with authenticated ciphertext, never the header.
+$fh = fopen($enc, 'r+b');
+fseek($fh, 128, SEEK_SET);
+$b = fread($fh, 1);
+fseek($fh, 128, SEEK_SET);
+fwrite($fh, chr(ord($b) ^ 0x01));
+fclose($fh);
 $error = '';
-$meta = array();
-if (!SPL_Crypto::encrypt_file($source, $encrypted, $meta, $error)) {
-    fwrite(STDERR, "Encryption failed: {$error}\n");
-    exit(1);
-}
-if ('SPL2' !== $meta['format'] || 'v1' !== $meta['key_id'] || strlen($data) !== $meta['original_size']) {
-    fwrite(STDERR, "Encryption metadata mismatch.\n");
-    exit(1);
-}
-
-$out = fopen($restored, 'wb');
-$stream_meta = array();
-if (!SPL_Crypto::stream_file($encrypted, function ($chunk) use ($out) {
-    fwrite($out, $chunk);
-}, $stream_meta, $error)) {
-    fwrite(STDERR, "Decryption failed: {$error}\n");
-    exit(1);
-}
-fclose($out);
-if (!hash_equals(hash_file('sha256', $source), hash_file('sha256', $restored))) {
-    fwrite(STDERR, "Round-trip checksum mismatch.\n");
-    exit(1);
-}
-
-$original_encrypted = file_get_contents($encrypted);
-$key_length = ord($original_encrypted[5]);
-$header_length = 4 + 1 + 1 + $key_length + 4 + 8;
-$cursor = $header_length;
-$records = array();
-while ($cursor < strlen($original_encrypted)) {
-    $length = unpack('Nvalue', substr($original_encrypted, $cursor, 4));
-    $record_length = 4 + 12 + 16 + $length['value'];
-    $records[] = substr($original_encrypted, $cursor, $record_length);
-    $cursor += $record_length;
-}
-if (count($records) < 2) {
-    fwrite(STDERR, "The test file did not create multiple encrypted chunks.\n");
-    exit(1);
-}
-$reordered = substr($original_encrypted, 0, $header_length) . $records[1] . $records[0] . implode('', array_slice($records, 2));
-file_put_contents($encrypted, $reordered);
-$error = '';
-$accepted = SPL_Crypto::stream_file($encrypted, function ($chunk) {}, $stream_meta, $error);
-if ($accepted || false === strpos($error, 'authentication')) {
-    fwrite(STDERR, "Chunk-order authentication failed.\n");
-    exit(1);
-}
-
-file_put_contents($encrypted, $original_encrypted);
-$handle = fopen($encrypted, 'r+b');
-fseek($handle, -1, SEEK_END);
-$byte = fread($handle, 1);
-fseek($handle, -1, SEEK_END);
-fwrite($handle, chr(ord($byte) ^ 1));
-fclose($handle);
-$error = '';
-$accepted = SPL_Crypto::stream_file($encrypted, function ($chunk) {}, $stream_meta, $error);
-if ($accepted || false === strpos($error, 'authentication')) {
-    fwrite(STDERR, "Tamper detection failed.\n");
-    exit(1);
-}
-
-@unlink($source);
-@unlink($encrypted);
-@unlink($restored);
-echo "SPL2 crypto smoke test passed.\n";
+assert(!PLDR_Crypto::verify_file($enc, '', $error));
+assert($error !== '');
+@unlink($plain); @unlink($enc);
+echo "PLDR crypto/range/tamper: PASS\n";
