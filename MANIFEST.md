@@ -1,42 +1,25 @@
-# Manifest
+# File 12 Candidate Manifest
 
-## Corrective source package
+Candidate: `1.0.0-rc.1`
 
-- Corrective plugin version: `0.2.0`
-- Top-level plugin directory: `pdf-library/`
-- Plugin source files: 14
-- PHP files: 11
-- JavaScript files: 1
-- CSS files: 1
-- Plugin documentation files: 1
-- Standalone QA tests: 1
+Canonical plugin directory: `pdf-library-foundation-12/`
 
-## Current source tree
+Major components:
 
-| Path | Bytes |
-|---|---:|
-| `pdf-library/assets/library.css` | 3,610 |
-| `pdf-library/assets/library.js` | 2,219 |
-| `pdf-library/includes/class-spl-activator.php` | 9,798 |
-| `pdf-library/includes/class-spl-admin.php` | 11,185 |
-| `pdf-library/includes/class-spl-crypto.php` | 12,726 |
-| `pdf-library/includes/class-spl-frontend.php` | 31,173 |
-| `pdf-library/includes/class-spl-helpers.php` | 9,579 |
-| `pdf-library/includes/class-spl-interactions.php` | 8,532 |
-| `pdf-library/includes/class-spl-plugin.php` | 1,562 |
-| `pdf-library/includes/class-spl-privacy.php` | 4,655 |
-| `pdf-library/includes/class-spl-seo.php` | 1,848 |
-| `pdf-library/pdf-library.php` | 1,371 |
-| `pdf-library/readme.txt` | 1,751 |
-| `pdf-library/uninstall.php` | 125 |
+- `class-pldr-core.php` — canonical types/categories, authorization, DTOs, audit, idempotency, events.
+- `class-pldr-schema.php` — normalized schema, migrations, cron, legacy migration.
+- `class-pldr-storage.php` — private storage, atomic object paths and cleanup.
+- `class-pldr-crypto.php` — PLD3 chunked AES-256-GCM plus SPL2 migration reader and authenticated ranges.
+- `class-pldr-ingest.php` — validation, scanner gate, encryption, dedupe, derivatives/OCR.
+- `class-pldr-access.php` — policy evaluation, short-lived bound grants, Range delivery and revocation.
+- `class-pldr-reader.php` — catalog, reader, private reading state, citations and search.
+- `class-pldr-rights.php` — rights cases, takedown/appeal, Book Content Packs, outbox integrations.
+- `class-pldr-rest.php` — versioned command/query API.
+- `class-pldr-admin.php` — health, integrity, safe repair and admin workflows.
+- `class-pldr-privacy.php` — privacy exporter/eraser and legal-hold boundary.
+- `assets/reader.js` — reader behavior and resumable Range download manager.
+- `assets/reader.css` — responsive, accessible, RTL-aware presentation.
+- `tests/` — cryptographic/tamper/range and plan-contract checks.
+- `docs/` — traceability and staging acceptance boundary.
 
-Total corrective plugin-source bytes: 100,134.
-
-## Original supplied archive
-
-- Archive: `12-pdf-library-and-digital-reading-foundation-0.1.0.zip`
-- Original archive size: 17,705 bytes
-- Original archive SHA-256: `5f9f9b16e714365fc4eb4a49b40d1eec8a895cf1045747ad4dfae7fc1cb6856d`
-- Original extracted source files: 13
-
-The original archive is a provenance artifact. The corrective 0.2.0 source intentionally differs and is identified by `CHECKSUMS.sha256`.
+Large PDF/book binaries are intentionally **not** embedded in GitHub or the plugin package.
