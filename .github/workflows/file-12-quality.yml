@@ -1,0 +1,62 @@
+name: File 12 New-Plan Quality Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  php-quality:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: PHP syntax
+        run: find pdf-library-foundation-12 tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Authenticated crypto/range/tamper test
+        run: php -d zend.assertions=1 -d assert.exception=1 tests/test-crypto.php
+      - name: New-plan contract scan
+        run: php tests/test-plan-contract.php
+      - name: Secret scan
+        run: php tests/test-no-secrets.php
+      - name: Independent review regressions
+        run: php tests/test-review-regressions.php
+
+  frontend-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: node --check pdf-library-foundation-12/assets/reader.js
+      - name: Verify committed checksums
+        run: sha256sum --check CHECKSUMS.sha256
+      - name: Build deterministic install ZIP
+        run: |
+          rm -rf build dist
+          mkdir -p build dist
+          cp -a pdf-library-foundation-12 build/
+          find build/pdf-library-foundation-12 -exec touch -t 202601010000 {} +
+          (cd build && find pdf-library-foundation-12 -type f -print | LC_ALL=C sort | zip -X -q ../dist/12-pdf-library-and-digital-reading-1.0.0-rc.1.zip -@)
+          sha256sum dist/12-pdf-library-and-digital-reading-1.0.0-rc.1.zip | tee dist/SHA256SUMS
+          unzip -t dist/12-pdf-library-and-digital-reading-1.0.0-rc.1.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: file-12-pdf-library-1.0.0-rc.1
+          path: dist/
+          if-no-files-found: error

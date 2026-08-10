@@ -1,45 +1,24 @@
-# PDF Library and Digital Reading Foundation
+# File 12 — PDF Library and Digital Reading
 
-File 12 of the **Sabri Social Homeopathy Platform**.
+This branch contains the **new-plan implementation candidate** for Sabri Social Homeopathy Platform File 12. It supersedes the earlier 0.2.0 corrective candidate as the forward source candidate while preserving the earlier Git history and provenance.
 
-This repository preserves the original source baseline for **PDF Library and Digital Reading Foundation 0.1.0**. The WordPress plugin provides the first-stage PDF library and digital reading foundation, including encrypted document storage, searchable discovery, controlled inline reading, optional downloads, private reading progress, page bookmarks, notes, reactions, comments, reports, privacy callbacks, structured data, and moderation workflows.
+## Candidate identity
 
-## Repository layout
+- Software: `1.0.0-rc.1`
+- Database schema: `1.0.0`
+- Contract: `1.0.0`
+- Canonical install folder: `pdf-library-foundation-12/`
+- WordPress slug/text domain: `pdf-library-digital-reading`
+- PHP namespace prefix: `PLDR_`
 
-- `pdf-library/` — original installable WordPress plugin source.
-- `SOURCE-PROVENANCE.md` — source origin and integrity record.
-- `MANIFEST.md` — package inventory.
-- `CHECKSUMS.sha256` — SHA-256 integrity checksums for the preserved source.
-- `STATUS.md` — current verification and release status.
+## Implemented plan scope
 
-## Requirements
+The candidate implements the File 12 catalog and bibliographic domain, private encrypted objects, governed ingest, malware/OCR adapter gates, edition/hash dedupe, audience/access policy, short-lived bound delivery grants, authenticated HTTP Range delivery, a responsive accessible reader, progress/bookmarks/private notes/highlight notes, citations, lawful OCR search, rights/takedown/appeal lifecycle, preservation/integrity checks, versioned Book Content Packs, reliable outbox integration, privacy export/erasure, safe repair, legacy File 12 migration, and the rights-aware download manager.
 
-- WordPress 6.0 or later.
-- PHP 7.4 or later.
-- Companion Files 02, 03, 04, 07, 09, and 10 should remain active, as stated by the original package documentation.
+The implementation consumes File 00 identity/entitlement authority and integrates through versioned hooks with Files 01, 05, 06, 16, 19, 20, 21 and 25 without creating parallel ownership.
 
-## Baseline verification
+## Truthful release boundary
 
-The imported package has passed:
+This repository candidate is **not automatically a live-site claim**. Production completion requires Hostinger staging evidence for fresh install and supported upgrade/migration, real key backup/restore/decrypt, an actual malware scanner, storage placement, large-file/range/weak-connection behavior, roles/IDOR/privacy/rights workflows, companion integrations, responsive/RTL/accessibility/browser checks, deterministic package verification, backup/rollback rehearsal, Founder acceptance, deployment, and live re-test.
 
-- ZIP integrity and path-safety inspection before extraction.
-- PHP syntax validation for all PHP files under PHP 8.4.16.
-- JavaScript syntax validation with Node.js.
-- Suspicious executable-pattern scan for common high-risk PHP constructs.
-- SHA-256 generation for the original ZIP and every source file.
-
-These checks establish archive and source integrity only. WordPress activation, database migration, permissions, encryption-key deployment, browser behavior, integration, upgrade, rollback, and staging acceptance remain separate release gates.
-
-## Installation
-
-Create an installable ZIP whose top-level directory is `pdf-library/`, upload it through the WordPress plugin installer, activate it on staging, and test both an online-reading-only PDF and a downloadable PDF before public release.
-
-## Original package checksum
-
-`12-pdf-library-and-digital-reading-foundation-0.1.0.zip`
-
-SHA-256: `5f9f9b16e714365fc4eb4a49b40d1eec8a895cf1045747ad4dfae7fc1cb6856d`
-
-## License
-
-GPL-2.0-or-later, as declared by the plugin header and original readme.
+See `docs/STAGING-ACCEPTANCE.md` and `STATUS.md`.

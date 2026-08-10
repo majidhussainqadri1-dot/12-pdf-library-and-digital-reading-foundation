@@ -1,32 +1,30 @@
-# Status
+# File 12 Status — 1.0.0-rc.1
 
-## Current state
+| Gate | Status |
+|---|---|
+| New central + File 12 plan reconciliation | Complete in candidate scope |
+| Coded | **Candidate complete** |
+| Deterministic package | **GitHub Actions build + ZIP integrity gate green** |
+| Static / automated QA | **GitHub Actions green on the exact candidate HEAD after each source/status change** |
+| PHP compatibility QA | **PHP 8.1 / 8.3 / 8.4 green** |
+| Cryptographic range/tamper QA | **Green** |
+| New-plan contract + secret scan | **Green** |
+| Independent Review/Fix Round 1 | Completed; defects corrected |
+| Independent Review/Fix Round 2 | Completed; defects corrected |
+| Hostinger staging | **Pending** |
+| Live deployed | **Not claimed** |
+| Operational | **Not claimed** |
 
-**Baseline import prepared — review required before merge.**
+## External/runtime acceptance dependencies
 
-The original File 12 source is preserved without functional modification. The supplied ZIP package is identified by its recorded SHA-256 checksum.
+The code deliberately fails or degrades safely when required runtime evidence/providers are absent. In particular, public publication requires a **clean malware scan result**; OCR and thumbnails truthfully expose provider-degraded states; encrypted storage/key health is checked; and staging must prove backup/key recovery rather than infer it from configuration.
 
-## Completed verification
+The CI artifact is named `file-12-pdf-library-1.0.0-rc.1`; its artifact identifier/digest are runtime evidence produced by the corresponding GitHub Actions run and therefore are not frozen into this source-status file.
 
-- Original ZIP SHA-256 recorded.
-- ZIP archive opens successfully.
-- No absolute-path or parent-directory traversal entries detected.
-- 13 source files extracted.
-- 10 PHP files passed `php -l` under PHP 8.4.16.
-- 1 JavaScript file passed `node --check`.
-- Common high-risk PHP execution patterns were not detected by the baseline scan.
-- Per-file SHA-256 checksums generated.
+## Legacy continuity
 
-## Not yet established
+The candidate can read prior `SPL2` encrypted objects, migrates legacy documents in bounded batches, computes authenticated plaintext checksums where keys are available, migrates progress/bookmarks/private notes and legacy reports, leaves historical source data intact, and emits a canonical interaction-migration request for legacy save/reaction/comment reconciliation rather than silently duplicating interaction ownership.
 
-- Fresh WordPress staging installation.
-- Plugin activation without warnings or fatal errors.
-- Database/table creation and migration behavior.
-- AES-256-GCM key configuration and recovery procedure.
-- Upload, encryption, reader, download-control, progress, notes, reactions, reports, and privacy workflows.
-- Role and capability enforcement across Founder, verified doctor, reviewer, and public user states.
-- Integration with Files 02, 03, 04, 07, 09, and 10.
-- Upgrade, deactivation, uninstall, backup restore, and rollback acceptance.
-- Responsive, accessibility, cross-browser, caching, and production-host testing.
+## Production-truth boundary
 
-No production-completion claim should be made until these remaining gates pass on staging and are formally accepted.
+This status does **not** convert repository evidence into Hostinger truth. Fresh install/upgrade/migration, private storage and key recovery, real provider configuration, real-role/browser/accessibility/RTL workflows, backup/restore/rollback, Founder acceptance, production deployment and live re-test/parity remain separate gates.
