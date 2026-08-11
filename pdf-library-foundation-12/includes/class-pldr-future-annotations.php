@@ -31,7 +31,7 @@ final class PLDR_Future_Annotations {
             if(!is_array($annotation)){$rejected++;continue;}
             $target=(array)($annotation['target']??array());
             $source=isset($target['source'])?esc_url_raw((string)$target['source']):'';
-            if(''!==$source&&untrailingslashit($source)!==untrailingslashit($canonical)){$rejected++;continue;}
+            if(''===$source||untrailingslashit($source)!==untrailingslashit($canonical)){$rejected++;continue;}
             $selectors=(array)($target['selector']??array());$page_no=0;$anchor='';
             foreach(array_slice($selectors,0,8) as $selector){
                 if(!is_array($selector))continue;
@@ -43,11 +43,12 @@ final class PLDR_Future_Annotations {
                 }
             }
             if($page_no<1||$page_no>(int)$edition['pages']){$rejected++;continue;}
-            $body=self::limit(sanitize_textarea_field((string)($annotation['body']['value']??'')),4000);
+            $body_node=$annotation['body']??array();
+            $body=is_array($body_node)?self::limit(sanitize_textarea_field((string)($body_node['value']??'')),4000):'';
             $result=PLDR_Reading::add_item($edition_id,array('type'=>'highlight','page'=>$page_no,'anchor'=>$anchor,'note'=>$body,'tags'=>array('w3c-import')),get_current_user_id());
             if(is_wp_error($result))$rejected++;else$imported++;
         }
-        return array('imported'=>$imported,'rejected'=>$rejected,'private'=>true,'edition_bound'=>true,'input_limit'=>500);
+        return array('imported'=>$imported,'rejected'=>$rejected,'private'=>true,'edition_bound'=>true,'source_required'=>true,'input_limit'=>500);
     }
 
     private static function selector(array $selector):array {
