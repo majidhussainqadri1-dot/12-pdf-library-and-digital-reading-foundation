@@ -6,30 +6,38 @@ final class PLDR_Future_Shelves {
     private const CUSTOM_SHELF_LIMIT = 100;
     private const LIST_LIMIT = 120;
 
-    public static function ensure_defaults(int $uid):void {
+    public static function ensure_defaults(int $uid) {
         global $wpdb;
         foreach(array('reading'=>'Reading now','later'=>'Read later','complete'=>'Completed','reference'=>'Important reference') as $type=>$name){
+            $wpdb->last_error='';
             $exists=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d AND shelf_type=%s LIMIT 1',$uid,$type));
+            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_default_read','Default shelf state could not be read reliably.',503,array('degraded'=>true,'shelf_type'=>$type));
             if($exists)continue;
             $key=self::default_key($uid,$type);
             $inserted=$wpdb->insert(PLDR_Core::table('shelves'),array('shelf_key'=>$key,'user_id'=>$uid,'name'=>$name,'shelf_type'=>$type,'sort_order'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
             if(false===$inserted){
+                $wpdb->last_error='';
                 $race=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d AND shelf_type=%s LIMIT 1',$uid,$type));
-                if(!$race)PLDR_Core::audit('user',$uid,'future_shelf_default_failed',array('shelf_type'=>$type,'db_error'=>(string)$wpdb->last_error));
+                if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_default_recheck','Default shelf state could not be rechecked after a concurrent/store failure.',503,array('degraded'=>true,'shelf_type'=>$type));
+                if(!$race){PLDR_Core::audit('user',$uid,'future_shelf_default_failed',array('shelf_type'=>$type));return PLDR_Core::machine_error('pldr_shelf_default_store','Default shelf could not be stored.',500,array('shelf_type'=>$type));}
             }
         }
+        return true;
     }
 
     public static function list():array {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return array();
-        self::ensure_defaults($uid);
+        $defaults=self::ensure_defaults($uid);if(is_wp_error($defaults))return array('error'=>$defaults);
         $shelves=PLDR_Core::table('shelves');$items=PLDR_Core::table('shelf_items');
+        $wpdb->last_error='';
         $rows=$wpdb->get_results($wpdb->prepare(
             "SELECT s.*,COUNT(i.id) item_count FROM {$shelves} s LEFT JOIN {$items} i ON i.shelf_id=s.id WHERE s.user_id=%d GROUP BY s.id ORDER BY s.sort_order ASC,s.id ASC LIMIT %d",
             $uid,self::LIST_LIMIT
-        ),ARRAY_A)?:array();
+        ),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_shelf_list_read','Private shelves could not be read reliably.',503,array('degraded'=>true)));
+        $rows=is_array($rows)?$rows:array();
         foreach($rows as &$row){$row['id']=(int)$row['id'];$row['version']=(int)$row['version'];$row['count']=(int)($row['item_count']??0);unset($row['item_count']);}
         unset($row);
         return $rows;
@@ -45,7 +53,9 @@ final class PLDR_Future_Shelves {
         $locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,2)',$lock));
         if(1!==$locked)return array('error'=>PLDR_Core::machine_error('pldr_shelf_limit_lock','Private shelf capacity is temporarily busy; retry shortly.',503,array('retry_after'=>2)));
         try{
+            $wpdb->last_error='';
             $custom_count=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d AND shelf_type=%s',$uid,'custom'));
+            if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_shelf_limit_read','Private shelf capacity could not be verified; no shelf was created.',503,array('degraded'=>true)));
             if($custom_count>=self::CUSTOM_SHELF_LIMIT)return array('error'=>PLDR_Core::machine_error('pldr_shelf_limit','The private custom-shelf limit has been reached.',409,array('limit'=>self::CUSTOM_SHELF_LIMIT)));
             $key=PLDR_Core::uuid();
             $inserted=$wpdb->insert(PLDR_Core::table('shelves'),array('shelf_key'=>$key,'user_id'=>$uid,'name'=>$name,'shelf_type'=>'custom','sort_order'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
@@ -58,7 +68,8 @@ final class PLDR_Future_Shelves {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
-        $shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        $wpdb->last_error='';$shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true));
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
         $edition=PLDR_Future_Data::require_edition($edition_id);
         if(is_wp_error($edition))return $edition;
@@ -71,7 +82,8 @@ final class PLDR_Future_Shelves {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
-        $shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        $wpdb->last_error='';$shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true));
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
         if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be renamed.',409);
         $name=self::name($name);
@@ -87,7 +99,8 @@ final class PLDR_Future_Shelves {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
-        $shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        $wpdb->last_error='';$shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true));
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
         if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be deleted.',409);
         if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_shelf_transaction','Shelf deletion transaction could not start.',500);
@@ -103,9 +116,11 @@ final class PLDR_Future_Shelves {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
-        $shelf=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        $wpdb->last_error='';$shelf=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true));
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
-        $exists=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d AND edition_id=%d',$shelf_id,$edition_id));
+        $wpdb->last_error='';$exists=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d AND edition_id=%d',$shelf_id,$edition_id));
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_item_read','Shelf membership state could not be read reliably.',503,array('degraded'=>true));
         if(!$exists)return PLDR_Core::machine_error('pldr_shelf_item_missing','Shelf item was not found.',404);
         $deleted=$wpdb->delete(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id));
         if(1!==$deleted)return PLDR_Core::machine_error('pldr_shelf_item_delete','Shelf item could not be removed.',500);
