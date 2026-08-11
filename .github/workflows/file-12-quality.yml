@@ -46,6 +46,8 @@ jobs:
         run: php tests/test-ten-round-review-r7.php
       - name: Eighth fresh ten-round corrective-review regressions
         run: php tests/test-ten-round-review-r8.php
+      - name: Ninth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r9.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
@@ -71,7 +73,7 @@ jobs:
         run: |
           rm -rf build dist
           mkdir -p build dist
-          LC_ALL=C find pdf-library-foundation-12 -type f -print0 | sort -z | xargs -0 sha256sum > dist/SOURCE-SHA256SUMS
+          LC_ALL=C find pdf-library-foundation-12 -type f -print0 | sort -z | xargs -0 -n1 sha256sum > dist/SOURCE-SHA256SUMS
           cp -a pdf-library-foundation-12 build/
           find build/pdf-library-foundation-12 -exec touch -t 202601010000 {} +
           (cd build && find pdf-library-foundation-12 -type f -print | LC_ALL=C sort | zip -X -q ../dist/12-pdf-library-and-digital-reading-1.1.0-rc.1.zip -@)
