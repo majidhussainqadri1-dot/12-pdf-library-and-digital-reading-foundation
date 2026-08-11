@@ -12,16 +12,26 @@ final class PLDR_Future_A11y {
         $document_id=(int)$edition['document_id'];
         $can_refresh=PLDR_Core::authorize('manage',$document_id)||PLDR_Core::authorize('rights',$document_id);
         if($refresh&&!$can_refresh)return array('error'=>PLDR_Core::machine_error('pldr_a11y_refresh_forbidden','Refreshing this accessibility audit requires review authority for the document.',403));
-        if(!$refresh){$row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('a11y_audits').' WHERE edition_id=%d',$edition_id),ARRAY_A);if($row)return self::dto($row);}
+        if(!$refresh){
+            $wpdb->last_error='';
+            $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('a11y_audits').' WHERE edition_id=%d',$edition_id),ARRAY_A);
+            if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_a11y_read','Stored accessibility state could not be read reliably.',503,array('degraded'=>true)));
+            if($row)return self::dto($row);
+        }
 
-        $ocr_stats=$wpdb->get_row($wpdb->prepare('SELECT COUNT(*) page_count,AVG(quality_score) avg_quality FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id),ARRAY_A)?:array();
+        $wpdb->last_error='';
+        $ocr_stats=$wpdb->get_row($wpdb->prepare('SELECT COUNT(*) page_count,AVG(quality_score) avg_quality FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_a11y_ocr_read','Accessibility OCR evidence could not be read reliably; no score was projected.',503,array('degraded'=>true)));
+        $ocr_stats=is_array($ocr_stats)?$ocr_stats:array();
         $ocr_pages=(int)($ocr_stats['page_count']??0);
         $ocr_avg=(float)($ocr_stats['avg_quality']??0);
         $findings=array();$score=30;
         if(!empty($edition['title']))$score+=10;else$findings[]='Document title metadata is missing.';
         if(!empty($edition['language']))$score+=10;else$findings[]='Document language metadata is missing.';
         if($ocr_pages>0)$score+=min(25,$ocr_avg/4);else$findings[]='No lawful OCR text is available for accessible text fallback.';
+        $wpdb->last_error='';
         $thumbs=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s',$edition_id,'thumbnail','available'));
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_a11y_derivative_read','Accessibility derivative evidence could not be read reliably; no score was projected.',503,array('degraded'=>true)));
         if($thumbs>0)$score+=5;else$findings[]='Page preview derivatives are unavailable.';
         $provider='heuristic';$provider_failure=false;$provider_input_total=0;
         if($can_refresh){
@@ -53,7 +63,9 @@ final class PLDR_Future_A11y {
         $note=self::limit(sanitize_textarea_field($note),2000);
         $report=self::inspect($edition_id,true);if(isset($report['error']))return $report['error'];
         if((float)$report['score']<75)return PLDR_Core::machine_error('pldr_a11y_verify_score','Accessibility status is below the verification threshold.',409);
+        $wpdb->last_error='';
         $row=$wpdb->get_row($wpdb->prepare('SELECT score,status,findings_json,provider,verified_by,updated_at FROM '.PLDR_Core::table('a11y_audits').' WHERE edition_id=%d',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_a11y_verify_read','Fresh accessibility evidence could not be re-read for verification.',503,array('degraded'=>true));
         if(!$row)return PLDR_Core::machine_error('pldr_a11y_verify_store','Fresh accessibility assessment disappeared before verification.',409);
         $verified_at=PLDR_Core::now();
         $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('a11y_audits').' SET verified_by=%d,verified_at=%s,updated_at=%s WHERE edition_id=%d AND verified_by=0 AND score=%f AND status=%s AND findings_json=%s AND provider=%s AND updated_at=%s',get_current_user_id(),$verified_at,$verified_at,$edition_id,(float)$row['score'],(string)$row['status'],(string)$row['findings_json'],(string)$row['provider'],(string)$row['updated_at']));
