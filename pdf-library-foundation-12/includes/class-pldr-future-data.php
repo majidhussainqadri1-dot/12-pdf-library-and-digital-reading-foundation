@@ -170,7 +170,13 @@ final class PLDR_Future_Data {
             return array('error'=>PLDR_Core::machine_error('pldr_compare_left_read','Left-edition OCR comparison evidence could not be read reliably; no partial comparison was returned.',503,array('degraded'=>true)));
         }
         $pa = array_column($left_pages, null, 'page_number');
-        $pb = array_column(self::ocr_pages($right,0,1000,0), null, 'page_number');
+        $wpdb->last_error='';
+        $right_pages=self::ocr_pages($right,0,1000,0);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$right,'edition_compare_right_read_failed',array('left'=>$left,'limit'=>1000));
+            return array('error'=>PLDR_Core::machine_error('pldr_compare_right_read','Right-edition OCR comparison evidence could not be read reliably; no partial comparison was returned.',503,array('degraded'=>true)));
+        }
+        $pb = array_column($right_pages, null, 'page_number');
         $declared_max=max((int)($a['pages']??0),(int)($b['pages']??0));
         $candidate_max=min(1000,max($declared_max,count($pa),count($pb)));
         $changed = array(); $same = 0; $missing = 0; $processed=0; $result_capped=false;
