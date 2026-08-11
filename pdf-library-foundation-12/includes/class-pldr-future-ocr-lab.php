@@ -41,14 +41,20 @@ final class PLDR_Future_OCR_Lab {
         if (!is_user_logged_in()) return PLDR_Core::machine_error('pldr_ocr_correction_login', 'Log in to submit an OCR correction.', 401);
         $edition = PLDR_Future_Data::require_edition($edition_id);
         if (is_wp_error($edition)) return $edition;
+        $uid=get_current_user_id();
+        $hourly_limit=(int)apply_filters('pldr_ocr_correction_hourly_limit',100,$uid,$edition_id);
+        $hourly_limit=max(10,min(500,$hourly_limit));
+        $since=gmdate('Y-m-d H:i:s',time()-HOUR_IN_SECONDS);
+        $recent=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_corrections').' WHERE submitted_by=%d AND created_at>=%s',$uid,$since));
+        if($recent>=$hourly_limit)return PLDR_Core::machine_error('pldr_ocr_correction_rate','OCR correction submission limit reached. Retry after the current hourly window.',429,array('retry_after'=>3600,'hourly_limit'=>$hourly_limit));
         $original = self::limit(sanitize_textarea_field($original),4000); $corrected = self::limit(sanitize_textarea_field($corrected),4000);
         if ($page < 1 || $page > (int) $edition['pages'] || '' === trim($original) || '' === trim($corrected)) return PLDR_Core::machine_error('pldr_ocr_correction_input', 'A valid page, original OCR excerpt and corrected text are required.', 400);
         $source = (string) $wpdb->get_var($wpdb->prepare('SELECT text_content FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d AND page_number=%d', $edition_id, $page));
         if ('' === $source || false === strpos($source, $original)) return PLDR_Core::machine_error('pldr_ocr_correction_stale', 'The submitted original excerpt does not match the current OCR source layer.', 409);
-        $stored=$wpdb->insert(PLDR_Core::table('ocr_corrections'), array('edition_id'=>$edition_id,'page_number'=>$page,'original_text'=>$original,'corrected_text'=>$corrected,'status'=>'pending','submitted_by'=>get_current_user_id(),'reviewed_by'=>0,'review_note'=>'','version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+        $stored=$wpdb->insert(PLDR_Core::table('ocr_corrections'), array('edition_id'=>$edition_id,'page_number'=>$page,'original_text'=>$original,'corrected_text'=>$corrected,'status'=>'pending','submitted_by'=>$uid,'reviewed_by'=>0,'review_note'=>'','version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
         if(false===$stored||!(int)$wpdb->insert_id)return PLDR_Core::machine_error('pldr_ocr_correction_store','OCR correction could not be stored.',500);
         $id=(int)$wpdb->insert_id; PLDR_Core::audit('ocr_correction',$id,'submitted',array('edition_id'=>$edition_id,'page'=>$page));
-        return array('id'=>$id,'status'=>'pending','original_scan_immutable'=>true);
+        return array('id'=>$id,'status'=>'pending','original_scan_immutable'=>true,'rate_limit'=>array('hourly'=>$hourly_limit));
     }
 
     public static function review(int $correction_id, string $decision, string $note) {
@@ -58,15 +64,16 @@ final class PLDR_Future_OCR_Lab {
         if (''===trim($note)) return PLDR_Core::machine_error('pldr_ocr_review_input','A decision and review note are required.',400);
         $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('ocr_corrections').' WHERE id=%d',$correction_id),ARRAY_A);
         if(!$row)return PLDR_Core::machine_error('pldr_ocr_correction_missing','OCR correction not found.',404);
+        if('pending'!==$row['status'])return PLDR_Core::machine_error('pldr_ocr_review_final','This OCR correction already has a final reviewer decision.',409,array('status'=>$row['status']));
         $edition=PLDR_Core::edition((int)$row['edition_id']);
         if(!$edition)return PLDR_Core::machine_error('pldr_ocr_review_edition','OCR correction edition is unavailable.',404);
         $document_id=(int)$edition['document_id'];
         if (!PLDR_Core::authorize('manage',$document_id) && !PLDR_Core::authorize('rights',$document_id)) return PLDR_Core::machine_error('pldr_ocr_review_forbidden', 'OCR correction review authority is required for this document.', 403);
         if('approved'===$decision){$source=(string)$wpdb->get_var($wpdb->prepare('SELECT text_content FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d AND page_number=%d',(int)$row['edition_id'],(int)$row['page_number']));if(''===$source||false===strpos($source,(string)$row['original_text']))return PLDR_Core::machine_error('pldr_ocr_review_stale','The base OCR source changed or no longer contains the submitted excerpt; re-submit the correction against current OCR.',409);}
-        $updated=$wpdb->update(PLDR_Core::table('ocr_corrections'),array('status'=>$decision,'reviewed_by'=>get_current_user_id(),'review_note'=>$note,'version'=>(int)$row['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$correction_id,'version'=>(int)$row['version']));
+        $updated=$wpdb->update(PLDR_Core::table('ocr_corrections'),array('status'=>$decision,'reviewed_by'=>get_current_user_id(),'review_note'=>$note,'version'=>(int)$row['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$correction_id,'version'=>(int)$row['version'],'status'=>'pending'));
         if(1!==$updated)return PLDR_Core::machine_error('pldr_ocr_review_conflict','OCR correction changed concurrently; refresh before reviewing.',409);
         PLDR_Core::audit('ocr_correction',$correction_id,'reviewed',array('decision'=>$decision,'document_id'=>$document_id));
-        return array('id'=>$correction_id,'status'=>$decision,'original_scan_immutable'=>true,'base_ocr_immutable'=>true,'derived_correction_layer'=>true);
+        return array('id'=>$correction_id,'status'=>$decision,'decision_final'=>true,'original_scan_immutable'=>true,'base_ocr_immutable'=>true,'derived_correction_layer'=>true);
     }
     private static function limit(string $value,int $length):string { return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length); }
 }
