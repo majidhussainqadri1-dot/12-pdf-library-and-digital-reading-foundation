@@ -9,24 +9,31 @@ final class PLDR_Future_Rooms {
         if(!$uid)return PLDR_Core::machine_error('pldr_room_login','Log in to create a scholarly reading room.',401);
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return $edition;
         $doc=PLDR_Core::document((int)$edition['document_id']);
-        if($doc && 'patient-cases'===$doc['category'] && !apply_filters('pldr_patient_case_reading_room_allowed',false,$edition_id,$doc))return PLDR_Core::machine_error('pldr_room_patient_case','Patient-case documents require separate privacy approval before a reading room can be created.',403);
+        if($doc && 'patient-cases'===$doc['category']){
+            try{$patient_case_allowed=(bool)apply_filters('pldr_patient_case_reading_room_allowed',false,$edition_id,$doc);}
+            catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'reading_room_patient_policy_provider_failed',array('provider_failure'=>1),$uid);return PLDR_Core::machine_error('pldr_room_policy_provider','Reading-room patient-case policy could not be verified; room creation was denied.',503,array('degraded'=>true,'provider_failure'=>true));}
+            if(!$patient_case_allowed)return PLDR_Core::machine_error('pldr_room_patient_case','Patient-case documents require separate privacy approval before a reading room can be created.',403);
+        }
         $page=max(1,min((int)$edition['pages'],$page));
         $anchor=self::anchor($anchor,$page);
         if(is_wp_error($anchor))return $anchor;
-        if(!self::anchor_belongs($edition_id,$page,$anchor,$edition))return PLDR_Core::machine_error('pldr_room_anchor_source','Reading-room text anchors must match the requested document page.',403);
+        $anchor_match=self::anchor_belongs($edition_id,$page,$anchor,$edition);
+        if(is_wp_error($anchor_match))return $anchor_match;
+        if(!$anchor_match)return PLDR_Core::machine_error('pldr_room_anchor_source','Reading-room text anchors must match the requested document page.',403);
         $encoded=wp_json_encode($anchor,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         if(false===$encoded||strlen($encoded)>1800)return PLDR_Core::machine_error('pldr_room_anchor','Reading-room anchor is too large.',400);
         $room_key=PLDR_Core::uuid();
         $now=PLDR_Core::now();
         $stored=$wpdb->insert(PLDR_Core::table('room_contexts'),array('room_key'=>$room_key,'edition_id'=>$edition_id,'created_by'=>$uid,'page_number'=>$page,'anchor_json'=>$encoded,'provider_ref'=>'','status'=>'pending-provider','created_at'=>$now,'updated_at'=>$now));
         if(false===$stored||!(int)$wpdb->insert_id)return PLDR_Core::machine_error('pldr_room_store','Reading-room context could not be stored.',500);
+        $context_id=(int)$wpdb->insert_id;
         $context=array('file'=>12,'room_key'=>$room_key,'edition_id'=>$edition_id,'document_id'=>$edition['public_id'],'page'=>$page,'anchor'=>$anchor,'source_url'=>add_query_arg('edition',$edition_id,PLDR_Core::route_url('read',array('id'=>$edition['public_id']))));
         try{
             $provider=apply_filters('pldr_create_reading_room_provider',null,$uid,$context);
         }catch(Throwable $e){
             $message=self::limit(sanitize_text_field($e->getMessage()),300);
             $wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'provider-error','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
-            PLDR_Core::audit('room_context',(int)$wpdb->insert_id,'provider_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'error'=>$message),$uid);
+            PLDR_Core::audit('room_context',$context_id,'provider_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'error'=>$message),$uid);
             return PLDR_Core::machine_error('pldr_room_provider','Reading-room provider failed; the local context remains for safe retry/reconciliation.',503,array('room_key'=>$room_key,'degraded'=>true));
         }
         $provider_ref=is_array($provider)?self::limit(sanitize_text_field((string)($provider['reference']??'')),190):'';
@@ -36,8 +43,10 @@ final class PLDR_Future_Rooms {
         }
         $updated=$wpdb->update(PLDR_Core::table('room_contexts'),array('provider_ref'=>$provider_ref,'status'=>'active','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid,'status'=>'pending-provider'));
         if(1!==$updated){
-            do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,'local-provider-reference-persistence-failed');
-            return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; provider compensation was requested and the local context requires reconciliation.',500,array('room_key'=>$room_key));
+            $compensation_failed=false;
+            try{do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,'local-provider-reference-persistence-failed');}
+            catch(Throwable $e){$compensation_failed=true;PLDR_Core::audit('room_context',$context_id,'provider_compensation_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_ref'=>$provider_ref),$uid);}
+            return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; provider compensation was requested and the local context requires reconciliation.',500,array('room_key'=>$room_key,'compensation_failed'=>$compensation_failed));
         }
         PLDR_Core::emit('PDFReadingRoomRequested.v1','edition',$edition_id,array('room_key'=>$room_key,'document_id'=>$edition['public_id'],'page'=>$page,'provider_ref'=>$provider_ref));
         return array('room_key'=>$room_key,'status'=>'active','provider_ref'=>$provider_ref,'source_bound'=>true,'selector_value_preserved'=>isset($anchor['value']),'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
@@ -58,7 +67,7 @@ final class PLDR_Future_Rooms {
         return $out;
     }
 
-    private static function anchor_belongs(int $edition_id,int $page,array $anchor,array $edition):bool {
+    private static function anchor_belongs(int $edition_id,int $page,array $anchor,array $edition) {
         $texts=array();
         foreach(array('exact','selection') as $key){if(!empty($anchor[$key]))$texts[]=PLDR_Core::normalize_search((string)$anchor[$key]);}
         $texts=array_values(array_filter($texts,static fn(string $value):bool=>''!==$value));
@@ -67,11 +76,16 @@ final class PLDR_Future_Rooms {
         if($rows){
             $haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));
             if(''!==$haystack){
-                foreach($texts as $needle){if(false===strpos($haystack,$needle))return (bool)apply_filters('pldr_reading_room_anchor_allowed',false,$edition_id,$page,$anchor,$edition);}
+                foreach($texts as $needle){if(false===strpos($haystack,$needle))return self::external_anchor_allowed($edition_id,$page,$anchor,$edition);}
                 return true;
             }
         }
-        return (bool)apply_filters('pldr_reading_room_anchor_allowed',false,$edition_id,$page,$anchor,$edition);
+        return self::external_anchor_allowed($edition_id,$page,$anchor,$edition);
+    }
+
+    private static function external_anchor_allowed(int $edition_id,int $page,array $anchor,array $edition) {
+        try{return (bool)apply_filters('pldr_reading_room_anchor_allowed',false,$edition_id,$page,$anchor,$edition);}
+        catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'reading_room_anchor_provider_failed',array('page'=>$page,'provider_failure'=>1));return PLDR_Core::machine_error('pldr_room_anchor_provider','Reading-room anchor validation is temporarily unavailable; the room was not created.',503,array('degraded'=>true,'provider_failure'=>true));}
     }
 
     private static function limit(string $value,int $length):string {return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length);}
