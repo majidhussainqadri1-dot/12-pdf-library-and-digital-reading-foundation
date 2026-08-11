@@ -8,7 +8,7 @@ final class PLDR_Future_Preservation {
 
     public static function assess(int $edition_id,bool $verify=false):array {
         global $wpdb;
-        $system=(function_exists('wp_doing_cron')&&wp_doing_cron())||doing_action('pldr_future_preservation_scan');
+        $system=function_exists('wp_doing_cron')&&wp_doing_cron()&&function_exists('doing_action')&&doing_action('pldr_future_preservation_scan');
         $edition=PLDR_Core::edition($edition_id);
         if(!$edition)return array('error'=>PLDR_Core::machine_error('pldr_preservation_edition','Edition not found.',404));
         $document_id=(int)$edition['document_id'];
