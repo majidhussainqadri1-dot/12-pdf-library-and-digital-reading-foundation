@@ -64,9 +64,15 @@ final class PLDR_Future_Derived_Text {
     }
 
     private static function selection_belongs(int $edition_id,int $page,string $text,array $edition) {
+        global $wpdb;
         $needle=PLDR_Core::normalize_search($text);
         if(''===$needle)return false;
+        $wpdb->last_error='';
         $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'derived_text_source_read_failed',array('page'=>$page));
+            return PLDR_Core::machine_error('pldr_derive_source_read','Derived-text source could not be read reliably; no external provider validation or processing was attempted.',503,array('degraded'=>true));
+        }
         if($rows){
             $haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));
             if(''!==$haystack&&false!==strpos($haystack,$needle))return true;
