@@ -5,6 +5,7 @@ defined('ABSPATH') || exit;
 final class PLDR_Future_Context {
     private const PROVIDER_INPUT_LIMIT = 100;
     private const RESULT_LIMIT = 20;
+    private const EXPECTED_OWNERS = array('File 05','File 06','File 16');
 
     public static function lookup(int $edition_id,string $selection,int $page=0):array {
         $edition=PLDR_Future_Data::require_edition($edition_id);
@@ -21,15 +22,17 @@ final class PLDR_Future_Context {
             return array('error'=>PLDR_Core::machine_error('pldr_context_provider','Knowledge-context provider failed; no companion data was invented or copied.',503,array('degraded'=>true,'provider_failure'=>true)));
         }
         if(!is_array($items))return array('error'=>PLDR_Core::machine_error('pldr_context_provider','Knowledge-context provider returned an invalid response.',502,array('degraded'=>true)));
-        $input_total=count($items);$safe=array();
+        $input_total=count($items);$safe=array();$provenance_rejected=0;
         foreach(array_slice(array_values($items),0,self::PROVIDER_INPUT_LIMIT) as $item){
             if(!is_array($item)||empty($item['url'])||empty($item['title']))continue;
+            $owner=self::limit(sanitize_text_field((string)($item['owner']??'')),80);
+            if(''===$owner||!in_array($owner,self::EXPECTED_OWNERS,true)||true!==($item['canonical']??false)){$provenance_rejected++;continue;}
             $url=esc_url_raw((string)$item['url']);
             if(''===$url)continue;
-            $safe[]=array('owner'=>self::limit(sanitize_text_field((string)($item['owner']??'companion')),80),'title'=>self::limit(sanitize_text_field((string)$item['title']),180),'url'=>$url,'summary'=>self::limit(sanitize_text_field((string)($item['summary']??'')),500),'canonical'=>true);
+            $safe[]=array('owner'=>$owner,'title'=>self::limit(sanitize_text_field((string)$item['title']),180),'url'=>$url,'summary'=>self::limit(sanitize_text_field((string)($item['summary']??'')),500),'canonical'=>true);
             if(count($safe)>=self::RESULT_LIMIT)break;
         }
-        return array('items'=>$safe,'selection'=>$selection,'copied_domain_data'=>false,'expected_owners'=>array('File 05','File 06','File 16'),'source_bound'=>true,'provider_input_total'=>$input_total,'provider_input_limit'=>self::PROVIDER_INPUT_LIMIT,'result_limit'=>self::RESULT_LIMIT,'truncated'=>$input_total>self::PROVIDER_INPUT_LIMIT||count($safe)>=self::RESULT_LIMIT);
+        return array('items'=>$safe,'selection'=>$selection,'copied_domain_data'=>false,'expected_owners'=>self::EXPECTED_OWNERS,'source_bound'=>true,'provider_input_total'=>$input_total,'provider_input_limit'=>self::PROVIDER_INPUT_LIMIT,'result_limit'=>self::RESULT_LIMIT,'provenance_rejected'=>$provenance_rejected,'truncated'=>$input_total>self::PROVIDER_INPUT_LIMIT||count($safe)>=self::RESULT_LIMIT);
     }
 
     private static function selection_belongs(int $edition_id,int $page,string $selection,array $edition):bool {
