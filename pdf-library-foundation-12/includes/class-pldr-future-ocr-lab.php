@@ -3,6 +3,9 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Future_OCR_Lab {
+    private const CORRECTION_LIMIT = 500;
+    private const HEATMAP_LIMIT = 2000;
+
     public static function report(int $edition_id): array {
         global $wpdb;
         $edition = PLDR_Future_Data::require_edition($edition_id);
@@ -10,13 +13,27 @@ final class PLDR_Future_OCR_Lab {
         $document_id = (int) $edition['document_id'];
         $can_review = PLDR_Core::authorize('manage', $document_id) || PLDR_Core::authorize('rights', $document_id);
         $row = $wpdb->get_row($wpdb->prepare('SELECT COUNT(*) pages,AVG(quality_score) avg_quality,MIN(quality_score) min_quality,MAX(quality_score) max_quality FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d', $edition_id), ARRAY_A) ?: array();
+        $correction_total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_corrections').' WHERE edition_id=%d',$edition_id));
         if ($can_review) {
-            $corrections = $wpdb->get_results($wpdb->prepare('SELECT id,page_number,status,original_text,corrected_text,review_note,submitted_by,reviewed_by,version,updated_at FROM ' . PLDR_Core::table('ocr_corrections') . ' WHERE edition_id=%d ORDER BY page_number ASC,id ASC LIMIT 500', $edition_id), ARRAY_A) ?: array();
+            $corrections = $wpdb->get_results($wpdb->prepare('SELECT id,page_number,status,original_text,corrected_text,review_note,submitted_by,reviewed_by,version,updated_at FROM ' . PLDR_Core::table('ocr_corrections') . ' WHERE edition_id=%d ORDER BY page_number ASC,id ASC LIMIT %d', $edition_id,self::CORRECTION_LIMIT), ARRAY_A) ?: array();
         } else {
-            $corrections = $wpdb->get_results($wpdb->prepare('SELECT id,page_number,status,original_text,corrected_text,updated_at FROM ' . PLDR_Core::table('ocr_corrections') . ' WHERE edition_id=%d ORDER BY page_number ASC,id ASC LIMIT 500', $edition_id), ARRAY_A) ?: array();
+            $corrections = $wpdb->get_results($wpdb->prepare('SELECT id,page_number,status,original_text,corrected_text,updated_at FROM ' . PLDR_Core::table('ocr_corrections') . ' WHERE edition_id=%d ORDER BY page_number ASC,id ASC LIMIT %d', $edition_id,self::CORRECTION_LIMIT), ARRAY_A) ?: array();
         }
-        $heat = $wpdb->get_results($wpdb->prepare('SELECT page_number,quality_score FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d ORDER BY page_number ASC', $edition_id), ARRAY_A) ?: array();
-        return array('edition_id'=>$edition_id,'pages'=>(int)($row['pages']??0),'average_quality'=>round((float)($row['avg_quality']??0),2),'minimum_quality'=>(float)($row['min_quality']??0),'maximum_quality'=>(float)($row['max_quality']??0),'heatmap'=>$heat,'corrections'=>$corrections,'review_metadata_visible'=>$can_review,'original_scan_immutable'=>true);
+        $heat_total=(int)($row['pages']??0);
+        $heat = $wpdb->get_results($wpdb->prepare('SELECT page_number,quality_score FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d ORDER BY page_number ASC LIMIT %d', $edition_id,self::HEATMAP_LIMIT), ARRAY_A) ?: array();
+        return array(
+            'edition_id'=>$edition_id,
+            'pages'=>$heat_total,
+            'average_quality'=>round((float)($row['avg_quality']??0),2),
+            'minimum_quality'=>(float)($row['min_quality']??0),
+            'maximum_quality'=>(float)($row['max_quality']??0),
+            'heatmap'=>$heat,
+            'heatmap_meta'=>array('limit'=>self::HEATMAP_LIMIT,'returned'=>count($heat),'total'=>$heat_total,'truncated'=>$heat_total>count($heat)),
+            'corrections'=>$corrections,
+            'corrections_meta'=>array('limit'=>self::CORRECTION_LIMIT,'returned'=>count($corrections),'total'=>$correction_total,'truncated'=>$correction_total>count($corrections)),
+            'review_metadata_visible'=>$can_review,
+            'original_scan_immutable'=>true,
+        );
     }
 
     public static function submit(int $edition_id, int $page, string $original, string $corrected) {
