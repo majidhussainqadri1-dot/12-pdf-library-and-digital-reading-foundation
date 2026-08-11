@@ -53,11 +53,24 @@ final class PLDR_Future_Data {
         $limit=$page>0?1:self::REFLOW_WINDOW_LIMIT;
         $pages = self::ocr_pages($edition_id,$page,$limit,0);
         $provider = 'lawful-ocr';
+        $external_input_total=0;
+        $external_used=false;
         if (!$pages) {
-            $external = apply_filters('pldr_reflow_extract', null, $edition_id, $edition, $page);
+            try {
+                $external = apply_filters('pldr_reflow_extract', null, $edition_id, $edition, $page);
+            } catch (Throwable $e) {
+                PLDR_Core::audit('edition',$edition_id,'reflow_provider_failed',array('error'=>self::limit_text(sanitize_text_field($e->getMessage()),500)));
+                return array('error'=>PLDR_Core::machine_error('pldr_reflow_provider','The approved reflow provider failed; no derived reflow text was substituted.',503,array('degraded'=>true,'provider_failure'=>true)));
+            }
             if (is_array($external) && !empty($external['pages'])) {
-                $pages = array_slice((array) $external['pages'],0,$limit);
-                $provider = self::limit_text(sanitize_text_field((string) ($external['provider'] ?? 'adapter')),80);
+                $provider = self::limit_text(sanitize_text_field((string) ($external['provider'] ?? '')),80);
+                if(''===$provider)return array('error'=>PLDR_Core::machine_error('pldr_reflow_provenance','Reflow provider identity is required; anonymous derived text was rejected.',502,array('degraded'=>true)));
+                $external_pages=(array)$external['pages'];
+                $external_input_total=count($external_pages);
+                $pages = array_slice($external_pages,0,$limit);
+                $external_used=true;
+            } elseif(null!==$external) {
+                return array('error'=>PLDR_Core::machine_error('pldr_reflow_provider','The approved reflow provider returned an invalid response.',502,array('degraded'=>true)));
             }
         }
         $items = array();
@@ -69,8 +82,9 @@ final class PLDR_Future_Data {
             $text = self::limit_text(wp_strip_all_tags((string) ($row['text_content'] ?? $row['text'] ?? '')),200000);
             if ('' !== trim($text)) $items[] = array('page' => $item_page, 'text' => $text, 'language' => self::limit_text(sanitize_text_field((string) ($row['language'] ?? $edition['language'])),35), 'quality' => max(0,min(100,(float) ($row['quality_score'] ?? 0))));
         }
-        $ocr_total=$page>0?count($items):(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id));
-        return array('edition_id' => $edition_id,'requested_page'=>$page ?: null,'provider' => $provider,'pages' => $items,'available' => (bool) $items,'derived' => true,'original_immutable' => true,'page_window_limit'=>$page>0?1:self::REFLOW_WINDOW_LIMIT,'ocr_pages_total'=>$ocr_total,'truncated'=>$page===0&&$ocr_total>count($items));
+        $ocr_total=$external_used?$external_input_total:($page>0?count($items):(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id)));
+        $truncated=$external_used?$external_input_total>count($items):($page===0&&$ocr_total>count($items));
+        return array('edition_id' => $edition_id,'requested_page'=>$page ?: null,'provider' => $provider,'pages' => $items,'available' => (bool) $items,'derived' => true,'original_immutable' => true,'page_window_limit'=>$page>0?1:self::REFLOW_WINDOW_LIMIT,'ocr_pages_total'=>$ocr_total,'provider_input_total'=>$external_input_total,'provider_input_truncated'=>$external_used&&$external_input_total>$limit,'truncated'=>$truncated);
     }
 
     public static function outline(int $edition_id): array {
