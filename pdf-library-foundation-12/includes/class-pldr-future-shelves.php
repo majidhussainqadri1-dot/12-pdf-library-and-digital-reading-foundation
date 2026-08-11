@@ -3,6 +3,9 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Future_Shelves {
+    private const CUSTOM_SHELF_LIMIT = 100;
+    private const LIST_LIMIT = 120;
+
     public static function ensure_defaults(int $uid):void {
         global $wpdb;
         foreach(array('reading'=>'Reading now','later'=>'Read later','complete'=>'Completed','reference'=>'Important reference') as $type=>$name){
@@ -22,22 +25,29 @@ final class PLDR_Future_Shelves {
         $uid=get_current_user_id();
         if(!$uid)return array();
         self::ensure_defaults($uid);
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d ORDER BY sort_order ASC,id ASC',$uid),ARRAY_A)?:array();
-        foreach($rows as &$row){$row['id']=(int)$row['id'];$row['version']=(int)$row['version'];$row['count']=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d',$row['id']));}
+        $shelves=PLDR_Core::table('shelves');$items=PLDR_Core::table('shelf_items');
+        $rows=$wpdb->get_results($wpdb->prepare(
+            "SELECT s.*,COUNT(i.id) item_count FROM {$shelves} s LEFT JOIN {$items} i ON i.shelf_id=s.id WHERE s.user_id=%d GROUP BY s.id ORDER BY s.sort_order ASC,s.id ASC LIMIT %d",
+            $uid,self::LIST_LIMIT+1
+        ),ARRAY_A)?:array();
+        $truncated=count($rows)>self::LIST_LIMIT;if($truncated)$rows=array_slice($rows,0,self::LIST_LIMIT);
+        foreach($rows as &$row){$row['id']=(int)$row['id'];$row['version']=(int)$row['version'];$row['count']=(int)($row['item_count']??0);unset($row['item_count']);}
         unset($row);
-        return $rows;
+        return array('items'=>$rows,'limit'=>self::LIST_LIMIT,'returned'=>count($rows),'truncated'=>$truncated);
     }
 
     public static function create(string $name):array {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return array('error'=>PLDR_Core::machine_error('pldr_shelf_login','Log in to create a private shelf.',401));
+        $custom_count=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d AND shelf_type=%s',$uid,'custom'));
+        if($custom_count>=self::CUSTOM_SHELF_LIMIT)return array('error'=>PLDR_Core::machine_error('pldr_shelf_limit','The private custom-shelf limit has been reached.',409,array('limit'=>self::CUSTOM_SHELF_LIMIT)));
         $name=self::name($name);
         if(''===$name)return array('error'=>PLDR_Core::machine_error('pldr_shelf_name','Shelf name is required.',400));
         $key=PLDR_Core::uuid();
         $inserted=$wpdb->insert(PLDR_Core::table('shelves'),array('shelf_key'=>$key,'user_id'=>$uid,'name'=>$name,'shelf_type'=>'custom','sort_order'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
         if(false===$inserted||!(int)$wpdb->insert_id)return array('error'=>PLDR_Core::machine_error('pldr_shelf_store','Private shelf could not be stored.',500));
-        return array('id'=>(int)$wpdb->insert_id,'shelf_key'=>$key,'name'=>$name,'version'=>1);
+        return array('id'=>(int)$wpdb->insert_id,'shelf_key'=>$key,'name'=>$name,'version'=>1,'custom_limit'=>self::CUSTOM_SHELF_LIMIT);
     }
 
     public static function add(int $shelf_id,int $edition_id) {
@@ -76,7 +86,7 @@ final class PLDR_Future_Shelves {
         $shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
         if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be deleted.',409);
-        $wpdb->query('START TRANSACTION');
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_shelf_transaction','Shelf deletion transaction could not start.',500);
         $items=$wpdb->delete(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id));
         if(false===$items){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_delete','Shelf items could not be removed.',500);}
         $deleted=$wpdb->query($wpdb->prepare('DELETE FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d AND version=%d',$shelf_id,$uid,(int)$shelf['version']));
