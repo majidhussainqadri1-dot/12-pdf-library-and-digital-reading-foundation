@@ -57,27 +57,43 @@ final class PLDR_Future_Data {
             $external = apply_filters('pldr_reflow_extract', null, $edition_id, $edition, $page);
             if (is_array($external) && !empty($external['pages'])) {
                 $pages = array_slice((array) $external['pages'],0,$limit);
-                $provider = sanitize_text_field((string) ($external['provider'] ?? 'adapter'));
+                $provider = self::limit_text(sanitize_text_field((string) ($external['provider'] ?? 'adapter')),80);
             }
         }
         $items = array();
         foreach ($pages as $row) {
+            if(!is_array($row))continue;
             $item_page = absint($row['page_number'] ?? $row['page'] ?? 0);
             if($page>0&&$item_page!==$page)continue;
-            $text = wp_strip_all_tags((string) ($row['text_content'] ?? $row['text'] ?? ''));
-            if ($item_page > 0 && '' !== trim($text)) $items[] = array('page' => $item_page, 'text' => $text, 'language' => sanitize_text_field((string) ($row['language'] ?? $edition['language'])), 'quality' => (float) ($row['quality_score'] ?? 0));
+            if($item_page<1||$item_page>(int)$edition['pages'])continue;
+            $text = self::limit_text(wp_strip_all_tags((string) ($row['text_content'] ?? $row['text'] ?? '')),200000);
+            if ('' !== trim($text)) $items[] = array('page' => $item_page, 'text' => $text, 'language' => self::limit_text(sanitize_text_field((string) ($row['language'] ?? $edition['language'])),35), 'quality' => max(0,min(100,(float) ($row['quality_score'] ?? 0))));
         }
         $ocr_total=$page>0?count($items):(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id));
         return array('edition_id' => $edition_id,'requested_page'=>$page ?: null,'provider' => $provider,'pages' => $items,'available' => (bool) $items,'derived' => true,'original_immutable' => true,'page_window_limit'=>$page>0?1:self::REFLOW_WINDOW_LIMIT,'ocr_pages_total'=>$ocr_total,'truncated'=>$page===0&&$ocr_total>count($items));
     }
 
     public static function outline(int $edition_id): array {
+        global $wpdb;
         $edition = self::require_edition($edition_id);
         if (is_wp_error($edition)) return array('error' => $edition);
         $external = apply_filters('pldr_outline_extract', null, $edition_id, $edition);
-        if (is_array($external) && !empty($external['items'])) return array('items' => array_slice(array_values($external['items']),0,300), 'provider' => sanitize_text_field((string) ($external['provider'] ?? 'adapter')), 'derived' => true);
+        if (is_array($external) && isset($external['items']) && is_array($external['items'])) {
+            $input=array_values($external['items']);$projected=array();
+            foreach(array_slice($input,0,301) as $item){
+                if(!is_array($item))continue;
+                $page=absint($item['page']??$item['page_number']??0);
+                if($page<1||$page>(int)$edition['pages'])continue;
+                $title=self::limit_text(trim(wp_strip_all_tags((string)($item['title']??$item['label']??''))),200);
+                if(''===$title)continue;
+                $projected[]=array('page'=>$page,'title'=>$title,'level'=>max(1,min(6,absint($item['level']??1))));
+                if(count($projected)>=300)break;
+            }
+            if($projected)return array('items'=>$projected,'provider'=>self::limit_text(sanitize_text_field((string)($external['provider']??'adapter')),80),'derived'=>true,'original_immutable'=>true,'input_count'=>count($input),'returned'=>count($projected),'truncated'=>count($input)>300);
+        }
         $items = array();
-        foreach (self::ocr_pages($edition_id,0,1000,0) as $row) {
+        $rows=self::ocr_pages($edition_id,0,1000,0);
+        foreach ($rows as $row) {
             $lines = preg_split('/\R/u', (string) $row['text_content']) ?: array();
             foreach (array_slice($lines, 0, 80) as $line) {
                 $line = trim(wp_strip_all_tags($line));
@@ -88,7 +104,8 @@ final class PLDR_Future_Data {
                 if (count($items) >= 300) break 2;
             }
         }
-        return array('items' => $items, 'provider' => 'ocr-heading-heuristic', 'derived' => true, 'original_immutable' => true,'scan_page_limit'=>1000);
+        $ocr_total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id));
+        return array('items' => $items, 'provider' => 'ocr-heading-heuristic', 'derived' => true, 'original_immutable' => true,'scan_page_limit'=>1000,'ocr_pages_scanned'=>count($rows),'ocr_pages_total'=>$ocr_total,'truncated'=>$ocr_total>count($rows)||count($items)>=300);
     }
 
     public static function compare(int $left, int $right): array {
@@ -113,5 +130,9 @@ final class PLDR_Future_Data {
 
     private static function excerpt(string $text): string {
         return function_exists('mb_substr') ? mb_substr($text, 0, 280, 'UTF-8') : substr($text, 0, 280);
+    }
+
+    private static function limit_text(string $text,int $limit):string {
+        return function_exists('mb_substr')?mb_substr($text,0,$limit,'UTF-8'):substr($text,0,$limit);
     }
 }
