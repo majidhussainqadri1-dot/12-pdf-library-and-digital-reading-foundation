@@ -11,10 +11,11 @@ final class PLDR_Future_Rooms {
         $doc=PLDR_Core::document((int)$edition['document_id']);
         if($doc && 'patient-cases'===$doc['category'] && !apply_filters('pldr_patient_case_reading_room_allowed',false,$edition_id,$doc))return PLDR_Core::machine_error('pldr_room_patient_case','Patient-case documents require separate privacy approval before a reading room can be created.',403);
         $page=max(1,min((int)$edition['pages'],$page));
-        $anchor=self::anchor($anchor);
+        $anchor=self::anchor($anchor,$page);
+        if(is_wp_error($anchor))return $anchor;
         if(!self::anchor_belongs($edition_id,$page,$anchor,$edition))return PLDR_Core::machine_error('pldr_room_anchor_source','Reading-room text anchors must match the requested document page.',403);
         $encoded=wp_json_encode($anchor,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
-        if(false===$encoded||strlen($encoded)>1600)return PLDR_Core::machine_error('pldr_room_anchor','Reading-room anchor is too large.',400);
+        if(false===$encoded||strlen($encoded)>1800)return PLDR_Core::machine_error('pldr_room_anchor','Reading-room anchor is too large.',400);
         $room_key=PLDR_Core::uuid();
         $now=PLDR_Core::now();
         $stored=$wpdb->insert(PLDR_Core::table('room_contexts'),array('room_key'=>$room_key,'edition_id'=>$edition_id,'created_by'=>$uid,'page_number'=>$page,'anchor_json'=>$encoded,'provider_ref'=>'','status'=>'pending-provider','created_at'=>$now,'updated_at'=>$now));
@@ -39,15 +40,21 @@ final class PLDR_Future_Rooms {
             return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; provider compensation was requested and the local context requires reconciliation.',500,array('room_key'=>$room_key));
         }
         PLDR_Core::emit('PDFReadingRoomRequested.v1','edition',$edition_id,array('room_key'=>$room_key,'document_id'=>$edition['public_id'],'page'=>$page,'provider_ref'=>$provider_ref));
-        return array('room_key'=>$room_key,'status'=>'active','provider_ref'=>$provider_ref,'source_bound'=>true,'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
+        return array('room_key'=>$room_key,'status'=>'active','provider_ref'=>$provider_ref,'source_bound'=>true,'selector_value_preserved'=>isset($anchor['value']),'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
     }
 
-    private static function anchor(array $anchor):array {
+    private static function anchor(array $anchor,int $page) {
         $out=array();
         $type=sanitize_text_field((string)($anchor['type']??''));
         if(in_array($type,array('TextQuoteSelector','FragmentSelector','SvgSelector','CssSelector'),true))$out['type']=$type;
-        foreach(array('exact'=>500,'prefix'=>120,'suffix'=>120,'selection'=>500) as $key=>$limit){if(isset($anchor[$key]))$out[$key]=self::limit(wp_strip_all_tags((string)$anchor[$key]),$limit);}
-        if(isset($anchor['region'])&&is_array($anchor['region']))$out['region']=array('x'=>max(0,min(1,(float)($anchor['region']['x']??0))),'y'=>max(0,min(1,(float)($anchor['region']['y']??0))),'w'=>max(0,min(1,(float)($anchor['region']['w']??0))),'h'=>max(0,min(1,(float)($anchor['region']['h']??0))));
+        foreach(array('exact'=>500,'prefix'=>120,'suffix'=>120,'selection'=>500,'value'=>300) as $key=>$limit){if(isset($anchor[$key]))$out[$key]=self::limit(wp_strip_all_tags((string)$anchor[$key]),$limit);}
+        if(in_array($type,array('FragmentSelector','SvgSelector','CssSelector'),true)&&''===trim((string)($out['value']??''))&&!isset($anchor['region']))return PLDR_Core::machine_error('pldr_room_selector_value','This reading-room selector requires a bounded selector value or region.',400);
+        if('FragmentSelector'===$type&&!empty($out['value'])&&preg_match('/(?:^|[?&#;])page=(\d+)/',(string)$out['value'],$m)&&absint($m[1])!==$page)return PLDR_Core::machine_error('pldr_room_fragment_page','Reading-room fragment selector page identity does not match the requested page.',409);
+        if(isset($anchor['region'])&&is_array($anchor['region'])){
+            $region=array('x'=>max(0,min(1,(float)($anchor['region']['x']??0))),'y'=>max(0,min(1,(float)($anchor['region']['y']??0))),'w'=>max(0,min(1,(float)($anchor['region']['w']??0))),'h'=>max(0,min(1,(float)($anchor['region']['h']??0))));
+            if($region['w']<=0||$region['h']<=0)return PLDR_Core::machine_error('pldr_room_region','Reading-room anchor region must have a positive width and height.',400);
+            $out['region']=$region;
+        }
         return $out;
     }
 
