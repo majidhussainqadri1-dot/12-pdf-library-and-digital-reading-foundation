@@ -33,13 +33,20 @@ final class PLDR_REST {
     public static function can_repair(): bool { return PLDR_Core::authorize('repair'); }
 
     private static function idempotent(WP_REST_Request $request,string $route,callable $callback) {
-        $key=sanitize_text_field((string)$request->get_header('Idempotency-Key'));$actor=get_current_user_id();
-        if($key){$hit=PLDR_Core::idempotency_lookup($route,$key,$actor);if($hit)return new WP_REST_Response($hit['body'],$hit['status']);}
+        $key=substr(sanitize_text_field((string)$request->get_header('Idempotency-Key')),0,200);
+        if(''===$key)return $callback();
+        $actor=get_current_user_id();
+        $claim=PLDR_Core::idempotency_begin($route,$key,$actor);
+        if('hit'===($claim['state']??''))return new WP_REST_Response($claim['body'],$claim['status']);
+        if('pending'===($claim['state']??''))return PLDR_Core::machine_error('pldr_idempotency_in_progress','A request with this Idempotency-Key is already in progress.',409,array('retry_after'=>2));
+        if('reserved'!==($claim['state']??''))return PLDR_Core::machine_error('pldr_idempotency_unavailable','Idempotency protection could not be reserved; the mutation was not executed.',503);
         $result=$callback();
-        if(is_wp_error($result))return $result;
-        $response=rest_ensure_response($result);$status=$response instanceof WP_REST_Response?$response->get_status():200;$body=$response instanceof WP_REST_Response?$response->get_data():$result;
-        if($key)PLDR_Core::idempotency_store($route,$key,$actor,$body,$status);
-        return $response;
+        if(is_array($result)&&isset($result['error'])&&is_wp_error($result['error']))$result=$result['error'];
+        $response=is_wp_error($result)?rest_convert_error_to_response($result):rest_ensure_response($result);
+        $status=$response instanceof WP_REST_Response?$response->get_status():200;
+        $body=$response instanceof WP_REST_Response?$response->get_data():$result;
+        if(!PLDR_Core::idempotency_complete($route,$key,$actor,$body,$status))return PLDR_Core::machine_error('pldr_idempotency_persist','The operation completed but its idempotency result could not be finalized; retry with a new key only after reconciliation.',503,array('original_status'=>$status));
+        return is_wp_error($result)?$result:$response;
     }
 
     public static function library(WP_REST_Request $request) { return rest_ensure_response(PLDR_Search::search($request->get_params(),get_current_user_id())); }
