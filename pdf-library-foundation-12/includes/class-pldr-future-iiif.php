@@ -19,8 +19,14 @@ final class PLDR_Future_IIIF {
         $canvas_limit=max(25,min(1000,$canvas_limit));
         $preview_grant_limit=max(1,min(100,$preview_grant_limit));
         $edition_pages=max(0,(int)$edition['pages']);$canvas_count=min($edition_pages,$canvas_limit);
+        $wpdb->last_error='';
         $thumbs=$canvas_count>0?$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s AND page_number BETWEEN 1 AND %d ORDER BY page_number ASC LIMIT %d',(int)$edition['id'],'thumbnail','available',$canvas_count,$canvas_count),ARRAY_A):array();
-        $thumb_by_page=array();foreach($thumbs?:array() as $row)$thumb_by_page[(int)$row['page_number']]=$row;
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',(int)$edition['id'],'iiif_derivative_read_failed',array('provider_failure'=>false));
+            return PLDR_Core::machine_error('pldr_iiif_derivative_read','IIIF preview derivative state could not be verified; no manifest grants were issued.',503,array('degraded'=>true));
+        }
+        $thumbs=is_array($thumbs)?$thumbs:array();
+        $thumb_by_page=array();foreach($thumbs as $row)$thumb_by_page[(int)$row['page_number']]=$row;
         $canvases=array();$preview_missing=0;$preview_grant_failed=0;$preview_grants_issued=0;$preview_grant_deferred=0;
         for($page=1;$page<=$canvas_count;$page++){
             $canvas_id=rest_url('pldr/v1/future/iiif/'.rawurlencode($public_id).'/manifest').'#canvas-'.$page;$items=array();
@@ -32,10 +38,10 @@ final class PLDR_Future_IIIF {
             }else $preview_missing++;
             $canvases[]=array('id'=>$canvas_id,'type'=>'Canvas','label'=>array('en'=>array('Page '.$page)),'height'=>240,'width'=>180,'items'=>$items);
         }
-        $truncated=$edition_pages>$canvas_limit;$policy=PLDR_Core::policy((int)$doc['id']);$render=null;
-        if(!empty($policy['download_allowed'])){$candidate=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'download',get_current_user_id(),900);if(is_array($candidate))$render=$candidate;}
+        $truncated=$edition_pages>$canvas_limit;$policy=PLDR_Core::policy((int)$doc['id']);$render=null;$render_grant_failed=false;
+        if(!empty($policy['download_allowed'])){$candidate=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'download',get_current_user_id(),900);if(is_array($candidate))$render=$candidate;else $render_grant_failed=true;}
         $rights=self::rights_uri((string)$edition['license_code']);
-        $manifest=array('@context'=>'http://iiif.io/api/presentation/3/context.json','id'=>rest_url('pldr/v1/future/iiif/'.rawurlencode($public_id).'/manifest'),'type'=>'Manifest','label'=>array('en'=>array((string)$doc['title'])),'metadata'=>array(array('label'=>array('en'=>array('Author')),'value'=>array('en'=>array((string)$edition['author_name']))),array('label'=>array('en'=>array('Edition')),'value'=>array('en'=>array((string)$edition['edition_label']))),array('label'=>array('en'=>array('License code')),'value'=>array('en'=>array((string)$edition['license_code'])))),'items'=>$canvases,'rendering'=>is_array($render)?array(array('id'=>$render['url'],'type'=>'Text','label'=>array('en'=>array('Rights-aware PDF download')),'format'=>'application/pdf')):array(),'requiredStatement'=>array('label'=>array('en'=>array('Rights / source')),'value'=>array('en'=>array((string)$edition['rights_basis'].' — '.(string)$edition['source_name']))),'file12ExpectedPages'=>$edition_pages,'file12CanvasLimit'=>$canvas_limit,'file12CanvasReturned'=>count($canvases),'file12CanvasTruncated'=>$truncated,'file12PreviewMissing'=>$preview_missing,'file12PreviewGrantFailed'=>$preview_grant_failed,'file12PreviewGrantLimit'=>$preview_grant_limit,'file12PreviewGrantsIssued'=>$preview_grants_issued,'file12PreviewGrantsDeferred'=>$preview_grant_deferred,'file12CanvasIdentityPreserved'=>true,'file12DownloadRenderingAllowed'=>is_array($render));
+        $manifest=array('@context'=>'http://iiif.io/api/presentation/3/context.json','id'=>rest_url('pldr/v1/future/iiif/'.rawurlencode($public_id).'/manifest'),'type'=>'Manifest','label'=>array('en'=>array((string)$doc['title'])),'metadata'=>array(array('label'=>array('en'=>array('Author')),'value'=>array('en'=>array((string)$edition['author_name']))),array('label'=>array('en'=>array('Edition')),'value'=>array('en'=>array((string)$edition['edition_label']))),array('label'=>array('en'=>array('License code')),'value'=>array('en'=>array((string)$edition['license_code'])))),'items'=>$canvases,'rendering'=>is_array($render)?array(array('id'=>$render['url'],'type'=>'Text','label'=>array('en'=>array('Rights-aware PDF download')),'format'=>'application/pdf')):array(),'requiredStatement'=>array('label'=>array('en'=>array('Rights / source')),'value'=>array('en'=>array((string)$edition['rights_basis'].' — '.(string)$edition['source_name']))),'file12ExpectedPages'=>$edition_pages,'file12CanvasLimit'=>$canvas_limit,'file12CanvasReturned'=>count($canvases),'file12CanvasTruncated'=>$truncated,'file12PreviewMissing'=>$preview_missing,'file12PreviewGrantFailed'=>$preview_grant_failed,'file12PreviewGrantLimit'=>$preview_grant_limit,'file12PreviewGrantsIssued'=>$preview_grants_issued,'file12PreviewGrantsDeferred'=>$preview_grant_deferred,'file12CanvasIdentityPreserved'=>true,'file12DownloadRenderingAllowed'=>is_array($render),'file12DownloadGrantFailed'=>$render_grant_failed);
         if(''!==$rights)$manifest['rights']=$rights;return $manifest;
     }
 
