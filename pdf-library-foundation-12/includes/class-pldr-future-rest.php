@@ -114,7 +114,33 @@ final class PLDR_Future_REST {
     public static function annotations_import(WP_REST_Request $r) { return self::idempotent($r,'annotations-import',static fn()=>PLDR_Future_Annotations::import(absint($r['edition']),self::body($r))); }
     public static function iiif(WP_REST_Request $r) { return self::response(PLDR_Future_IIIF::manifest((string)$r['id'])); }
     public static function heatmap(WP_REST_Request $r) { return self::response(PLDR_Future_Search::heatmap(absint($r['edition']),(string)$r['q'])); }
-    public static function offline_grant(WP_REST_Request $r) { $b=self::body($r);$edition=PLDR_Core::edition(absint($b['edition_id']??0));if(!$edition)return PLDR_Core::machine_error('pldr_offline_edition','Edition not found.',404);$grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline',get_current_user_id(),900);if(is_wp_error($grant))return $grant;$ttl=(int)apply_filters('pldr_offline_vault_ttl',7*DAY_IN_SECONDS,$edition,get_current_user_id());$ttl=max(HOUR_IN_SECONDS,min(30*DAY_IN_SECONDS,$ttl));$valid=time()+$ttl;if(!empty($edition['rights_expires_at'])){$rights=strtotime((string)$edition['rights_expires_at']);if($rights)$valid=min($valid,$rights);}if($valid<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);$grant['offline_valid_until']=gmdate('c',$valid);$grant['requires_logout_purge']=true;$grant['device_vault_policy']='non-extractable WebCrypto key; local expiry enforced; future refresh requires server reauthorization';return self::response($grant); }
+    public static function offline_grant(WP_REST_Request $r) {
+        $b=self::body($r);
+        $edition=PLDR_Core::edition(absint($b['edition_id']??0));
+        if(!$edition)return PLDR_Core::machine_error('pldr_offline_edition','Edition not found.',404);
+        $uid=get_current_user_id();
+        try {
+            $ttl=(int)apply_filters('pldr_offline_vault_ttl',7*DAY_IN_SECONDS,$edition,$uid);
+        } catch (Throwable $e) {
+            PLDR_Core::audit('edition',(int)$edition['id'],'offline_vault_ttl_policy_provider_failed',array('provider_failure'=>1),$uid);
+            return PLDR_Core::machine_error('pldr_offline_ttl_policy','Offline-vault lifetime policy is temporarily unavailable; no offline delivery grant was issued.',503,array('degraded'=>true,'provider_failure'=>true));
+        }
+        $ttl=max(HOUR_IN_SECONDS,min(30*DAY_IN_SECONDS,$ttl));
+        $valid=time()+$ttl;
+        if(!empty($edition['rights_expires_at'])){
+            $rights=strtotime((string)$edition['rights_expires_at']);
+            if($rights)$valid=min($valid,$rights);
+        }
+        if($valid<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);
+        $grant_ttl=max(60,min(900,$valid-time()));
+        $grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline',$uid,$grant_ttl);
+        if(is_wp_error($grant))return $grant;
+        $grant['offline_valid_until']=gmdate('c',$valid);
+        $grant['requires_logout_purge']=true;
+        $grant['policy_checked_before_grant']=true;
+        $grant['device_vault_policy']='non-extractable WebCrypto key; local expiry enforced; future refresh requires server reauthorization';
+        return self::response($grant);
+    }
     public static function preferences_get(WP_REST_Request $r) { return self::response(PLDR_Future_Preferences::get((string)($r['key']?:'reader'))); }
     public static function preferences_save(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'preferences-save',static fn()=>PLDR_Future_Preferences::save((string)($b['key']??'reader'),(array)($b['value']??array()),absint($b['expected_version']??0))); }
     public static function shelves() { return self::response(array('items'=>PLDR_Future_Shelves::list(),'private'=>true)); }
