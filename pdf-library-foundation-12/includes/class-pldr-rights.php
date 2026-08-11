@@ -132,7 +132,18 @@ final class PLDR_Rights {
         return true;
     }
 
-    public static function expire_rights():void { global $wpdb; $rows=$wpdb->get_results($wpdb->prepare('SELECT DISTINCT document_id FROM '.PLDR_Core::table('editions').' WHERE rights_expires_at IS NOT NULL AND rights_expires_at<=%s',PLDR_Core::now()),ARRAY_A); foreach($rows as $r){$doc=PLDR_Core::document((int)$r['document_id']); if($doc && 'published'===$doc['status'])self::set_document_status((int)$doc['id'],'restricted','rights-expired');} }
+    public static function expire_rights():void {
+        global $wpdb;
+        $editions=PLDR_Core::table('editions');
+        $rows=$wpdb->get_results($wpdb->prepare(
+            "SELECT e.document_id FROM {$editions} e INNER JOIN (SELECT document_id,MAX(id) current_id FROM {$editions} WHERE status=%s GROUP BY document_id) current ON current.current_id=e.id WHERE e.rights_expires_at IS NOT NULL AND e.rights_expires_at<=%s",
+            'published',PLDR_Core::now()
+        ),ARRAY_A);
+        foreach($rows as $r){
+            $doc=PLDR_Core::document((int)$r['document_id']);
+            if($doc && 'published'===$doc['status'])self::set_document_status((int)$doc['id'],'restricted','rights-expired');
+        }
+    }
 }
 
 final class PLDR_Book_Packs {
