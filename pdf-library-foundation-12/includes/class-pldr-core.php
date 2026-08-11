@@ -71,7 +71,12 @@ final class PLDR_Core {
 
     public static function authorize(string $action, int $object_id = 0, int $user_id = 0): bool {
         $user_id = $user_id ?: get_current_user_id();
-        $external = apply_filters('pldr_authorize', null, $action, $user_id, $object_id);
+        try {
+            $external = apply_filters('pldr_authorize', null, $action, $user_id, $object_id);
+        } catch (Throwable $e) {
+            self::audit('authorization',$object_id,'authorization_provider_failed',array('action'=>$action,'provider_failure'=>true),$user_id);
+            return false;
+        }
         if (is_bool($external)) return $external;
         if (self::founder($user_id)) return true;
         $map = array(
@@ -83,10 +88,15 @@ final class PLDR_Core {
         );
         if (isset($map[$action]) && $user_id && user_can($user_id, $map[$action])) return true;
         if ('publish' === $action && $user_id) {
-            $doctor = apply_filters('pldr_verified_doctor', null, $user_id);
-            if (is_bool($doctor)) return $doctor;
-            if (class_exists('SPD_Helpers') && method_exists('SPD_Helpers', 'is_doctor') && method_exists('SPD_Helpers', 'verification_status')) {
-                return SPD_Helpers::is_doctor($user_id) && 'verified' === SPD_Helpers::verification_status($user_id);
+            try {
+                $doctor = apply_filters('pldr_verified_doctor', null, $user_id);
+                if (is_bool($doctor)) return $doctor;
+                if (class_exists('SPD_Helpers') && method_exists('SPD_Helpers', 'is_doctor') && method_exists('SPD_Helpers', 'verification_status')) {
+                    return SPD_Helpers::is_doctor($user_id) && 'verified' === SPD_Helpers::verification_status($user_id);
+                }
+            } catch (Throwable $e) {
+                self::audit('authorization',$object_id,'doctor_verification_provider_failed',array('action'=>$action,'provider_failure'=>true),$user_id);
+                return false;
             }
         }
         return false;
