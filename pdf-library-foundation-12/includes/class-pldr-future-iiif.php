@@ -8,9 +8,22 @@ final class PLDR_Future_IIIF {
         $doc=PLDR_Core::document_by_public_id($public_id);if(!$doc)return PLDR_Core::machine_error('pldr_iiif_missing','Document not found.',404);
         $edition=PLDR_Core::current_edition((int)$doc['id']);if(!$edition||!PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id()))return PLDR_Core::machine_error('pldr_iiif_forbidden','IIIF manifest is unavailable for this document.',404);
         $canvas_limit=(int)apply_filters('pldr_iiif_canvas_limit',500,(int)$edition['id']);$canvas_limit=max(25,min(1000,$canvas_limit));
-        $thumbs=$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT %d',(int)$edition['id'],'thumbnail','available',$canvas_limit+1),ARRAY_A)?:array();
-        $truncated=count($thumbs)>$canvas_limit;if($truncated)$thumbs=array_slice($thumbs,0,$canvas_limit);
-        $canvases=array();foreach($thumbs as $row){$page=absint($row['page_number']);$grant=PLDR_Access::issue_token((int)$edition['id'],(int)$row['object_id'],'preview',get_current_user_id(),900);if(!is_array($grant))continue;$canvas_id=rest_url('pldr/v1/future/iiif/'.rawurlencode($public_id).'/manifest').'#canvas-'.$page;$canvases[]=array('id'=>$canvas_id,'type'=>'Canvas','label'=>array('en'=>array('Page '.$page)),'height'=>240,'width'=>180,'items'=>array(array('id'=>$canvas_id.'/page','type'=>'AnnotationPage','items'=>array(array('id'=>$canvas_id.'/annotation','type'=>'Annotation','motivation'=>'painting','body'=>array('id'=>$grant['url'],'type'=>'Image','format'=>'image/jpeg','height'=>240,'width'=>180),'target'=>$canvas_id)))));}
+        $edition_pages=max(0,(int)$edition['pages']);
+        $canvas_count=min($edition_pages,$canvas_limit);
+        $thumbs=$canvas_count>0?$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s AND page_number BETWEEN 1 AND %d ORDER BY page_number ASC LIMIT %d',(int)$edition['id'],'thumbnail','available',$canvas_count,$canvas_count),ARRAY_A):array();
+        $thumb_by_page=array();foreach($thumbs?:array() as $row)$thumb_by_page[(int)$row['page_number']]=$row;
+        $canvases=array();$preview_missing=0;$preview_grant_failed=0;
+        for($page=1;$page<=$canvas_count;$page++){
+            $canvas_id=rest_url('pldr/v1/future/iiif/'.rawurlencode($public_id).'/manifest').'#canvas-'.$page;
+            $items=array();
+            if(isset($thumb_by_page[$page])){
+                $row=$thumb_by_page[$page];$grant=PLDR_Access::issue_token((int)$edition['id'],(int)$row['object_id'],'preview',get_current_user_id(),900);
+                if(is_array($grant))$items=array(array('id'=>$canvas_id.'/page','type'=>'AnnotationPage','items'=>array(array('id'=>$canvas_id.'/annotation','type'=>'Annotation','motivation'=>'painting','body'=>array('id'=>$grant['url'],'type'=>'Image','format'=>'image/jpeg','height'=>240,'width'=>180),'target'=>$canvas_id))));
+                else $preview_grant_failed++;
+            }else $preview_missing++;
+            $canvases[]=array('id'=>$canvas_id,'type'=>'Canvas','label'=>array('en'=>array('Page '.$page)),'height'=>240,'width'=>180,'items'=>$items);
+        }
+        $truncated=$edition_pages>$canvas_limit;
         $policy=PLDR_Core::policy((int)$doc['id']);
         $render=null;
         if(!empty($policy['download_allowed'])){
@@ -18,7 +31,7 @@ final class PLDR_Future_IIIF {
             if(is_array($candidate))$render=$candidate;
         }
         $rights=self::rights_uri((string)$edition['license_code']);
-        $manifest=array('@context'=>'http://iiif.io/api/presentation/3/context.json','id'=>rest_url('pldr/v1/future/iiif/'.rawurlencode($public_id).'/manifest'),'type'=>'Manifest','label'=>array('en'=>array((string)$doc['title'])),'metadata'=>array(array('label'=>array('en'=>array('Author')),'value'=>array('en'=>array((string)$edition['author_name']))),array('label'=>array('en'=>array('Edition')),'value'=>array('en'=>array((string)$edition['edition_label']))),array('label'=>array('en'=>array('License code')),'value'=>array('en'=>array((string)$edition['license_code'])))),'items'=>$canvases,'rendering'=>is_array($render)?array(array('id'=>$render['url'],'type'=>'Text','label'=>array('en'=>array('Rights-aware PDF download')),'format'=>'application/pdf')):array(),'requiredStatement'=>array('label'=>array('en'=>array('Rights / source')),'value'=>array('en'=>array((string)$edition['rights_basis'].' — '.(string)$edition['source_name']))),'file12CanvasLimit'=>$canvas_limit,'file12CanvasTruncated'=>$truncated,'file12DownloadRenderingAllowed'=>is_array($render));
+        $manifest=array('@context'=>'http://iiif.io/api/presentation/3/context.json','id'=>rest_url('pldr/v1/future/iiif/'.rawurlencode($public_id).'/manifest'),'type'=>'Manifest','label'=>array('en'=>array((string)$doc['title'])),'metadata'=>array(array('label'=>array('en'=>array('Author')),'value'=>array('en'=>array((string)$edition['author_name']))),array('label'=>array('en'=>array('Edition')),'value'=>array('en'=>array((string)$edition['edition_label']))),array('label'=>array('en'=>array('License code')),'value'=>array('en'=>array((string)$edition['license_code'])))),'items'=>$canvases,'rendering'=>is_array($render)?array(array('id'=>$render['url'],'type'=>'Text','label'=>array('en'=>array('Rights-aware PDF download')),'format'=>'application/pdf')):array(),'requiredStatement'=>array('label'=>array('en'=>array('Rights / source')),'value'=>array('en'=>array((string)$edition['rights_basis'].' — '.(string)$edition['source_name']))),'file12ExpectedPages'=>$edition_pages,'file12CanvasLimit'=>$canvas_limit,'file12CanvasReturned'=>count($canvases),'file12CanvasTruncated'=>$truncated,'file12PreviewMissing'=>$preview_missing,'file12PreviewGrantFailed'=>$preview_grant_failed,'file12CanvasIdentityPreserved'=>true,'file12DownloadRenderingAllowed'=>is_array($render));
         if(''!==$rights)$manifest['rights']=$rights;
         return $manifest;
     }
