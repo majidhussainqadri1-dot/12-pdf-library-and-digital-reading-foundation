@@ -11,25 +11,57 @@ final class PLDR_Search {
         $language = sanitize_text_field((string) ($args['language'] ?? ''));
         $page = max(1, absint($args['page'] ?? 1));
         $per_page = min(48, max(1, absint($args['per_page'] ?? 24)));
-        $offset = ($page - 1) * $per_page;
+        $logical_offset = ($page - 1) * $per_page;
         $where = array("d.status='published'");
-        $params = array();
-        if ($term) { $where[] = 'd.search_text LIKE %s'; $params[] = '%' . $wpdb->esc_like($term) . '%'; }
-        if ($type && isset(PLDR_Core::DOCUMENT_TYPES[$type])) { $where[] = 'd.document_type=%s'; $params[] = $type; }
-        if ($category && isset(PLDR_Core::CATEGORIES[$category])) { $where[] = 'd.category=%s'; $params[] = $category; }
-        if ($language) { $where[] = 'd.language=%s'; $params[] = $language; }
-        $sql = 'SELECT d.* FROM ' . PLDR_Core::table('documents') . ' d WHERE ' . implode(' AND ', $where) . ' ORDER BY d.updated_at DESC,d.id DESC LIMIT %d OFFSET %d';
-        $params[] = $per_page * 3;
-        $params[] = $offset;
-        $rows = $wpdb->get_results($wpdb->prepare($sql, $params), ARRAY_A);
-        $items = array();
-        foreach ($rows as $doc) {
-            $edition = PLDR_Core::current_edition((int) $doc['id']);
-            if (!$edition || !PLDR_Access::can_access_edition((int) $edition['id'], 'read', $user_id)) continue;
-            $items[] = PLDR_Core::public_document_dto($doc, $edition);
-            if (count($items) >= $per_page) break;
+        $base_params = array();
+        if ($term) { $where[] = 'd.search_text LIKE %s'; $base_params[] = '%' . $wpdb->esc_like($term) . '%'; }
+        if ($type && isset(PLDR_Core::DOCUMENT_TYPES[$type])) { $where[] = 'd.document_type=%s'; $base_params[] = $type; }
+        if ($category && isset(PLDR_Core::CATEGORIES[$category])) { $where[] = 'd.category=%s'; $base_params[] = $category; }
+        if ($language) { $where[] = 'd.language=%s'; $base_params[] = $language; }
+
+        // Entitlements can only be resolved per edition/user, so page offsets must be
+        // applied after access filtering. Otherwise page N can overlap page N+1 when
+        // inaccessible raw rows are skipped. Scan in bounded batches from the ordered
+        // start and expose truncation rather than silently claiming completeness.
+        $batch_size = min(200, max(48, $per_page * 4));
+        $target = $logical_offset + $per_page + 1;
+        $suggested_limit = max(2000, $target * 8);
+        $scan_limit = (int) apply_filters('pldr_search_scan_limit', $suggested_limit, $args, $user_id);
+        $scan_limit = max($batch_size, min(20000, $scan_limit));
+        $raw_offset = 0;
+        $eligible = array();
+        $scan_truncated = false;
+
+        while (count($eligible) < $target && $raw_offset < $scan_limit) {
+            $limit = min($batch_size, $scan_limit - $raw_offset);
+            $sql = 'SELECT d.* FROM ' . PLDR_Core::table('documents') . ' d WHERE ' . implode(' AND ', $where) . ' ORDER BY d.updated_at DESC,d.id DESC LIMIT %d OFFSET %d';
+            $params = $base_params;
+            $params[] = $limit;
+            $params[] = $raw_offset;
+            $rows = $wpdb->get_results($wpdb->prepare($sql, $params), ARRAY_A) ?: array();
+            if (!$rows) break;
+            foreach ($rows as $doc) {
+                $edition = PLDR_Core::current_edition((int) $doc['id']);
+                if (!$edition || !PLDR_Access::can_access_edition((int) $edition['id'], 'read', $user_id)) continue;
+                $eligible[] = PLDR_Core::public_document_dto($doc, $edition);
+                if (count($eligible) >= $target) break;
+            }
+            $raw_offset += count($rows);
+            if (count($rows) < $limit) break;
         }
-        return array('items' => $items, 'page' => $page, 'per_page' => $per_page, 'has_more' => count($rows) > $per_page);
+        if ($raw_offset >= $scan_limit && count($eligible) < $target) $scan_truncated = true;
+
+        $items = array_slice($eligible, $logical_offset, $per_page);
+        $has_more = count($eligible) > ($logical_offset + $per_page) || $scan_truncated;
+        return array(
+            'items' => $items,
+            'page' => $page,
+            'per_page' => $per_page,
+            'has_more' => $has_more,
+            'access_filtered_pagination' => true,
+            'scan_truncated' => $scan_truncated,
+            'raw_rows_scanned' => $raw_offset,
+        );
     }
 
     public static function ocr(int $edition_id, string $query, int $user_id = 0): array {
