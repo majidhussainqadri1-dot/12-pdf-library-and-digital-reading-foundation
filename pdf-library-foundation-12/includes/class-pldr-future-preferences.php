@@ -28,10 +28,15 @@ final class PLDR_Future_Preferences {
         $now=PLDR_Core::now();
         if((int)$current['version']>0){
             $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('future_prefs').' SET preference_json=%s,version=%d,updated_at=%s WHERE user_id=%d AND preference_key=%s AND version=%d',wp_json_encode($clean),$version,$now,$uid,$key,(int)$current['version']));
-            if(1!==$updated)return PLDR_Core::machine_error('pldr_future_pref_conflict','Concurrent reading-preference update detected.',409);
+            if(false===$updated)return PLDR_Core::machine_error('pldr_future_pref_store','Reading preferences could not be stored.',500);
+            if(1!==$updated)return PLDR_Core::machine_error('pldr_future_pref_conflict','Concurrent reading-preference update detected.',409,array('current_version'=>(int)(self::get($key)['version']??0)));
         }else{
             $inserted=$wpdb->insert(PLDR_Core::table('future_prefs'),array('user_id'=>$uid,'preference_key'=>$key,'preference_json'=>wp_json_encode($clean),'version'=>$version,'updated_at'=>$now));
-            if(false===$inserted)return PLDR_Core::machine_error('pldr_future_pref_store','Reading preferences could not be stored.',500);
+            if(false===$inserted){
+                $race=self::get($key);
+                if((int)($race['version']??0)>0)return PLDR_Core::machine_error('pldr_future_pref_conflict','Reading preferences were created concurrently on another request.',409,array('current_version'=>(int)$race['version']));
+                return PLDR_Core::machine_error('pldr_future_pref_store','Reading preferences could not be stored.',500);
+            }
         }
         return array('value'=>$clean,'version'=>$version,'updated_at'=>$now);
     }
