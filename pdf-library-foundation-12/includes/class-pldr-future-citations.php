@@ -18,13 +18,19 @@ final class PLDR_Future_Citations {
         $url = PLDR_Core::route_url('document', array('id' => $edition['public_id'], 'slug' => $edition['slug']));
         $url = add_query_arg(array_filter(array('edition'=>$edition_id,'page'=>$page ?: null), static fn($value): bool => null !== $value), $url);
         $url = esc_url_raw($url);
-        $key = 'pldr-' . substr(str_replace('-', '', (string) $edition['public_id']), 0, 12) . '-e' . $edition_id;
+        $key = 'pldr-' . substr(str_replace('-', '', (string) $edition['public_id']), 0, 12) . '-e' . $edition_id . ($page ? '-p'.$page : '');
         $csl = array('id' => $key, 'type' => 'book', 'title' => $title, 'author' => array(array('literal' => $author)), 'issued' => array('date-parts' => array(array($year ?: null))), 'publisher' => $publisher, 'ISBN' => $isbn, 'URL' => $url, 'edition' => $edition_label, 'page' => $page ?: null, 'PLDR-edition-id'=>$edition_id);
-        if ('csl-json' === $format) return array('format' => 'csl-json', 'content' => $csl, 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null);
-        if ('bibtex' === $format) return array('format' => 'bibtex', 'content' => "@book{{$key},\n  title={" . self::bibtex_escape($title) . "},\n  author={" . self::bibtex_escape($author) . "},\n  year={" . ($year ?: '') . "},\n  publisher={" . self::bibtex_escape($publisher) . "},\n  isbn={" . self::bibtex_escape($isbn) . "},\n  url={" . self::bibtex_escape($url) . "}\n}", 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null);
-        if ('ris' === $format) return array('format' => 'ris', 'content' => "TY  - BOOK\nTI  - {$title}\nAU  - {$author}\nPY  - " . ($year ?: '') . "\nPB  - {$publisher}\nSN  - {$isbn}\nUR  - {$url}\nER  -", 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null);
-        if (in_array($format, array('apa','mla','sabri'), true)) return array('format' => $format, 'content' => PLDR_Reader::citation($edition, $page, $format), 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null);
-        if ('chicago' === $format) return array('format' => 'chicago', 'content' => trim($author . '. ' . $title . '. ' . ($edition_label ? $edition_label . '. ' : '') . ($publisher ? $publisher . ', ' : '') . ($year ?: 'n.d.') . '. ' . $url . ($page ? ', ' . $page : '') . '.'), 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null);
+        if ('csl-json' === $format) return array('format' => 'csl-json', 'content' => $csl, 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
+        if ('bibtex' === $format) {
+            $page_field=$page?",\n  pages={".$page."}":'';
+            return array('format' => 'bibtex', 'content' => "@book{{$key},\n  title={" . self::bibtex_escape($title) . "},\n  author={" . self::bibtex_escape($author) . "},\n  year={" . ($year ?: '') . "},\n  publisher={" . self::bibtex_escape($publisher) . "},\n  isbn={" . self::bibtex_escape($isbn) . "},\n  url={" . self::bibtex_escape($url) . "}".$page_field."\n}", 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
+        }
+        if ('ris' === $format) {
+            $page_line=$page?"\nSP  - {$page}":'';
+            return array('format' => 'ris', 'content' => "TY  - BOOK\nTI  - {$title}\nAU  - {$author}\nPY  - " . ($year ?: '') . "\nPB  - {$publisher}\nSN  - {$isbn}\nUR  - {$url}".$page_line."\nER  -", 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
+        }
+        if (in_array($format, array('apa','mla','sabri'), true)) return array('format' => $format, 'content' => PLDR_Reader::citation($edition, $page, $format), 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
+        if ('chicago' === $format) return array('format' => 'chicago', 'content' => trim($author . '. ' . $title . '. ' . ($edition_label ? $edition_label . '. ' : '') . ($publisher ? $publisher . ', ' : '') . ($year ?: 'n.d.') . '. ' . $url . ($page ? ', ' . $page : '') . '.'), 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
         return array('error' => PLDR_Core::machine_error('pldr_citation_format', 'Unsupported citation export format.', 400));
     }
 
