@@ -26,7 +26,7 @@ final class PLDR_Future_Fingerprint {
 
     public static function candidates(int $edition_id): array {
         global $wpdb;
-        $edition=PLDR_Core::edition($edition_id);if(!$edition)return array();if(!self::can_inspect($edition))return array();
+        $edition=PLDR_Core::edition($edition_id);if(!$edition)return array();if(!self::can_inspect($edition))return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_review_forbidden','Scan-fingerprint candidates are review evidence and require document review or repair authority.',403));
         $rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A)?:array();
         $current_types=array_column($rowsCurrent,null,'fingerprint_type');
         $needs_ocr=!isset($current_types['ocr-simhash64']);
@@ -58,8 +58,8 @@ final class PLDR_Future_Fingerprint {
     }
 
     private static function can_inspect(array $edition): bool {
-        $edition_id=(int)($edition['id']??0);$document_id=(int)($edition['document_id']??0);
-        return PLDR_Access::can_access_edition($edition_id,'read',get_current_user_id()) || PLDR_Core::authorize('manage',$document_id) || PLDR_Core::authorize('rights',$document_id);
+        $document_id=(int)($edition['document_id']??0);
+        return PLDR_Core::authorize('manage',$document_id)||PLDR_Core::authorize('rights',$document_id)||PLDR_Core::authorize('repair',$document_id);
     }
 
     private static function can_compute(array $edition): bool {
