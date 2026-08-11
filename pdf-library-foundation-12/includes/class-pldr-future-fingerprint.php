@@ -11,20 +11,32 @@ final class PLDR_Future_Fingerprint {
         $pages=PLDR_Future_Data::ocr_pages($edition_id,0,12,0);
         $sample=''; foreach($pages as $row)$sample.=' '.PLDR_Core::normalize_search((string)$row['text_content']);
         $ocr=self::simhash($sample);
+        $visual=self::visual_fingerprint($edition_id);
         $meta=hash('sha256',PLDR_Core::normalize_search((string)$edition['title'].' '.(string)$edition['author_name'].' '.(string)$edition['publication_year'].' '.(string)$edition['pages']));
         $now=PLDR_Core::now();
-        if($ocr){$stored=$wpdb->replace(PLDR_Core::table('scan_fingerprints'),array('edition_id'=>$edition_id,'fingerprint_type'=>'ocr-simhash64','fingerprint_value'=>$ocr,'metadata_hash'=>$meta,'version'=>1,'created_at'=>$now,'updated_at'=>$now));if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_store','OCR scan fingerprint could not be stored.',500));}
-        $visual=self::visual_fingerprint($edition_id);
-        if($visual){$stored=$wpdb->replace(PLDR_Core::table('scan_fingerprints'),array('edition_id'=>$edition_id,'fingerprint_type'=>'visual-ahash','fingerprint_value'=>$visual,'metadata_hash'=>$meta,'version'=>1,'created_at'=>$now,'updated_at'=>$now));if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_store','Visual scan fingerprint could not be stored.',500));}
+        if(!$ocr&&!$visual)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_unavailable','No lawful OCR or visual evidence was available to compute a scan fingerprint.',409,array('degraded'=>true)));
+        if(false===$wpdb->query('START TRANSACTION'))return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_transaction','Scan fingerprint persistence could not start.',500));
+        if($ocr){
+            $stored=$wpdb->replace(PLDR_Core::table('scan_fingerprints'),array('edition_id'=>$edition_id,'fingerprint_type'=>'ocr-simhash64','fingerprint_value'=>$ocr,'metadata_hash'=>$meta,'version'=>1,'created_at'=>$now,'updated_at'=>$now));
+            if(false===$stored){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_store','OCR scan fingerprint could not be stored.',500));}
+        }
+        if($visual){
+            $stored=$wpdb->replace(PLDR_Core::table('scan_fingerprints'),array('edition_id'=>$edition_id,'fingerprint_type'=>'visual-ahash','fingerprint_value'=>$visual,'metadata_hash'=>$meta,'version'=>1,'created_at'=>$now,'updated_at'=>$now));
+            if(false===$stored){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_store','Visual scan fingerprint could not be stored.',500));}
+        }
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_commit','Scan fingerprint persistence could not be committed.',500));}
         PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_computed',array('visual'=>(bool)$visual,'ocr'=>(bool)$ocr));
-        return array('edition_id'=>$edition_id,'visual_fingerprint'=>$visual,'ocr_fingerprint'=>$ocr,'metadata_hash'=>$meta,'automatic_merge'=>false,'immutable_scan_family_evidence'=>true,'ocr_pages_sampled'=>count($pages));
+        return array('edition_id'=>$edition_id,'visual_fingerprint'=>$visual,'ocr_fingerprint'=>$ocr,'metadata_hash'=>$meta,'automatic_merge'=>false,'immutable_scan_family_evidence'=>true,'ocr_pages_sampled'=>count($pages),'atomic_persistence'=>true);
     }
 
     public static function candidates(int $edition_id): array {
         global $wpdb;
         $edition=PLDR_Core::edition($edition_id);if(!$edition)return array();if(!self::can_inspect($edition))return array();
         $rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A)?:array();
-        if(!$rowsCurrent){$computed=self::compute_and_store($edition_id);if(isset($computed['error']))return array();$rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A)?:array();}
+        $current_types=array_column($rowsCurrent,null,'fingerprint_type');
+        $needs_ocr=!isset($current_types['ocr-simhash64']);
+        $needs_visual=class_exists('Imagick')&&!isset($current_types['visual-ahash']);
+        if(!$rowsCurrent||$needs_ocr||$needs_visual){$computed=self::compute_and_store($edition_id);if(isset($computed['error'])&&!$rowsCurrent)return array();$rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A)?:array();}
         $current=array_column($rowsCurrent,null,'fingerprint_type'); if(!$current)return array();
         $rows=$wpdb->get_results($wpdb->prepare('SELECT f.*,e.document_id,e.edition_label,d.public_id,d.title FROM '.PLDR_Core::table('scan_fingerprints').' f JOIN '.PLDR_Core::table('editions').' e ON e.id=f.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE f.edition_id<>%d ORDER BY f.updated_at DESC LIMIT 1000',$edition_id),ARRAY_A)?:array();
         $grouped=array(); foreach($rows as $row)$grouped[(int)$row['edition_id']][]=$row;
