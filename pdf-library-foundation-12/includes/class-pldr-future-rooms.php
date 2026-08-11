@@ -18,17 +18,28 @@ final class PLDR_Future_Rooms {
         $room_key=PLDR_Core::uuid();
         $now=PLDR_Core::now();
         $stored=$wpdb->insert(PLDR_Core::table('room_contexts'),array('room_key'=>$room_key,'edition_id'=>$edition_id,'created_by'=>$uid,'page_number'=>$page,'anchor_json'=>$encoded,'provider_ref'=>'','status'=>'pending-provider','created_at'=>$now,'updated_at'=>$now));
-        if(false===$stored)return PLDR_Core::machine_error('pldr_room_store','Reading-room context could not be stored.',500);
-        $context=array('file'=>12,'room_key'=>$room_key,'edition_id'=>$edition_id,'document_id'=>$edition['public_id'],'page'=>$page,'anchor'=>$anchor,'source_url'=>PLDR_Core::route_url('read',array('id'=>$edition['public_id'])));
-        $provider=apply_filters('pldr_create_reading_room_provider',null,$uid,$context);
+        if(false===$stored||!(int)$wpdb->insert_id)return PLDR_Core::machine_error('pldr_room_store','Reading-room context could not be stored.',500);
+        $context=array('file'=>12,'room_key'=>$room_key,'edition_id'=>$edition_id,'document_id'=>$edition['public_id'],'page'=>$page,'anchor'=>$anchor,'source_url'=>add_query_arg('edition',$edition_id,PLDR_Core::route_url('read',array('id'=>$edition['public_id']))));
+        try{
+            $provider=apply_filters('pldr_create_reading_room_provider',null,$uid,$context);
+        }catch(Throwable $e){
+            $message=self::limit(sanitize_text_field($e->getMessage()),300);
+            $wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'provider-error','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
+            PLDR_Core::audit('room_context',(int)$wpdb->insert_id,'provider_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'error'=>$message),$uid);
+            return PLDR_Core::machine_error('pldr_room_provider','Reading-room provider failed; the local context remains for safe retry/reconciliation.',503,array('room_key'=>$room_key,'degraded'=>true));
+        }
         $provider_ref=is_array($provider)?self::limit(sanitize_text_field((string)($provider['reference']??'')),190):'';
-        $status=$provider_ref?'active':'pending-provider';
-        if($provider_ref){
-            $updated=$wpdb->update(PLDR_Core::table('room_contexts'),array('provider_ref'=>$provider_ref,'status'=>'active','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
-            if(1!==$updated)return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; the local pending context remains for reconciliation.',500,array('room_key'=>$room_key));
+        if(''===$provider_ref){
+            $wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'pending-provider','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
+            return PLDR_Core::machine_error('pldr_room_provider','No approved reading-room provider accepted the request; the local context remains pending.',503,array('room_key'=>$room_key,'degraded'=>true));
+        }
+        $updated=$wpdb->update(PLDR_Core::table('room_contexts'),array('provider_ref'=>$provider_ref,'status'=>'active','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid,'status'=>'pending-provider'));
+        if(1!==$updated){
+            do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,'local-provider-reference-persistence-failed');
+            return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; provider compensation was requested and the local context requires reconciliation.',500,array('room_key'=>$room_key));
         }
         PLDR_Core::emit('PDFReadingRoomRequested.v1','edition',$edition_id,array('room_key'=>$room_key,'document_id'=>$edition['public_id'],'page'=>$page,'provider_ref'=>$provider_ref));
-        return array('room_key'=>$room_key,'status'=>$status,'provider_ref'=>$provider_ref,'source_bound'=>true,'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
+        return array('room_key'=>$room_key,'status'=>'active','provider_ref'=>$provider_ref,'source_bound'=>true,'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
     }
 
     private static function anchor(array $anchor):array {
