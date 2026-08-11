@@ -24,11 +24,10 @@ final class PLDR_Future_Context {
     private static function selection_belongs(int $edition_id,int $page,string $selection,array $edition):bool {
         $needle=PLDR_Core::normalize_search($selection);
         if(''===$needle)return false;
-        foreach(PLDR_Future_Data::ocr_pages($edition_id) as $row){
-            if((int)($row['page_number']??0)!==$page)continue;
+        $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        foreach($rows as $row){
             $haystack=PLDR_Core::normalize_search((string)($row['text_content']??''));
             if(''!==$haystack&&false!==strpos($haystack,$needle))return true;
-            break;
         }
         return (bool)apply_filters('pldr_knowledge_context_selection_allowed',false,$edition_id,$page,$selection,$edition);
     }
