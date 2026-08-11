@@ -103,7 +103,17 @@ final class PLDR_REST {
     private static function accessibility_metadata(int $edition_id,array $edition):array { global $wpdb;$ocr=$wpdb->get_row($wpdb->prepare('SELECT status,quality_score,language FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s LIMIT 1',$edition_id,'ocr-status'),ARRAY_A);$thumbs=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s',$edition_id,'thumbnail','available'));return array('title'=>$edition['title'],'author'=>$edition['author_name'],'language'=>$edition['language'],'pages'=>(int)$edition['pages'],'ocr_status'=>$ocr['status']??'unknown','ocr_quality'=>isset($ocr['quality_score'])?(float)$ocr['quality_score']:0,'ocr_language'=>$ocr['language']??$edition['language'],'thumbnail_pages'=>$thumbs,'screen_reader_fallback'=>$ocr&&'available'===$ocr['status']?'ocr-text':'document-metadata'); }
     public static function ocr_search(WP_REST_Request $request) { return rest_ensure_response(array('items'=>PLDR_Search::ocr(absint($request['edition']),(string)$request['q'],get_current_user_id()))); }
     public static function save_progress(WP_REST_Request $request) { return self::idempotent($request,'reading-progress',static fn()=>PLDR_Reading::save_progress(absint($request['edition_id']),absint($request['page']))); }
-    public static function reading_items(WP_REST_Request $request) { return rest_ensure_response(array('items'=>PLDR_Reading::items(absint($request['edition_id'])))); }
+    public static function reading_items(WP_REST_Request $request) {
+        global $wpdb;
+        $uid=get_current_user_id();$edition_id=absint($request['edition_id']);
+        if(!$uid||!PLDR_Access::can_access_edition($edition_id,'read',$uid))return PLDR_Core::machine_error('pldr_items_forbidden','Private reading items are unavailable.',403);
+        $limit=max(1,min(200,absint($request['limit']?:100)));$offset=max(0,min(100000,absint($request['offset'])));
+        $table=PLDR_Core::table('reading_items');
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM '.$table.' WHERE user_id=%d AND edition_id=%d ORDER BY page_number ASC,id ASC LIMIT %d OFFSET %d',$uid,$edition_id,$limit+1,$offset),ARRAY_A)?:array();
+        $has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
+        foreach($rows as &$row){$row['id']=(int)$row['id'];$row['page_number']=(int)$row['page_number'];$row['version']=(int)$row['version'];$row['tags']=json_decode((string)$row['tags_json'],true)?:array();unset($row['tags_json']);}unset($row);
+        return rest_ensure_response(array('items'=>$rows,'limit'=>$limit,'offset'=>$offset,'has_more'=>$has_more,'next_offset'=>$has_more?$offset+$limit:null));
+    }
     public static function add_reading_item(WP_REST_Request $request) { return self::idempotent($request,'reading-item',static fn()=>PLDR_Reading::add_item(absint($request['edition_id']),$request->get_json_params()?:$request->get_params())); }
 
     private static function delete_reading_item_owned(int $item_id) {
