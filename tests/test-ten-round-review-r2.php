@@ -64,7 +64,7 @@ $must($corpus, 'manifest_version', 'Corpus bounded manifest missing.');
 // Round 7.
 $must($annotations, 'edition_bound', 'Portable annotation edition binding missing.');
 $must($annotations, 'untrailingslashit', 'Annotation source comparison missing.');
-$must($annotations, 'strlen($encoded)<=480', 'Portable selector size guard missing.');
+$must($annotations, 'strlen($encoded)<=640', 'Portable selector size guard missing.');
 
 // Round 8.
 $must($iiif, 'cc-by-nc-sa-4.0', 'Exact CC BY-NC-SA rights mapping missing.');
