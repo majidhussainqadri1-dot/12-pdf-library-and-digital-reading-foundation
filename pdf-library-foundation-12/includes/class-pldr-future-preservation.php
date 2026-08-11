@@ -16,7 +16,7 @@ final class PLDR_Future_Preservation {
         $object=PLDR_Core::object((int)$edition['object_id']);
         if(!$object)return array('error'=>PLDR_Core::machine_error('pldr_preservation_object','Object not found.',404));
         $path=PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);
-        $integrity='unknown';$error='';$findings=array();$provider_failure=false;$provider_input_total=0;
+        $integrity='unknown';$error='';$findings=array();$provider_failure=false;$provider_input_total=0;$provider_requested_quarantine=false;
         if($verify){
             if(is_wp_error($path)){
                 $integrity='unavailable';
@@ -49,8 +49,13 @@ final class PLDR_Future_Preservation {
         }
         if(is_array($external)){
             $external_health=sanitize_key((string)($external['format_health']??$health));
-            if(in_array($external_health,array('healthy','warning','needs-review','quarantined'),true)&&'quarantined'!==$health){
-                $rank=array('healthy'=>0,'warning'=>1,'needs-review'=>2,'quarantined'=>3);
+            if('quarantined'===$external_health&&'quarantined'!==$object['object_status']){
+                $provider_requested_quarantine=true;
+                $external_health='needs-review';
+                $findings[]='External provider requested quarantine; authoritative object quarantine requires local integrity/governed repair evidence.';
+            }
+            if(in_array($external_health,array('healthy','warning','needs-review'),true)&&'quarantined'!==$health){
+                $rank=array('healthy'=>0,'warning'=>1,'needs-review'=>2);
                 if(($rank[$external_health]??0)>($rank[$health]??0))$health=$external_health;
             }
             $provider_findings=(array)($external['findings']??array());$provider_input_total=count($provider_findings);
@@ -63,12 +68,12 @@ final class PLDR_Future_Preservation {
         $verified_now=$verify&&in_array($integrity,array('verified','failed'),true);
         $generation=max(1,(int)($existing['checksum_generation']??0)+($verified_now?1:0));
         $last_verified_at=$verified_now?PLDR_Core::now():($existing['last_verified_at']??null);
-        $assessment=array('integrity'=>$integrity,'findings'=>$findings,'error'=>self::limit($error,1000),'provider_failure'=>$provider_failure,'provider_input_total'=>$provider_input_total,'provider_findings_limit'=>self::PROVIDER_FINDINGS_LIMIT,'provider_input_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT);
+        $assessment=array('integrity'=>$integrity,'findings'=>$findings,'error'=>self::limit($error,1000),'provider_failure'=>$provider_failure,'provider_requested_quarantine'=>$provider_requested_quarantine,'provider_input_total'=>$provider_input_total,'provider_findings_limit'=>self::PROVIDER_FINDINGS_LIMIT,'provider_input_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT);
         $assessment_json=wp_json_encode($assessment);
         if(!is_string($assessment_json))return array('error'=>PLDR_Core::machine_error('pldr_preservation_encode','Preservation assessment could not be encoded.',500));
         $stored=$wpdb->replace(PLDR_Core::table('preservation_records'),array('edition_id'=>$edition_id,'object_id'=>(int)$object['id'],'format_health'=>$health,'checksum_generation'=>$generation,'sha256'=>(string)$object['sha256'],'encrypted_sha256'=>(string)$object['encrypted_sha256'],'derivative_status_json'=>wp_json_encode($derivatives),'assessment_json'=>$assessment_json,'last_verified_at'=>$last_verified_at,'updated_at'=>PLDR_Core::now()));
         if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_preservation_store','Preservation assessment could not be stored.',500));
-        return array('edition_id'=>$edition_id,'format_health'=>$health,'checksum_generation'=>$generation,'sha256'=>$object['sha256'],'encrypted_sha256'=>$object['encrypted_sha256'],'integrity'=>$integrity,'findings'=>$findings,'derivatives'=>$derivatives,'provider_failure'=>$provider_failure,'provider_findings_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT,'original_immutable'=>true,'preservation_derivative_policy'=>'separate object only; never overwrite original');
+        return array('edition_id'=>$edition_id,'format_health'=>$health,'checksum_generation'=>$generation,'sha256'=>$object['sha256'],'encrypted_sha256'=>$object['encrypted_sha256'],'integrity'=>$integrity,'findings'=>$findings,'derivatives'=>$derivatives,'provider_failure'=>$provider_failure,'provider_requested_quarantine'=>$provider_requested_quarantine,'provider_findings_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT,'original_immutable'=>true,'preservation_derivative_policy'=>'separate object only; never overwrite original');
     }
 
     public static function scheduled_scan():void {
