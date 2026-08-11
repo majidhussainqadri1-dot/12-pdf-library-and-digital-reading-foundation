@@ -19,7 +19,9 @@ final class PLDR_Future_Handoff {
         if(!$uid)return PLDR_Core::machine_error('pldr_handoff_login','Log in to synchronize reading sessions.',401);
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return $edition;
         $current=self::get($edition_id);if(is_wp_error($current))return $current;
-        if($expected&&$current&&(int)$current['version']!==$expected)return PLDR_Core::machine_error('pldr_handoff_conflict','A newer reading session exists on another device.',409,array('current'=>$current));
+        if($current && $expected<1)return PLDR_Core::machine_error('pldr_handoff_precondition','expected_version is required when updating an existing cross-device reading session.',428,array('current'=>$current));
+        if(!$current && $expected>0)return PLDR_Core::machine_error('pldr_handoff_conflict','No existing reading session matches the supplied expected_version.',409,array('current'=>array()));
+        if($current&&(int)$current['version']!==$expected)return PLDR_Core::machine_error('pldr_handoff_conflict','A newer reading session exists on another device.',409,array('current'=>$current));
         $page=max(1,min((int)$edition['pages'],absint($context['page']??1)));
         $layout=sanitize_key((string)($context['layout']??'single'));
         if(!in_array($layout,array('single','continuous','spread-ltr','spread-rtl','horizontal','presentation'),true))$layout='single';
@@ -30,7 +32,7 @@ final class PLDR_Future_Handoff {
         $version=max(1,(int)($current['version']??0)+1);
         $row=array('user_id'=>$uid,'edition_id'=>$edition_id,'page_number'=>$page,'zoom'=>$zoom,'layout_mode'=>$layout,'anchor_json'=>$anchor_json,'device_hint'=>self::limit(sanitize_text_field((string)($context['device']??'')),80),'version'=>$version,'updated_at'=>PLDR_Core::now());
         if($current){
-            $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('session_handoffs').' SET page_number=%d,zoom=%s,layout_mode=%s,anchor_json=%s,device_hint=%s,version=%d,updated_at=%s WHERE user_id=%d AND edition_id=%d AND version=%d',$row['page_number'],$row['zoom'],$row['layout_mode'],$row['anchor_json'],$row['device_hint'],$version,$row['updated_at'],$uid,$edition_id,(int)$current['version']));
+            $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('session_handoffs').' SET page_number=%d,zoom=%s,layout_mode=%s,anchor_json=%s,device_hint=%s,version=%d,updated_at=%s WHERE user_id=%d AND edition_id=%d AND version=%d',$row['page_number'],$row['zoom'],$row['layout_mode'],$row['anchor_json'],$row['device_hint'],$version,$row['updated_at'],$uid,$edition_id,$expected));
             if(false===$updated)return PLDR_Core::machine_error('pldr_handoff_store','Reading-session handoff could not be stored.',500);
             if(1!==$updated)return PLDR_Core::machine_error('pldr_handoff_conflict','Concurrent reading-session handoff update detected.',409,array('current'=>self::get($edition_id)));
         }else{
