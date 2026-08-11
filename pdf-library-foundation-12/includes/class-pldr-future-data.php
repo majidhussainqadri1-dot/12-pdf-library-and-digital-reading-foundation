@@ -3,6 +3,9 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Future_Data {
+    private const BULK_OCR_LIMIT = 1000;
+    private const REFLOW_WINDOW_LIMIT = 100;
+
     public static function require_edition(int $edition_id, string $operation = 'read') {
         $edition = PLDR_Core::edition($edition_id);
         if (!$edition || !PLDR_Access::can_access_edition($edition_id, $operation, get_current_user_id())) {
@@ -13,7 +16,8 @@ final class PLDR_Future_Data {
 
     public static function ocr_pages(int $edition_id,int $page=0,int $limit=0,int $offset=0): array {
         global $wpdb;
-        $page=max(0,$page);$offset=max(0,$offset);$limit=max(0,min(1000,$limit));
+        $page=max(0,$page);$offset=max(0,$offset);$limit=max(0,min(self::BULK_OCR_LIMIT,$limit));
+        if(0===$page && 0===$limit)$limit=self::BULK_OCR_LIMIT;
         $sql='SELECT page_number,language,quality_score,text_content,normalized_text FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d';
         $params=array($edition_id);
         if($page>0){$sql.=' AND page_number=%d';$params[]=$page;}
@@ -41,16 +45,18 @@ final class PLDR_Future_Data {
     }
 
     public static function reflow(int $edition_id,int $page=0): array {
+        global $wpdb;
         $edition = self::require_edition($edition_id);
         if (is_wp_error($edition)) return array('error' => $edition);
         $page=max(0,$page);
         if($page>(int)$edition['pages'])return array('error'=>PLDR_Core::machine_error('pldr_reflow_page','Requested reflow page is outside this edition.',400));
-        $pages = self::ocr_pages($edition_id,$page);
+        $limit=$page>0?1:self::REFLOW_WINDOW_LIMIT;
+        $pages = self::ocr_pages($edition_id,$page,$limit,0);
         $provider = 'lawful-ocr';
         if (!$pages) {
             $external = apply_filters('pldr_reflow_extract', null, $edition_id, $edition, $page);
             if (is_array($external) && !empty($external['pages'])) {
-                $pages = (array) $external['pages'];
+                $pages = array_slice((array) $external['pages'],0,$limit);
                 $provider = sanitize_text_field((string) ($external['provider'] ?? 'adapter'));
             }
         }
@@ -61,7 +67,8 @@ final class PLDR_Future_Data {
             $text = wp_strip_all_tags((string) ($row['text_content'] ?? $row['text'] ?? ''));
             if ($item_page > 0 && '' !== trim($text)) $items[] = array('page' => $item_page, 'text' => $text, 'language' => sanitize_text_field((string) ($row['language'] ?? $edition['language'])), 'quality' => (float) ($row['quality_score'] ?? 0));
         }
-        return array('edition_id' => $edition_id, 'requested_page'=>$page ?: null,'provider' => $provider, 'pages' => $items, 'available' => (bool) $items, 'derived' => true, 'original_immutable' => true);
+        $ocr_total=$page>0?count($items):(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id));
+        return array('edition_id' => $edition_id,'requested_page'=>$page ?: null,'provider' => $provider,'pages' => $items,'available' => (bool) $items,'derived' => true,'original_immutable' => true,'page_window_limit'=>$page>0?1:self::REFLOW_WINDOW_LIMIT,'ocr_pages_total'=>$ocr_total,'truncated'=>$page===0&&$ocr_total>count($items));
     }
 
     public static function outline(int $edition_id): array {
