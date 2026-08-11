@@ -34,11 +34,12 @@ final class PLDR_Future_Handoff {
         if($current){
             $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('session_handoffs').' SET page_number=%d,zoom=%s,layout_mode=%s,anchor_json=%s,device_hint=%s,version=%d,updated_at=%s WHERE user_id=%d AND edition_id=%d AND version=%d',$row['page_number'],$row['zoom'],$row['layout_mode'],$row['anchor_json'],$row['device_hint'],$version,$row['updated_at'],$uid,$edition_id,$expected));
             if(false===$updated)return PLDR_Core::machine_error('pldr_handoff_store','Reading-session handoff could not be stored.',500);
-            if(1!==$updated)return PLDR_Core::machine_error('pldr_handoff_conflict','Concurrent reading-session handoff update detected.',409,array('current'=>self::get($edition_id)));
+            if(1!==$updated){$fresh=self::get($edition_id);if(is_wp_error($fresh))return $fresh;return PLDR_Core::machine_error('pldr_handoff_conflict','Concurrent reading-session handoff update detected.',409,array('current'=>$fresh));}
         }else{
             $inserted=$wpdb->insert(PLDR_Core::table('session_handoffs'),$row);
             if(false===$inserted){
                 $race=self::get($edition_id);
+                if(is_wp_error($race))return $race;
                 if(is_array($race)&&$race)return PLDR_Core::machine_error('pldr_handoff_conflict','Reading-session handoff was created concurrently on another request.',409,array('current'=>$race));
                 return PLDR_Core::machine_error('pldr_handoff_store','Reading-session handoff could not be stored.',500);
             }
@@ -46,13 +47,19 @@ final class PLDR_Future_Handoff {
         return self::dto($row);
     }
 
-    private static function dto(array $row):array {
+    private static function dto(array $row) {
+        $raw=(string)($row['anchor_json']??'');
+        $anchor=json_decode($raw,true);
+        if(''!==trim($raw)&&!is_array($anchor)){
+            PLDR_Core::audit('edition',(int)($row['edition_id']??0),'handoff_anchor_corrupt',array('user_id'=>(int)($row['user_id']??0),'version'=>(int)($row['version']??0)));
+            return PLDR_Core::machine_error('pldr_handoff_corrupt','Stored cross-device reading anchor failed integrity validation and was not silently discarded.',500,array('version'=>(int)($row['version']??0)));
+        }
         return array(
             'edition_id'=>(int)($row['edition_id']??0),
             'page'=>(int)($row['page_number']??1),
             'zoom'=>(string)($row['zoom']??'page-width'),
             'layout'=>(string)($row['layout_mode']??'single'),
-            'anchor'=>json_decode((string)($row['anchor_json']??''),true)?:array(),
+            'anchor'=>is_array($anchor)?$anchor:array(),
             'device'=>(string)($row['device_hint']??''),
             'version'=>(int)($row['version']??0),
             'updated_at'=>$row['updated_at']??null,
