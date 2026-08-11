@@ -1,0 +1,46 @@
+name: R15 Sequential Patch Applier
+
+on:
+  push:
+    branches:
+      - feat/file-12-future-24-v1.1.0-rc1
+    paths:
+      - 'r15-patches/*.patch'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !startsWith(github.event.head_commit.message, 'Apply R15 patch:') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Resolve patch file
+        id: patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch_file="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep '^r15-patches/.*\.patch$' | tail -n 1)"
+          test -n "$patch_file"
+          echo "file=$patch_file" >> "$GITHUB_OUTPUT"
+      - name: Apply reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check "${{ steps.patch.outputs.file }}"
+          git apply "${{ steps.patch.outputs.file }}"
+          find pdf-library-foundation-12 -type f -name '*.php' -print0 | xargs -0 -n1 php -l >/dev/null
+          find pdf-library-foundation-12/assets -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Commit reviewed source correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Sabri File 12 R15 Corrective Review'
+          git config user.email 'actions@users.noreply.github.com'
+          git add pdf-library-foundation-12
+          git commit -m "Apply R15 patch: $(basename '${{ steps.patch.outputs.file }}')"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
