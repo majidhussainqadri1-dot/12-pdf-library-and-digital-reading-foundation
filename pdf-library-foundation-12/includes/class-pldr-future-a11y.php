@@ -10,10 +10,14 @@ final class PLDR_Future_A11y {
         $document_id=(int)$edition['document_id'];
         if($refresh&&!PLDR_Core::authorize('manage',$document_id)&&!PLDR_Core::authorize('rights',$document_id))return array('error'=>PLDR_Core::machine_error('pldr_a11y_refresh_forbidden','Refreshing this accessibility audit requires review authority for the document.',403));
         if(!$refresh){$row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('a11y_audits').' WHERE edition_id=%d',$edition_id),ARRAY_A);if($row)return self::dto($row);}
-        $ocr=PLDR_Future_Data::ocr_pages($edition_id);$findings=array();$score=30;
+
+        $ocr_stats=$wpdb->get_row($wpdb->prepare('SELECT COUNT(*) page_count,AVG(quality_score) avg_quality FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id),ARRAY_A)?:array();
+        $ocr_pages=(int)($ocr_stats['page_count']??0);
+        $ocr_avg=(float)($ocr_stats['avg_quality']??0);
+        $findings=array();$score=30;
         if(!empty($edition['title']))$score+=10;else$findings[]='Document title metadata is missing.';
         if(!empty($edition['language']))$score+=10;else$findings[]='Document language metadata is missing.';
-        if($ocr){$avg=array_sum(array_map(static fn($r)=>(float)$r['quality_score'],$ocr))/count($ocr);$score+=min(25,$avg/4);}else$findings[]='No lawful OCR text is available for accessible text fallback.';
+        if($ocr_pages>0)$score+=min(25,$ocr_avg/4);else$findings[]='No lawful OCR text is available for accessible text fallback.';
         $thumbs=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s',$edition_id,'thumbnail','available'));
         if($thumbs>0)$score+=5;else$findings[]='Page preview derivatives are unavailable.';
         $external=apply_filters('pldr_accessibility_inspect',null,$edition_id,$edition);$provider='heuristic';
@@ -22,7 +26,7 @@ final class PLDR_Future_A11y {
         $status=$score>=90?'excellent':($score>=75?'good':($score>=50?'partial':'needs-remediation'));
         $stored=$wpdb->replace(PLDR_Core::table('a11y_audits'),array('edition_id'=>$edition_id,'score'=>$score,'status'=>$status,'findings_json'=>wp_json_encode($findings),'provider'=>$provider,'verified_by'=>0,'verified_at'=>null,'updated_at'=>PLDR_Core::now()));
         if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_a11y_store','Accessibility assessment could not be stored.',500));
-        return array('edition_id'=>$edition_id,'score'=>round($score,2),'status'=>$status,'findings'=>$findings,'provider'=>$provider,'verified'=>false,'verified_at'=>null,'public_badge_allowed'=>false);
+        return array('edition_id'=>$edition_id,'score'=>round($score,2),'status'=>$status,'findings'=>$findings,'provider'=>$provider,'verified'=>false,'verified_at'=>null,'public_badge_allowed'=>false,'ocr_pages_assessed'=>$ocr_pages,'ocr_average_quality'=>round($ocr_avg,2));
     }
 
     public static function verify(int $edition_id,string $note='') {
