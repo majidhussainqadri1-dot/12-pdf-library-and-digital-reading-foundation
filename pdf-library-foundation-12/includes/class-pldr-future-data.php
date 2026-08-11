@@ -51,7 +51,12 @@ final class PLDR_Future_Data {
         $page=max(0,$page);
         if($page>(int)$edition['pages'])return array('error'=>PLDR_Core::machine_error('pldr_reflow_page','Requested reflow page is outside this edition.',400));
         $limit=$page>0?1:self::REFLOW_WINDOW_LIMIT;
+        $wpdb->last_error='';
         $pages = self::ocr_pages($edition_id,$page,$limit,0);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'reflow_source_read_failed',array('page'=>$page,'limit'=>$limit));
+            return array('error'=>PLDR_Core::machine_error('pldr_reflow_source_read','Reflow OCR source state could not be read reliably; no external provider fallback was attempted.',503,array('degraded'=>true)));
+        }
         $provider = 'lawful-ocr';
         $external_input_total=0;
         $external_used=false;
