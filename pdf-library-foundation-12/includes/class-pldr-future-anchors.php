@@ -18,7 +18,9 @@ final class PLDR_Future_Anchors {
         if (isset($selector['value'])) { $value=wp_strip_all_tags((string)$selector['value']); $clean['value']=self::limit($value,300); }
         if ('TextQuoteSelector' === $type) {
             if ('' === trim((string)($clean['exact'] ?? ''))) return PLDR_Core::machine_error('pldr_anchor_exact', 'A text-quote anchor requires an exact source excerpt.', 400);
-            if (!self::quote_belongs($edition_id, $page, (string)$clean['exact'], $edition)) return PLDR_Core::machine_error('pldr_anchor_source', 'The text-quote anchor does not match the requested edition page.', 403);
+            $source_match=self::quote_belongs($edition_id, $page, (string)$clean['exact'], $edition);
+            if (is_wp_error($source_match)) return $source_match;
+            if (!$source_match) return PLDR_Core::machine_error('pldr_anchor_source', 'The text-quote anchor does not match the requested edition page.', 403);
         } else {
             if ('' === trim((string)($clean['value'] ?? '')) && !isset($selector['region'])) return PLDR_Core::machine_error('pldr_anchor_selector_value', 'This scholarly selector requires a bounded selector value or region.', 400);
             if ('FragmentSelector' === $type && !empty($clean['value']) && preg_match('/(?:^|[?&#;])page=(\d+)/', (string)$clean['value'], $m) && absint($m[1]) !== $page) {
@@ -42,7 +44,7 @@ final class PLDR_Future_Anchors {
         return array('id'=>(int)$result['id'],'page'=>$page,'selector'=>$clean,'private'=>true,'portable'=>true,'edition_version'=>(int)$edition['version'],'source_verified'=>'TextQuoteSelector'===$type,'selector_value_preserved'=>isset($clean['value']));
     }
 
-    private static function quote_belongs(int $edition_id,int $page,string $exact,array $edition):bool {
+    private static function quote_belongs(int $edition_id,int $page,string $exact,array $edition) {
         $needle=PLDR_Core::normalize_search($exact);
         if(''===$needle)return false;
         $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
@@ -50,7 +52,12 @@ final class PLDR_Future_Anchors {
             $haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));
             if(''!==$haystack&&false!==strpos($haystack,$needle))return true;
         }
-        return (bool)apply_filters('pldr_precise_anchor_source_allowed',false,$edition_id,$page,$exact,$edition);
+        try {
+            return (bool)apply_filters('pldr_precise_anchor_source_allowed',false,$edition_id,$page,$exact,$edition);
+        } catch (Throwable $e) {
+            PLDR_Core::audit('edition',$edition_id,'precise_anchor_source_provider_failed',array('page'=>$page,'provider_failure'=>1));
+            return PLDR_Core::machine_error('pldr_anchor_source_provider','Precise-anchor source validation is temporarily unavailable; the anchor was not accepted.',503,array('degraded'=>true,'provider_failure'=>true));
+        }
     }
 
     private static function limit(string $value,int $length):string {
