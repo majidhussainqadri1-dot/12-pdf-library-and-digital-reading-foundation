@@ -56,6 +56,16 @@ final class PLDR_Future_Annotations {
     private static function canonical_source(array $edition,int $edition_id):string {return add_query_arg('edition',$edition_id,PLDR_Core::route_url('read',array('id'=>$edition['public_id'])));}
     private static function annotation_id(int $uid,int $edition_id,int $item_id):string {return 'urn:pldr:annotation:'.hash_hmac('sha256',$uid.'|'.$edition_id.'|'.$item_id,wp_salt('auth'));}
     private static function selector(array $selector):array {$type=sanitize_text_field((string)($selector['type']??''));$out=array('type'=>$type);foreach(array('exact'=>260,'prefix'=>80,'suffix'=>80,'value'=>300) as $key=>$limit){if(isset($selector[$key]))$out[$key]=self::limit(wp_strip_all_tags((string)$selector[$key]),$limit);}if(isset($selector['refinedBy'])&&is_array($selector['refinedBy'])){$ref=(array)$selector['refinedBy'];$ref_type=sanitize_text_field((string)($ref['type']??''));if('FragmentSelector'===$ref_type){$value=self::limit(wp_strip_all_tags((string)($ref['value']??'')),300);if(''!==$value)$out['refinedBy']=array('type'=>'FragmentSelector','conformsTo'=>'https://www.w3.org/TR/media-frags/','value'=>$value);}}return $out;}
-    private static function quote_belongs(int $edition_id,int $page,string $exact,array $edition):bool {$needle=PLDR_Core::normalize_search($exact);if(''===$needle)return false;$rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);if($rows){$haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));if(''!==$haystack&&false!==strpos($haystack,$needle))return true;}return (bool)apply_filters('pldr_annotation_import_source_allowed',false,$edition_id,$page,$exact,$edition);}
+    private static function quote_belongs(int $edition_id,int $page,string $exact,array $edition):bool {
+        $needle=PLDR_Core::normalize_search($exact);if(''===$needle)return false;
+        $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if($rows){$haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));if(''!==$haystack&&false!==strpos($haystack,$needle))return true;}
+        try{
+            return (bool)apply_filters('pldr_annotation_import_source_allowed',false,$edition_id,$page,$exact,$edition);
+        }catch(Throwable $e){
+            PLDR_Core::audit('edition',$edition_id,'annotation_source_provider_failed',array('page'=>$page,'provider_failure'=>true));
+            return false;
+        }
+    }
     private static function limit(string $value,int $length):string {return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length);}
 }
