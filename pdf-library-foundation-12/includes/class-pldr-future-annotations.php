@@ -3,29 +3,43 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Future_Annotations {
+    private const EXPORT_LIMIT = 1000;
+    private const IMPORT_LIMIT = 500;
+
     public static function export(int $edition_id): array {
+        global $wpdb;
         $edition = PLDR_Future_Data::require_edition($edition_id);
         if (is_wp_error($edition)) return array('error' => $edition);
-        if (!is_user_logged_in()) return array('error' => PLDR_Core::machine_error('pldr_annotations_login','Log in to export private annotations.',401));
-        $items = PLDR_Reading::items($edition_id);
+        $uid=get_current_user_id();
+        if (!$uid) return array('error' => PLDR_Core::machine_error('pldr_annotations_login','Log in to export private annotations.',401));
+        $rows=$wpdb->get_results($wpdb->prepare(
+            'SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM '.PLDR_Core::table('reading_items').' WHERE user_id=%d AND edition_id=%d ORDER BY page_number ASC,id ASC LIMIT %d',
+            $uid,$edition_id,self::EXPORT_LIMIT+1
+        ),ARRAY_A)?:array();
+        $truncated=count($rows)>self::EXPORT_LIMIT;
+        if($truncated)$rows=array_slice($rows,0,self::EXPORT_LIMIT);
+        $source=self::canonical_source($edition,$edition_id);
         $annotations = array();
-        foreach (array_slice($items,0,1000) as $item) {
-            $target = array('source' => PLDR_Core::route_url('read', array('id'=>$edition['public_id'])), 'selector' => array(array('type'=>'FragmentSelector','conformsTo'=>'https://www.w3.org/TR/media-frags/','value'=>'page='.(int)$item['page_number'])));
+        foreach ($rows as $item) {
+            $target = array('source' => $source, 'selector' => array(array('type'=>'FragmentSelector','conformsTo'=>'https://www.w3.org/TR/media-frags/','value'=>'page='.(int)$item['page_number'])));
             $anchor = (string) $item['anchor_text'];
             $decoded = json_decode($anchor, true);
             if (is_array($decoded)) $target['selector'][] = $decoded;
             elseif ('' !== $anchor) $target['selector'][] = array('type'=>'TextQuoteSelector','exact'=>self::limit($anchor,500));
-            $annotations[] = array('@context'=>'http://www.w3.org/ns/anno.jsonld','id'=>'urn:uuid:'.PLDR_Core::uuid(),'type'=>'Annotation','motivation'=>('bookmark'===$item['item_type']?'bookmarking':'commenting'),'body'=>array('type'=>'TextualBody','value'=>self::limit((string)$item['note_text'],4000),'purpose'=>'commenting'),'target'=>$target,'created'=>$item['created_at'],'modified'=>$item['updated_at']);
+            $motivation='bookmark'===$item['item_type']?'bookmarking':('highlight'===$item['item_type']?'highlighting':'commenting');
+            $annotations[] = array('@context'=>'http://www.w3.org/ns/anno.jsonld','id'=>'urn:uuid:'.PLDR_Core::uuid(),'type'=>'Annotation','motivation'=>$motivation,'body'=>array('type'=>'TextualBody','value'=>self::limit((string)$item['note_text'],4000),'purpose'=>'commenting'),'target'=>$target,'created'=>$item['created_at'],'modified'=>$item['updated_at']);
         }
-        return array('@context'=>'http://www.w3.org/ns/anno.jsonld','type'=>'AnnotationPage','items'=>$annotations,'private'=>true,'portable'=>true,'export_limit'=>1000);
+        return array('@context'=>'http://www.w3.org/ns/anno.jsonld','type'=>'AnnotationPage','items'=>$annotations,'private'=>true,'portable'=>true,'document_id'=>$edition['public_id'],'edition_id'=>$edition_id,'source'=>$source,'export_limit'=>self::EXPORT_LIMIT,'returned'=>count($annotations),'truncated'=>$truncated);
     }
 
     public static function import(int $edition_id, array $page): array {
         if (!is_user_logged_in()) return array('error' => PLDR_Core::machine_error('pldr_annotations_login','Log in to import annotations.',401));
         $edition = PLDR_Future_Data::require_edition($edition_id);
         if (is_wp_error($edition)) return array('error'=>$edition);
-        $items = isset($page['items']) && is_array($page['items']) ? array_slice($page['items'],0,500) : array();
-        $canonical=PLDR_Core::route_url('read',array('id'=>$edition['public_id']));
+        $all_items = isset($page['items']) && is_array($page['items']) ? array_values($page['items']) : array();
+        $input_total=count($all_items);
+        $items = array_slice($all_items,0,self::IMPORT_LIMIT);
+        $canonical=self::canonical_source($edition,$edition_id);
         $imported=0;$rejected=0;
         foreach($items as $annotation){
             if(!is_array($annotation)){$rejected++;continue;}
@@ -45,10 +59,17 @@ final class PLDR_Future_Annotations {
             if($page_no<1||$page_no>(int)$edition['pages']){$rejected++;continue;}
             $body_node=$annotation['body']??array();
             $body=is_array($body_node)?self::limit(sanitize_textarea_field((string)($body_node['value']??'')),4000):'';
-            $result=PLDR_Reading::add_item($edition_id,array('type'=>'highlight','page'=>$page_no,'anchor'=>$anchor,'note'=>$body,'tags'=>array('w3c-import')),get_current_user_id());
+            $motivation=sanitize_key((string)($annotation['motivation']??''));
+            $item_type='bookmarking'===$motivation?'bookmark':('commenting'===$motivation?'note':'highlight');
+            if('note'===$item_type&&''===trim($body))$item_type='highlight';
+            $result=PLDR_Reading::add_item($edition_id,array('type'=>$item_type,'page'=>$page_no,'anchor'=>$anchor,'note'=>$body,'tags'=>array('w3c-import')),get_current_user_id());
             if(is_wp_error($result))$rejected++;else$imported++;
         }
-        return array('imported'=>$imported,'rejected'=>$rejected,'private'=>true,'edition_bound'=>true,'source_required'=>true,'input_limit'=>500);
+        return array('imported'=>$imported,'rejected'=>$rejected,'private'=>true,'edition_bound'=>true,'source_required'=>true,'input_total'=>$input_total,'input_limit'=>self::IMPORT_LIMIT,'input_truncated'=>$input_total>self::IMPORT_LIMIT);
+    }
+
+    private static function canonical_source(array $edition,int $edition_id):string {
+        return add_query_arg('edition',$edition_id,PLDR_Core::route_url('read',array('id'=>$edition['public_id'])));
     }
 
     private static function selector(array $selector):array {
