@@ -5,7 +5,7 @@ defined('ABSPATH') || exit;
 final class PLDR_Future_REST {
     public static function register(): void {
         register_rest_route('pldr/v1', '/future/features', array('methods'=>'GET','callback'=>array(__CLASS__,'features'),'permission_callback'=>'__return_true'));
-        register_rest_route('pldr/v1', '/future/reflow/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'reflow'),'permission_callback'=>'__return_true'));
+        register_rest_route('pldr/v1', '/future/reflow/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'reflow'),'permission_callback'=>'__return_true','args'=>array('page'=>array('sanitize_callback'=>'absint'))));
         register_rest_route('pldr/v1', '/future/outline/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'outline'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/compare', array('methods'=>'GET','callback'=>array(__CLASS__,'compare'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/citation-export/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'citation_export'),'permission_callback'=>'__return_true'));
@@ -53,7 +53,7 @@ final class PLDR_Future_REST {
         ));
         register_rest_route('pldr/v1', '/future/reading-room', array('methods'=>'POST','callback'=>array(__CLASS__,'reading_room'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/context/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'context'),'permission_callback'=>'__return_true'));
-        register_rest_route('pldr/v1', '/future/corpus/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'corpus'),'permission_callback'=>'__return_true'));
+        register_rest_route('pldr/v1', '/future/corpus/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'corpus'),'permission_callback'=>'__return_true','args'=>array('offset'=>array('sanitize_callback'=>'absint'),'limit'=>array('sanitize_callback'=>'absint'))));
         register_rest_route('pldr/v1', '/future/derive-text', array('methods'=>'POST','callback'=>array(__CLASS__,'derive_text'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/preservation/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'preservation'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/fingerprint/(?P<edition>\d+)', array(
@@ -101,7 +101,7 @@ final class PLDR_Future_REST {
     }
 
     public static function features() { return rest_ensure_response(array('version'=>PLDR_Future::VERSION,'count'=>count(PLDR_Future::FEATURES),'features'=>PLDR_Future::FEATURES,'production_truth'=>'Source capability presence is not staging/live acceptance.')); }
-    public static function reflow(WP_REST_Request $r) { $result=PLDR_Future_Data::reflow(absint($r['edition']));if(isset($r['page'])&&is_array($result)&&!isset($result['error'])){$page=absint($r['page']);$result['pages']=array_values(array_filter($result['pages'],static fn($p)=>(int)$p['page']===$page));}return self::response($result); }
+    public static function reflow(WP_REST_Request $r) { return self::response(PLDR_Future_Data::reflow(absint($r['edition']),absint($r['page']))); }
     public static function outline(WP_REST_Request $r) { return self::response(PLDR_Future_Data::outline(absint($r['edition']))); }
     public static function compare(WP_REST_Request $r) { return self::response(PLDR_Future_Data::compare(absint($r['left']),absint($r['right']))); }
     public static function citation_export(WP_REST_Request $r) { return self::response(PLDR_Future_Citations::export(absint($r['edition']),sanitize_key((string)($r['format']?:'csl-json')),absint($r['page']))); }
@@ -131,7 +131,7 @@ final class PLDR_Future_REST {
     public static function a11y_verify(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'a11y-verify',static fn()=>PLDR_Future_A11y::verify(absint($r['edition']),(string)($b['note']??''))); }
     public static function reading_room(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'reading-room',static fn()=>PLDR_Future_Rooms::create(absint($b['edition_id']??0),absint($b['page']??1),(array)($b['anchor']??array()))); }
     public static function context(WP_REST_Request $r) { return self::response(PLDR_Future_Context::lookup(absint($r['edition']),(string)$r['selection'],absint($r['page']))); }
-    public static function corpus(WP_REST_Request $r) { return self::response(PLDR_Future_Corpus::manifest(absint($r['edition']))); }
+    public static function corpus(WP_REST_Request $r) { $limit=absint($r['limit']);if(!$limit)$limit=250;return self::response(PLDR_Future_Corpus::manifest(absint($r['edition']),absint($r['offset']),$limit)); }
     public static function derive_text(WP_REST_Request $r) { $b=self::body($r);return self::response(PLDR_Future_Derived_Text::derive(absint($b['edition_id']??0),absint($b['page']??0),(string)($b['text']??''),(string)($b['mode']??''),(string)($b['target']??''))); }
     public static function preservation(WP_REST_Request $r) { return self::response(PLDR_Future_Preservation::assess(absint($r['edition']),!empty($r['verify']))); }
     public static function duplicates(WP_REST_Request $r) { return self::response(array('items'=>PLDR_Future_Fingerprint::candidates(absint($r['edition'])),'automatic_merge'=>false)); }
