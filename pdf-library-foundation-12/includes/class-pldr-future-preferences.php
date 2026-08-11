@@ -11,7 +11,12 @@ final class PLDR_Future_Preferences {
         if(!$uid)return array();
         $key=self::key($key);
         if(is_wp_error($key))return array();
+        $wpdb->last_error='';
         $row=$wpdb->get_row($wpdb->prepare('SELECT preference_json,version,updated_at FROM '.PLDR_Core::table('future_prefs').' WHERE user_id=%d AND preference_key=%s',$uid,$key),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('user',$uid,'future_preference_read_failed',array('preference_key'=>$key));
+            return PLDR_Core::machine_error('pldr_future_pref_read','Synchronized reading preferences could not be read reliably.',503,array('degraded'=>true));
+        }
         if(!$row)return array('value'=>array(),'version'=>0);
         $decoded=json_decode((string)$row['preference_json'],true);
         if(!is_array($decoded)){
