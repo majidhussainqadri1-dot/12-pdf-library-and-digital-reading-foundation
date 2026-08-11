@@ -3,6 +3,7 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Access {
+    private const MAX_TOKEN_ISSUES_PER_HOUR = 600;
     public static function can_access_edition(int $edition_id, string $operation = 'read', int $user_id = 0): bool {
         $edition = PLDR_Core::edition($edition_id);
         if (!$edition) return false;
@@ -110,6 +111,8 @@ final class PLDR_Access {
         if ((int) $edition['object_id'] !== $object_id && !self::derivative_belongs($edition_id, $object_id)) {
             return PLDR_Core::machine_error('pldr_object_mismatch', 'The requested object does not belong to this document edition.', 403);
         }
+        $rate=self::consume_issue_slot($edition_id,$operation,$user_id);
+        if(is_wp_error($rate))return $rate;
         try {
             $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
         } catch (Throwable $e) {
@@ -146,6 +149,26 @@ final class PLDR_Access {
             'filename' => sanitize_file_name((string) $object['original_name']),
             'mime_type' => (string) $object['mime_type'],
         );
+    }
+
+    private static function consume_issue_slot(int $edition_id,string $operation,int $user_id) {
+        global $wpdb;
+        $ip=sanitize_text_field((string)($_SERVER['REMOTE_ADDR']??'unknown'));
+        $identity=$user_id>0?'u:'.$user_id:'a:'.hash('sha256',$ip.'|'.wp_salt('auth'));
+        $bucket='pldr_access_rate_'.substr(hash('sha256',$identity.'|'.$edition_id.'|'.$operation.'|'.gmdate('YmdH')),0,32);
+        $lock='pldr_access_'.substr(hash('sha256',$identity.'|'.$edition_id.'|'.$operation),0,32);
+        $locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,1)',$lock));
+        if(1!==$locked)return PLDR_Core::machine_error('pldr_access_rate_lock','Secure delivery capacity is temporarily unavailable; retry shortly.',503,array('retry_after'=>2));
+        try{
+            $count=(int)get_transient($bucket);
+            $limit=(int)apply_filters('pldr_access_token_hourly_limit',self::MAX_TOKEN_ISSUES_PER_HOUR,$user_id,$edition_id,$operation);
+            $limit=max(100,min(5000,$limit));
+            if($count>=$limit)return PLDR_Core::machine_error('pldr_access_rate_limit','Secure delivery grants are temporarily rate limited.',429,array('retry_after'=>60,'hourly_limit'=>$limit));
+            if(!set_transient($bucket,$count+1,HOUR_IN_SECONDS+120))return PLDR_Core::machine_error('pldr_access_rate_store','Secure delivery rate-limit state could not be stored; no grant was issued.',503);
+            return true;
+        }finally{
+            $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));
+        }
     }
 
     private static function derivative_belongs(int $edition_id, int $object_id): bool {
