@@ -205,13 +205,21 @@ final class PLDR_Privacy {
             $shelves = PLDR_Core::table('shelves');
             $shelf_ids = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$shelves} WHERE user_id=%d ORDER BY id ASC LIMIT %d", $user_id, self::BATCH)) ?: array();
             if ($shelf_ids) {
+                $shelf_items_remaining=false;
                 if (self::table_exists('shelf_items')) {
                     $items = PLDR_Core::table('shelf_items');
                     $in = implode(',', array_map('absint', $shelf_ids));
-                    if (false === $wpdb->query("DELETE FROM {$items} WHERE shelf_id IN ({$in})")) $errors[] = 'shelf_items';
+                    $item_ids=$wpdb->get_col("SELECT id FROM {$items} WHERE shelf_id IN ({$in}) ORDER BY id ASC LIMIT ".self::BATCH)?:array();
+                    if($item_ids){
+                        $result=self::delete_ids('shelf_items','id',$item_ids);
+                        if($result<0)$errors[]='shelf_items';else$removed+=$result;
+                    }
+                    $shelf_items_remaining=(bool)$wpdb->get_var("SELECT id FROM {$items} WHERE shelf_id IN ({$in}) LIMIT 1");
                 }
-                $result = self::delete_ids('shelves', 'id', $shelf_ids);
-                if ($result < 0) $errors[] = 'shelves'; else $removed += $result;
+                if(!$shelf_items_remaining&&!in_array('shelf_items',$errors,true)){
+                    $result = self::delete_ids('shelves', 'id', $shelf_ids);
+                    if ($result < 0) $errors[] = 'shelves'; else $removed += $result;
+                }
             }
         }
 
