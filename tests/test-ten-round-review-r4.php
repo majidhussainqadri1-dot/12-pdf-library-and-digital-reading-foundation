@@ -26,7 +26,7 @@ $must($privacy, 'private const BATCH = 50', 'Bounded privacy batch size is missi
 $must($privacy, "'future_prefs'", 'Future preferences are missing from privacy coverage.');
 $must($privacy, "'session_handoffs'", 'Session handoffs are missing from privacy coverage.');
 $must($privacy, "'room_contexts'", 'Reading-room contexts are missing from privacy coverage.');
-$must($privacy, "'done'=>0 === $remaining", 'Privacy erasure does not report remaining work truthfully.');
+$must($privacy, "'done'=>0 === \$remaining", 'Privacy erasure does not report remaining work truthfully.');
 
 // Round 2 — truthful/idempotent private item deletion and citation page validation.
 $must($rest, "'reading-item-delete'", 'Reading-item DELETE is not idempotency protected.');
