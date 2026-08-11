@@ -3,12 +3,38 @@
 defined('ABSPATH') || exit;
 
 $pldr_future_files = array(
-    'class-pldr-future-reading.php',
-    'class-pldr-future-standards.php',
-    'class-pldr-future-personal.php',
-    'class-pldr-future-preservation-lab.php',
+    'class-pldr-future-schema.php',
+    'class-pldr-future-data.php',
+    'class-pldr-future-derived-text.php',
+    'class-pldr-future-anchors.php',
+    'class-pldr-future-citations.php',
+    'class-pldr-future-authority.php',
+    'class-pldr-future-ocr-lab.php',
+    'class-pldr-future-annotations.php',
+    'class-pldr-future-iiif.php',
+    'class-pldr-future-search.php',
+    'class-pldr-future-preferences.php',
+    'class-pldr-future-shelves.php',
+    'class-pldr-future-insights.php',
+    'class-pldr-future-handoff.php',
+    'class-pldr-future-a11y.php',
+    'class-pldr-future-rooms.php',
+    'class-pldr-future-context.php',
+    'class-pldr-future-corpus.php',
+    'class-pldr-future-preservation.php',
+    'class-pldr-future-fingerprint.php',
 );
-foreach ($pldr_future_files as $pldr_future_file) { require_once __DIR__ . '/' . $pldr_future_file; }
+foreach ($pldr_future_files as $pldr_future_file) {
+    $pldr_future_path = __DIR__ . '/' . $pldr_future_file;
+    if (!is_readable($pldr_future_path)) {
+        add_action('admin_notices', static function () use ($pldr_future_file): void {
+            if (!current_user_can('manage_pdf_library')) return;
+            echo '<div class="notice notice-error"><p><strong>File 12 Future-24 loader error:</strong> ' . esc_html($pldr_future_file) . ' is missing from the deployed package.</p></div>';
+        });
+        continue;
+    }
+    require_once $pldr_future_path;
+}
 
 final class PLDR_Future {
     public const VERSION = '1.1.0';
@@ -44,6 +70,21 @@ final class PLDR_Future {
     public static function hooks(): void {
         if (self::$hooked) return;
         self::$hooked = true;
+
+        $required_classes = array(
+            'PLDR_Future_Schema','PLDR_Future_Data','PLDR_Future_Derived_Text','PLDR_Future_Anchors',
+            'PLDR_Future_Citations','PLDR_Future_Authority','PLDR_Future_OCR_Lab','PLDR_Future_Annotations',
+            'PLDR_Future_IIIF','PLDR_Future_Search','PLDR_Future_Preferences','PLDR_Future_Shelves',
+            'PLDR_Future_Insights','PLDR_Future_Handoff','PLDR_Future_A11y','PLDR_Future_Rooms',
+            'PLDR_Future_Context','PLDR_Future_Corpus','PLDR_Future_Preservation','PLDR_Future_Fingerprint',
+        );
+        $missing = array_values(array_filter($required_classes, static fn(string $class): bool => !class_exists($class)));
+        if ($missing) {
+            update_option('pldr_future_loader_error', array('missing_classes'=>$missing,'at'=>PLDR_Core::now()), false);
+            return;
+        }
+        delete_option('pldr_future_loader_error');
+
         PLDR_Future_Schema::maybe_upgrade();
         add_action('rest_api_init', array('PLDR_Future_REST', 'register'));
         add_action('wp_enqueue_scripts', array(__CLASS__, 'assets'), 30);
@@ -100,6 +141,10 @@ final class PLDR_Future {
 
     public static function schema_notice(): void {
         if (!current_user_can('manage_pdf_library')) return;
+        $loader = get_option('pldr_future_loader_error');
+        if ($loader) {
+            echo '<div class="notice notice-error"><p><strong>File 12 Future-24 package is incomplete.</strong> ' . esc_html(wp_json_encode($loader)) . '</p></div>';
+        }
         $error = get_option('pldr_future_schema_error');
         if (!$error) return;
         echo '<div class="notice notice-error"><p><strong>File 12 Future-24 schema is not ready.</strong> ' . esc_html(wp_json_encode($error)) . '</p></div>';
@@ -115,8 +160,14 @@ final class PLDR_Future {
         if ((string) get_query_var('pldr_route') !== 'read') return;
         wp_register_style('pldr-future-24', PLDR_URL . 'assets/future-reader.css', array('pldr-reader'), PLDR_VERSION);
         wp_register_script('pldr-future-24', PLDR_URL . 'assets/future-reader.js', array('pldr-reader'), PLDR_VERSION, true);
+        wp_register_script('pldr-future-24-scholar', PLDR_URL . 'assets/future-reader-scholar.js', array('pldr-future-24'), PLDR_VERSION, true);
+        wp_register_script('pldr-future-24-personal', PLDR_URL . 'assets/future-reader-personal.js', array('pldr-future-24'), PLDR_VERSION, true);
+        wp_register_script('pldr-future-24-vault', PLDR_URL . 'assets/future-reader-vault.js', array('pldr-future-24'), PLDR_VERSION, true);
         wp_enqueue_style('pldr-future-24');
         wp_enqueue_script('pldr-future-24');
+        wp_enqueue_script('pldr-future-24-scholar');
+        wp_enqueue_script('pldr-future-24-personal');
+        wp_enqueue_script('pldr-future-24-vault');
         wp_add_inline_script('pldr-future-24', 'window.PLDR_FUTURE=' . wp_json_encode(array(
             'version' => self::VERSION,
             'rest' => esc_url_raw(rest_url('pldr/v1/future/')),
