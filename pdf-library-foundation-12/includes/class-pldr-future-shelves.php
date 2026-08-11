@@ -23,7 +23,7 @@ final class PLDR_Future_Shelves {
         if(!$uid)return array();
         self::ensure_defaults($uid);
         $rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d ORDER BY sort_order ASC,id ASC',$uid),ARRAY_A)?:array();
-        foreach($rows as &$row){$row['id']=(int)$row['id'];$row['count']=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d',$row['id']));}
+        foreach($rows as &$row){$row['id']=(int)$row['id'];$row['version']=(int)$row['version'];$row['count']=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d',$row['id']));}
         return $rows;
     }
 
@@ -36,7 +36,7 @@ final class PLDR_Future_Shelves {
         $key=PLDR_Core::uuid();
         $inserted=$wpdb->insert(PLDR_Core::table('shelves'),array('shelf_key'=>$key,'user_id'=>$uid,'name'=>$name,'shelf_type'=>'custom','sort_order'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
         if(false===$inserted||!(int)$wpdb->insert_id)return array('error'=>PLDR_Core::machine_error('pldr_shelf_store','Private shelf could not be stored.',500));
-        return array('id'=>(int)$wpdb->insert_id,'shelf_key'=>$key,'name'=>$name);
+        return array('id'=>(int)$wpdb->insert_id,'shelf_key'=>$key,'name'=>$name,'version'=>1);
     }
 
     public static function add(int $shelf_id,int $edition_id) {
@@ -61,9 +61,11 @@ final class PLDR_Future_Shelves {
         if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be renamed.',409);
         $name=self::name($name);
         if(''===$name)return PLDR_Core::machine_error('pldr_shelf_name','Shelf name is required.',400);
-        $updated=$wpdb->update(PLDR_Core::table('shelves'),array('name'=>$name,'version'=>(int)$shelf['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$shelf_id,'user_id'=>$uid));
+        $next=(int)$shelf['version']+1;
+        $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('shelves').' SET name=%s,version=%d,updated_at=%s WHERE id=%d AND user_id=%d AND version=%d',$name,$next,PLDR_Core::now(),$shelf_id,$uid,(int)$shelf['version']));
         if(false===$updated)return PLDR_Core::machine_error('pldr_shelf_rename','Shelf could not be renamed.',500);
-        return array('id'=>$shelf_id,'name'=>$name,'version'=>(int)$shelf['version']+1);
+        if(1!==$updated)return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed concurrently; refresh before renaming.',409);
+        return array('id'=>$shelf_id,'name'=>$name,'version'=>$next);
     }
 
     public static function remove(int $shelf_id) {
