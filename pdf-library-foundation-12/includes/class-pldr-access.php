@@ -40,8 +40,18 @@ final class PLDR_Access {
         if($expected_version&&(int)$current['version']!==$expected_version)return PLDR_Core::machine_error('pldr_policy_conflict','Access policy changed; refresh before updating.',409,array('current_version'=>(int)$current['version']));
         $audience=sanitize_key((string)($changes['audience']??$current['audience']));if(!in_array($audience,array('public','account','education-entitled','assigned'),true))return PLDR_Core::machine_error('pldr_policy_audience','Invalid access audience.',400);
         $row=array('document_id'=>$document_id,'audience'=>$audience,'entitlement_key'=>sanitize_text_field((string)($changes['entitlement_key']??$current['entitlement_key'])),'download_allowed'=>array_key_exists('download_allowed',$changes)?(empty($changes['download_allowed'])?0:1):(int)$current['download_allowed'],'print_allowed'=>array_key_exists('print_allowed',$changes)?(empty($changes['print_allowed'])?0:1):(int)$current['print_allowed'],'offline_allowed'=>array_key_exists('offline_allowed',$changes)?(empty($changes['offline_allowed'])?0:1):(int)$current['offline_allowed'],'embargo_until'=>array_key_exists('embargo_until',$changes)?self::date_or_null($changes['embargo_until']):$current['embargo_until'],'version'=>(int)$current['version']+1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now());
-        $ok=$wpdb->insert(PLDR_Core::table('access_policies'),$row);if(false===$ok)return PLDR_Core::machine_error('pldr_policy_store','Access policy could not be versioned.',500);
-        $wpdb->update(PLDR_Core::table('documents'),array('access_mode'=>$audience,'version'=>(int)$doc['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$document_id));PLDR_Access::revoke_document($document_id,'access-policy-change');PLDR_Core::audit('document',$document_id,'access_policy_updated',array('version'=>$row['version'],'audience'=>$audience),$actor_id);PLDR_Core::emit('PDFDocumentAccessChanged.v1','document',$document_id,array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience));return array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience);
+
+        $wpdb->query('START TRANSACTION');
+        $ok=$wpdb->insert(PLDR_Core::table('access_policies'),$row);
+        if(false===$ok){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_conflict','Access policy could not be versioned because the policy changed concurrently.',409,array('current_version'=>(int)(PLDR_Core::policy($document_id)['version']??$current['version'])));}
+        $doc_updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET access_mode=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d',$audience,PLDR_Core::now(),$document_id,(int)$doc['version']));
+        if(1!==$doc_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_document_conflict','Document changed concurrently; access-policy update was rolled back.',409,array('current_document_version'=>(int)(PLDR_Core::document($document_id)['version']??$doc['version'])));}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_commit','Access-policy update could not be committed atomically.',500);}
+
+        PLDR_Access::revoke_document($document_id,'access-policy-change');
+        PLDR_Core::audit('document',$document_id,'access_policy_updated',array('version'=>$row['version'],'audience'=>$audience),$actor_id);
+        PLDR_Core::emit('PDFDocumentAccessChanged.v1','document',$document_id,array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience));
+        return array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience);
     }
 
     private static function date_or_null($value): ?string { if(!$value)return null;$ts=strtotime((string)$value);return $ts?gmdate('Y-m-d H:i:s',$ts):null; }
