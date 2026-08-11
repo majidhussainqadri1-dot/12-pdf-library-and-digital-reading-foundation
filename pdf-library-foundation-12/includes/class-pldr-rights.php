@@ -3,6 +3,42 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Rights {
+    private const EVIDENCE_KEYS_MAX = 30;
+    private const EVIDENCE_VALUE_MAX = 2000;
+    private const EVIDENCE_JSON_MAX = 32768;
+    private const REVIEW_NOTE_MAX = 4000;
+
+    private static function limit_text(string $value,int $limit):string {
+        $value=sanitize_textarea_field($value);
+        return function_exists('mb_substr')?mb_substr($value,0,$limit,'UTF-8'):substr($value,0,$limit);
+    }
+
+    private static function evidence_value($value,int $depth=0) {
+        if(is_scalar($value)||null===$value)return self::limit_text((string)$value,self::EVIDENCE_VALUE_MAX);
+        if(!is_array($value)||$depth>=2)return self::limit_text(wp_json_encode($value),self::EVIDENCE_VALUE_MAX);
+        $out=array();$count=0;
+        foreach($value as $key=>$child){
+            if($count++>=20)break;
+            $safe_key=sanitize_key((string)$key);
+            if(''===$safe_key)$safe_key='item-'.$count;
+            $out[$safe_key]=self::evidence_value($child,$depth+1);
+        }
+        return $out;
+    }
+
+    private static function sanitize_evidence(array $evidence) {
+        $safe=array();$count=0;
+        foreach($evidence as $key=>$value){
+            if($count++>=self::EVIDENCE_KEYS_MAX)break;
+            $safe_key=sanitize_key((string)$key);
+            if(''===$safe_key)$safe_key='item-'.$count;
+            $safe[$safe_key]=self::evidence_value($value,0);
+        }
+        $json=wp_json_encode($safe,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        if(!is_string($json)||strlen($json)>self::EVIDENCE_JSON_MAX)return PLDR_Core::machine_error('pldr_case_evidence_size','Rights-case evidence exceeds the bounded safe payload size.',413,array('max_bytes'=>self::EVIDENCE_JSON_MAX));
+        return array('data'=>$safe,'json'=>$json);
+    }
+
     public static function file_case(int $document_id, string $reason, array $evidence, int $reporter_id = 0) {
         global $wpdb;
         $reporter_id = $reporter_id ?: get_current_user_id();
@@ -12,10 +48,10 @@ final class PLDR_Rights {
         $allowed = array('copyright','unauthorized-scan','attribution','patient-privacy','medical-safety','misleading-claim','false-credentials','broken-pdf','rights-expired','other');
         $reason = sanitize_key($reason);
         if (!in_array($reason,$allowed,true)) return PLDR_Core::machine_error('pldr_case_reason','Invalid report reason.',400);
+        $safe_evidence=self::sanitize_evidence($evidence);
+        if(is_wp_error($safe_evidence))return $safe_evidence;
         $case_key = PLDR_Core::uuid();
-        $safe_evidence = array();
-        foreach ($evidence as $k=>$v) $safe_evidence[sanitize_key((string)$k)] = is_scalar($v)?sanitize_textarea_field((string)$v):wp_json_encode($v);
-        $ok=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$case_key,'document_id'=>$document_id,'reporter_id'=>$reporter_id,'parent_case_id'=>null,'state'=>'reported','reason'=>$reason,'evidence_json'=>wp_json_encode($safe_evidence),'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
+        $ok=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$case_key,'document_id'=>$document_id,'reporter_id'=>$reporter_id,'parent_case_id'=>null,'state'=>'reported','reason'=>$reason,'evidence_json'=>$safe_evidence['json'],'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
         if(false===$ok)return PLDR_Core::machine_error('pldr_case_store','The report could not be recorded.',500);
         $case_id=(int)$wpdb->insert_id;
         if(in_array($reason,array('patient-privacy','unauthorized-scan'),true)) self::temporary_restrict($document_id,$reason);
@@ -35,6 +71,7 @@ final class PLDR_Rights {
         if('closed'===$case['state'])return PLDR_Core::machine_error('pldr_case_state','This rights case cannot transition from its current state.',409);
         $allowed=array('restrict','remove','restore','dismiss','request-evidence');
         if(!in_array($decision,$allowed,true))return PLDR_Core::machine_error('pldr_case_decision','Invalid rights-case decision.',400);
+        $note=self::limit_text($note,self::REVIEW_NOTE_MAX);
         if(''===trim($note))return PLDR_Core::machine_error('pldr_case_note','A reasoned reviewer note is required.',400);
         $new_state='reviewed'; $closed=null;
         if(in_array($decision,array('remove','restore','dismiss'),true)){ $new_state='closed'; $closed=PLDR_Core::now(); }
@@ -45,7 +82,7 @@ final class PLDR_Rights {
         $transition=null;
 
         $wpdb->query('START TRANSACTION');
-        $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('rights_cases').' SET state=%s,decision_note=%s,assigned_to=%d,version=version+1,updated_at=%s,closed_at=%s WHERE id=%d AND version=%d',$new_state,sanitize_textarea_field($note),$reviewer_id,PLDR_Core::now(),$closed,$case_id,(int)$case['version']));
+        $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('rights_cases').' SET state=%s,decision_note=%s,assigned_to=%d,version=version+1,updated_at=%s,closed_at=%s WHERE id=%d AND version=%d',$new_state,$note,$reviewer_id,PLDR_Core::now(),$closed,$case_id,(int)$case['version']));
         if(1!==$updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_conflict','Concurrent rights-case update detected.',409);}
         if($status){
             $transition=self::transition_document_status_row($document_id,$status);
@@ -67,8 +104,14 @@ final class PLDR_Rights {
         if(!in_array($parent['state'],array('closed','reviewed'),true))return PLDR_Core::machine_error('pldr_appeal_state','This case is not eligible for appeal yet.',409);
         $document_id=(int)$parent['document_id'];
         if((int)$parent['reporter_id']!==$actor_id && !PLDR_Core::authorize('rights',$document_id,$actor_id) && !PLDR_Core::authorize('manage',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_appeal_forbidden','You cannot appeal this rights case.',403);
+        $safe_evidence=self::sanitize_evidence($evidence);
+        if(is_wp_error($safe_evidence))return $safe_evidence;
+        $appeal_reason=self::limit_text($reason,self::REVIEW_NOTE_MAX);
+        if(''===trim($appeal_reason))return PLDR_Core::machine_error('pldr_appeal_reason','A bounded appeal reason is required.',400);
+        $appeal_payload=wp_json_encode(array('reason'=>$appeal_reason,'evidence'=>$safe_evidence['data']),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        if(!is_string($appeal_payload)||strlen($appeal_payload)>self::EVIDENCE_JSON_MAX)return PLDR_Core::machine_error('pldr_case_evidence_size','Rights appeal evidence exceeds the bounded safe payload size.',413,array('max_bytes'=>self::EVIDENCE_JSON_MAX));
         $key=PLDR_Core::uuid();
-        $inserted=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$key,'document_id'=>$document_id,'reporter_id'=>$actor_id,'parent_case_id'=>$case_id,'state'=>'appealed','reason'=>'appeal','evidence_json'=>wp_json_encode(array('reason'=>sanitize_textarea_field($reason),'evidence'=>$evidence)),'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
+        $inserted=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$key,'document_id'=>$document_id,'reporter_id'=>$actor_id,'parent_case_id'=>$case_id,'state'=>'appealed','reason'=>'appeal','evidence_json'=>$appeal_payload,'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
         $new_id=(int)$wpdb->insert_id;
         if(false===$inserted||$new_id<1)return PLDR_Core::machine_error('pldr_appeal_store','The rights appeal could not be persisted; no appeal event was emitted.',500);
         PLDR_Core::emit('PDFRightsCaseAppealed.v1','rights_case',$new_id,array('case_id'=>$new_id,'parent_case_id'=>$case_id,'document_id'=>$document_id));
