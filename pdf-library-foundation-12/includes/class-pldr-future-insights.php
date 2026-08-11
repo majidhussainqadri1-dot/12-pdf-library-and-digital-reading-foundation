@@ -39,7 +39,13 @@ final class PLDR_Future_Insights {
 
     public static function report(int $days=30):array {
         global $wpdb;$uid=get_current_user_id();if(!$uid)return array();$days=max(1,min(365,$days));$since=gmdate('Y-m-d H:i:s',time()-$days*DAY_IN_SECONDS);
-        $groups=$wpdb->get_results($wpdb->prepare('SELECT e.edition_id,SUM(e.duration_seconds) seconds,COUNT(DISTINCT e.page_number) distinct_pages,d.title FROM '.PLDR_Core::table('reading_events').' e JOIN '.PLDR_Core::table('editions').' ed ON ed.id=e.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=ed.document_id WHERE e.user_id=%d AND e.created_at>=%s GROUP BY e.edition_id,d.title ORDER BY seconds DESC LIMIT %d',$uid,$since,self::REPORT_GROUP_LIMIT+1),ARRAY_A)?:array();
+        $wpdb->last_error='';
+        $groups=$wpdb->get_results($wpdb->prepare('SELECT e.edition_id,SUM(e.duration_seconds) seconds,COUNT(DISTINCT e.page_number) distinct_pages,d.title FROM '.PLDR_Core::table('reading_events').' e JOIN '.PLDR_Core::table('editions').' ed ON ed.id=e.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=ed.document_id WHERE e.user_id=%d AND e.created_at>=%s GROUP BY e.edition_id,d.title ORDER BY seconds DESC LIMIT %d',$uid,$since,self::REPORT_GROUP_LIMIT+1),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('user',$uid,'reading_insights_report_read_failed',array('days'=>$days));
+            return array('error'=>PLDR_Core::machine_error('pldr_insight_report_read','Private reading-insight aggregates could not be read reliably; no partial report was returned.',503,array('degraded'=>true)));
+        }
+        $groups=is_array($groups)?$groups:array();
         $group_scan_truncated=count($groups)>self::REPORT_GROUP_LIMIT;if($group_scan_truncated)$groups=array_slice($groups,0,self::REPORT_GROUP_LIMIT);
         $seconds=0;$pages=0;$editions=0;$recent=array();$hidden=0;
         foreach($groups as $row){$edition_id=(int)$row['edition_id'];if(!PLDR_Access::can_access_edition($edition_id,'read',$uid)){$hidden++;continue;}$editions++;$seconds+=(int)$row['seconds'];$pages+=(int)$row['distinct_pages'];if(count($recent)<10)$recent[]=array('edition_id'=>$edition_id,'seconds'=>(int)$row['seconds'],'title'=>(string)$row['title']);}
