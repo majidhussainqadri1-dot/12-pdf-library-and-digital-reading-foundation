@@ -5,14 +5,20 @@ defined('ABSPATH') || exit;
 final class PLDR_Future_Preferences {
     private const KEYS = array('reader');
 
-    public static function get(string $key='reader'):array {
+    public static function get(string $key='reader') {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return array();
         $key=self::key($key);
         if(is_wp_error($key))return array();
         $row=$wpdb->get_row($wpdb->prepare('SELECT preference_json,version,updated_at FROM '.PLDR_Core::table('future_prefs').' WHERE user_id=%d AND preference_key=%s',$uid,$key),ARRAY_A);
-        return $row?array('value'=>json_decode((string)$row['preference_json'],true)?:array(),'version'=>(int)$row['version'],'updated_at'=>$row['updated_at']):array('value'=>array(),'version'=>0);
+        if(!$row)return array('value'=>array(),'version'=>0);
+        $decoded=json_decode((string)$row['preference_json'],true);
+        if(!is_array($decoded)){
+            PLDR_Core::audit('user',$uid,'future_preference_corrupt',array('preference_key'=>$key,'version'=>(int)$row['version']));
+            return PLDR_Core::machine_error('pldr_future_pref_corrupt','Stored reading preferences failed integrity validation and were not silently replaced.',500,array('version'=>(int)$row['version']));
+        }
+        return array('value'=>$decoded,'version'=>(int)$row['version'],'updated_at'=>$row['updated_at']);
     }
 
     public static function save(string $key,array $value,int $expected=0) {
@@ -22,6 +28,7 @@ final class PLDR_Future_Preferences {
         $key=self::key($key);
         if(is_wp_error($key))return $key;
         $current=self::get($key);
+        if(is_wp_error($current))return $current;
         $current_version=(int)($current['version']??0);
         if($current_version>0 && $expected<=0)return PLDR_Core::machine_error('pldr_future_pref_precondition','expected_version is required when updating synchronized reading preferences.',428,array('current_version'=>$current_version));
         if($current_version>0 && $current_version!==$expected)return PLDR_Core::machine_error('pldr_future_pref_conflict','Reading preferences changed on another device.',409,array('current_version'=>$current_version));
@@ -34,11 +41,12 @@ final class PLDR_Future_Preferences {
         if($current_version>0){
             $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('future_prefs').' SET preference_json=%s,version=%d,updated_at=%s WHERE user_id=%d AND preference_key=%s AND version=%d',$encoded,$version,$now,$uid,$key,$current_version));
             if(false===$updated)return PLDR_Core::machine_error('pldr_future_pref_store','Reading preferences could not be stored.',500);
-            if(1!==$updated)return PLDR_Core::machine_error('pldr_future_pref_conflict','Concurrent reading-preference update detected.',409,array('current_version'=>(int)(self::get($key)['version']??0)));
+            if(1!==$updated){$fresh=self::get($key);if(is_wp_error($fresh))return $fresh;return PLDR_Core::machine_error('pldr_future_pref_conflict','Concurrent reading-preference update detected.',409,array('current_version'=>(int)($fresh['version']??0)));}
         }else{
             $inserted=$wpdb->insert(PLDR_Core::table('future_prefs'),array('user_id'=>$uid,'preference_key'=>$key,'preference_json'=>$encoded,'version'=>$version,'updated_at'=>$now));
             if(false===$inserted){
                 $race=self::get($key);
+                if(is_wp_error($race))return $race;
                 if((int)($race['version']??0)>0)return PLDR_Core::machine_error('pldr_future_pref_conflict','Reading preferences were created concurrently on another request.',409,array('current_version'=>(int)$race['version']));
                 return PLDR_Core::machine_error('pldr_future_pref_store','Reading preferences could not be stored.',500);
             }
