@@ -62,6 +62,13 @@ final class PLDR_Future_A11y {
         $report['verified']=true;$report['verified_at']=$verified_at;$report['public_badge_allowed']=true;return $report;
     }
 
-    private static function dto(array $row):array {return array('edition_id'=>(int)$row['edition_id'],'score'=>(float)$row['score'],'status'=>$row['status'],'findings'=>json_decode((string)$row['findings_json'],true)?:array(),'provider'=>$row['provider'],'verified'=>(int)$row['verified_by']>0,'verified_at'=>$row['verified_at'],'public_badge_allowed'=>(int)$row['verified_by']>0,'persisted'=>true);}
+    private static function dto(array $row):array {
+        $findings=json_decode((string)$row['findings_json'],true);
+        if(!is_array($findings)){
+            PLDR_Core::audit('edition',(int)$row['edition_id'],'accessibility_audit_corrupt',array('provider'=>self::limit(sanitize_text_field((string)$row['provider']),80),'verified'=>(int)$row['verified_by']>0));
+            return array('error'=>PLDR_Core::machine_error('pldr_a11y_corrupt','Stored accessibility findings failed integrity validation; verification/public badge state was not trusted.',500,array('edition_id'=>(int)$row['edition_id'])));
+        }
+        return array('edition_id'=>(int)$row['edition_id'],'score'=>(float)$row['score'],'status'=>$row['status'],'findings'=>$findings,'provider'=>$row['provider'],'verified'=>(int)$row['verified_by']>0,'verified_at'=>$row['verified_at'],'public_badge_allowed'=>(int)$row['verified_by']>0,'persisted'=>true);
+    }
     private static function limit(string $value,int $length):string {return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length);}
 }
