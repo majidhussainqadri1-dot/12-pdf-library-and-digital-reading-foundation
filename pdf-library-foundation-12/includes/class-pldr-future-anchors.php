@@ -33,6 +33,7 @@ final class PLDR_Future_Anchors {
             $w = round(max(0, min(1, (float) ($selector['region']['w'] ?? 0))) * 100, 3);
             $h = round(max(0, min(1, (float) ($selector['region']['h'] ?? 0))) * 100, 3);
             if ($w <= 0 || $h <= 0) return PLDR_Core::machine_error('pldr_anchor_region', 'A scholarly anchor region must have a positive width and height.', 400);
+            if (($x + $w) > 100.0 || ($y + $h) > 100.0) return PLDR_Core::machine_error('pldr_anchor_region_bounds', 'A scholarly anchor region must remain fully inside the page boundary.', 400, array('x'=>$x,'y'=>$y,'w'=>$w,'h'=>$h));
             $clean['refinedBy'] = array('type'=>'FragmentSelector','conformsTo'=>'https://www.w3.org/TR/media-frags/','value'=>'xywh=percent:' . $x . ',' . $y . ',' . $w . ',' . $h);
         }
         $json = wp_json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
