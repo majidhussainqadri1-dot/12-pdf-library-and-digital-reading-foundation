@@ -8,7 +8,19 @@ final class PLDR_Future_Schema {
     private const LOCK_OPTION = 'pldr_future_migration_lock';
 
     public static function maybe_upgrade(): void {
-        if ((string) get_option('pldr_future_db_version', '') === self::DB_VERSION && (string) get_option('pldr_future_schema_revision', '') === self::SCHEMA_REVISION) return;
+        $version_current = (string) get_option('pldr_future_db_version', '') === self::DB_VERSION;
+        $revision_current = (string) get_option('pldr_future_schema_revision', '') === self::SCHEMA_REVISION;
+        if ($version_current && $revision_current) {
+            $health_key = 'pldr_future_schema_health_' . md5(self::SCHEMA_REVISION);
+            if (get_transient($health_key)) return;
+            $health = self::verify_schema();
+            if ($health['ok']) {
+                set_transient($health_key, '1', 15 * MINUTE_IN_SECONDS);
+                return;
+            }
+            update_option('pldr_future_schema_error', array_merge($health, array('reason'=>'schema_drift','at'=>PLDR_Core::now())), false);
+            PLDR_Core::audit('system', 0, 'future_24_schema_drift_detected', $health);
+        }
         self::upgrade();
     }
 
