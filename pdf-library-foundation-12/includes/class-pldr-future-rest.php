@@ -15,7 +15,7 @@ final class PLDR_Future_REST {
             array('methods'=>'GET','callback'=>array(__CLASS__,'ocr_quality'),'permission_callback'=>'__return_true'),
             array('methods'=>'POST','callback'=>array(__CLASS__,'ocr_correction'),'permission_callback'=>array(__CLASS__,'logged_in')),
         ));
-        register_rest_route('pldr/v1', '/future/ocr-corrections/(?P<id>\d+)/review', array('methods'=>'POST','callback'=>array(__CLASS__,'ocr_review'),'permission_callback'=>array(__CLASS__,'can_review')));
+        register_rest_route('pldr/v1', '/future/ocr-corrections/(?P<id>\d+)/review', array('methods'=>'POST','callback'=>array(__CLASS__,'ocr_review'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/annotations/(?P<edition>\d+)', array(
             array('methods'=>'GET','callback'=>array(__CLASS__,'annotations_export'),'permission_callback'=>array(__CLASS__,'logged_in')),
             array('methods'=>'POST','callback'=>array(__CLASS__,'annotations_import'),'permission_callback'=>array(__CLASS__,'logged_in')),
@@ -49,16 +49,16 @@ final class PLDR_Future_REST {
         ));
         register_rest_route('pldr/v1', '/future/accessibility/(?P<edition>\d+)', array(
             array('methods'=>'GET','callback'=>array(__CLASS__,'a11y'),'permission_callback'=>'__return_true'),
-            array('methods'=>'POST','callback'=>array(__CLASS__,'a11y_verify'),'permission_callback'=>array(__CLASS__,'can_review')),
+            array('methods'=>'POST','callback'=>array(__CLASS__,'a11y_verify'),'permission_callback'=>array(__CLASS__,'logged_in')),
         ));
         register_rest_route('pldr/v1', '/future/reading-room', array('methods'=>'POST','callback'=>array(__CLASS__,'reading_room'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/context/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'context'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/corpus/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'corpus'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/derive-text', array('methods'=>'POST','callback'=>array(__CLASS__,'derive_text'),'permission_callback'=>'__return_true'));
-        register_rest_route('pldr/v1', '/future/preservation/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'preservation'),'permission_callback'=>array(__CLASS__,'can_preservation')));
+        register_rest_route('pldr/v1', '/future/preservation/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'preservation'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/fingerprint/(?P<edition>\d+)', array(
-            array('methods'=>'GET','callback'=>array(__CLASS__,'duplicates'),'permission_callback'=>array(__CLASS__,'can_publish')),
-            array('methods'=>'POST','callback'=>array(__CLASS__,'fingerprint'),'permission_callback'=>array(__CLASS__,'can_publish')),
+            array('methods'=>'GET','callback'=>array(__CLASS__,'duplicates'),'permission_callback'=>array(__CLASS__,'logged_in')),
+            array('methods'=>'POST','callback'=>array(__CLASS__,'fingerprint'),'permission_callback'=>array(__CLASS__,'logged_in')),
         ));
     }
 
@@ -80,19 +80,24 @@ final class PLDR_Future_REST {
 
     private static function idempotent(WP_REST_Request $request, string $route, callable $callback) {
         $key = substr(sanitize_text_field((string) $request->get_header('Idempotency-Key')), 0, 200);
-        $actor = get_current_user_id();
-        if ($key) {
-            $hit = PLDR_Core::idempotency_lookup('future-' . $route, $key, $actor);
-            if ($hit) return new WP_REST_Response($hit['body'], $hit['status']);
+        if ('' === $key) {
+            $result=$callback();
+            if(is_array($result)&&isset($result['error'])&&is_wp_error($result['error']))$result=$result['error'];
+            return is_wp_error($result)?$result:rest_ensure_response($result);
         }
+        $actor = get_current_user_id();
+        $route = 'future-' . $route;
+        $claim = PLDR_Core::idempotency_begin($route, $key, $actor);
+        if ('hit' === ($claim['state'] ?? '')) return new WP_REST_Response($claim['body'], $claim['status']);
+        if ('pending' === ($claim['state'] ?? '')) return PLDR_Core::machine_error('pldr_future_idempotency_in_progress','A request with this Idempotency-Key is already in progress.',409,array('retry_after'=>2));
+        if ('reserved' !== ($claim['state'] ?? '')) return PLDR_Core::machine_error('pldr_future_idempotency_unavailable','Idempotency protection could not be reserved; the mutation was not executed.',503);
         $result = $callback();
         if (is_array($result) && isset($result['error']) && is_wp_error($result['error'])) $result = $result['error'];
-        if (is_wp_error($result)) return $result;
-        $response = rest_ensure_response($result);
+        $response = is_wp_error($result) ? rest_convert_error_to_response($result) : rest_ensure_response($result);
         $status = $response instanceof WP_REST_Response ? $response->get_status() : 200;
         $body = $response instanceof WP_REST_Response ? $response->get_data() : $result;
-        if ($key && $status >= 200 && $status < 300) PLDR_Core::idempotency_store('future-' . $route, $key, $actor, $body, $status);
-        return $response;
+        if (!PLDR_Core::idempotency_complete($route, $key, $actor, $body, $status)) return PLDR_Core::machine_error('pldr_future_idempotency_persist','The operation completed but its idempotency result could not be finalized; reconcile before retrying with a new key.',503,array('original_status'=>$status));
+        return is_wp_error($result) ? $result : $response;
     }
 
     public static function features() { return rest_ensure_response(array('version'=>PLDR_Future::VERSION,'count'=>count(PLDR_Future::FEATURES),'features'=>PLDR_Future::FEATURES,'production_truth'=>'Source capability presence is not staging/live acceptance.')); }
