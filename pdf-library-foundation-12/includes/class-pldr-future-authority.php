@@ -10,11 +10,17 @@ final class PLDR_Future_Authority {
         if (!in_array($type, array('doi','orcid','isbn'), true) || '' === $value) return PLDR_Core::machine_error('pldr_authority_identifier', 'Use a DOI, ORCID or ISBN identifier.', 400);
         if (!PLDR_Core::authorize('manage') && !PLDR_Core::authorize('publish')) return PLDR_Core::machine_error('pldr_authority_forbidden', 'Bibliographic enrichment requires publishing authority.', 403);
         if (!$force) {
+            $wpdb->last_error='';
             $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . PLDR_Core::table('authority_cache') . ' WHERE identifier_type=%s AND identifier_value=%s AND expires_at>%s ORDER BY updated_at DESC LIMIT 1', $type, $value, PLDR_Core::now()), ARRAY_A);
+            if ('' !== (string)$wpdb->last_error) {
+                PLDR_Core::audit('authority',0,'authority_cache_read_failed',array('identifier_type'=>$type));
+                return PLDR_Core::machine_error('pldr_authority_cache_read','Bibliographic authority cache state could not be verified; no external provider request was made.',503,array('degraded'=>true));
+            }
             if ($row) {
                 $data=json_decode((string)$row['result_json'],true);$provenance=json_decode((string)$row['provenance_json'],true);
                 if(is_array($data)&&is_array($provenance))return array('status' => 'cached', 'provider' => $row['provider'], 'result' => $data, 'provenance' => $provenance, 'canonical_overwrite' => false);
-                $wpdb->delete(PLDR_Core::table('authority_cache'),array('id'=>(int)$row['id']),array('%d'));
+                $deleted=$wpdb->delete(PLDR_Core::table('authority_cache'),array('id'=>(int)$row['id']),array('%d'));
+                if(false===$deleted)return PLDR_Core::machine_error('pldr_authority_cache_repair','Corrupt bibliographic cache evidence could not be removed safely; provider refresh was not attempted.',503,array('degraded'=>true));
                 PLDR_Core::audit('authority',(int)$row['id'],'corrupt_cache_discarded',array('identifier_type'=>$type));
             }
         }
