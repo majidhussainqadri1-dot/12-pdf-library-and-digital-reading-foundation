@@ -21,7 +21,12 @@ final class PLDR_Future_Insights {
         if(1!==$locked)return PLDR_Core::machine_error('pldr_insight_rate_lock','Private reading-event capacity is temporarily unavailable; retry shortly.',503,array('retry_after'=>2));
         try{
             $since=gmdate('Y-m-d H:i:s',time()-HOUR_IN_SECONDS);
+            $wpdb->last_error='';
             $recent=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('reading_events').' WHERE user_id=%d AND created_at>=%s',$uid,$since));
+            if(''!==(string)$wpdb->last_error){
+                PLDR_Core::audit('edition',$edition_id,'reading_insight_rate_read_failed',array('provider_failure'=>false),$uid);
+                return PLDR_Core::machine_error('pldr_insight_rate_read','Private reading-event rate state could not be verified; the event was not stored.',503,array('degraded'=>true));
+            }
             try{$limit=(int)apply_filters('pldr_reading_event_hourly_limit',self::MAX_EVENTS_PER_HOUR,$uid,$edition_id);}
             catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'reading_insight_rate_policy_provider_failed',array('provider_failure'=>1),$uid);return PLDR_Core::machine_error('pldr_insight_rate_policy','Private reading-event rate policy is temporarily unavailable; the event was not stored.',503,array('degraded'=>true,'provider_failure'=>true));}
             $limit=max(60,min(5000,$limit));
