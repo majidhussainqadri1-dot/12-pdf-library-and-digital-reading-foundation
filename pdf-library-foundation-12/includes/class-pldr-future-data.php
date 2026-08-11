@@ -114,18 +114,22 @@ final class PLDR_Future_Data {
         if (is_wp_error($b)) return array('error' => $b);
         $pa = array_column(self::ocr_pages($left,0,1000,0), null, 'page_number');
         $pb = array_column(self::ocr_pages($right,0,1000,0), null, 'page_number');
-        $max = min(1000,max((int) ($a['pages'] ?? 0), (int) ($b['pages'] ?? 0), count($pa), count($pb)));
-        $changed = array(); $same = 0; $missing = 0;
-        for ($p = 1; $p <= $max; $p++) {
+        $declared_max=max((int)($a['pages']??0),(int)($b['pages']??0));
+        $candidate_max=min(1000,max($declared_max,count($pa),count($pb)));
+        $changed = array(); $same = 0; $missing = 0; $processed=0; $result_capped=false;
+        for ($p = 1; $p <= $candidate_max; $p++) {
+            $processed++;
             $ta = PLDR_Core::normalize_search((string) ($pa[$p]['text_content'] ?? ''));
             $tb = PLDR_Core::normalize_search((string) ($pb[$p]['text_content'] ?? ''));
             if ('' === $ta || '' === $tb) { $missing++; continue; }
             if (hash_equals(hash('sha256', $ta), hash('sha256', $tb))) { $same++; continue; }
             similar_text(substr($ta, 0, 20000), substr($tb, 0, 20000), $pct);
             $changed[] = array('page' => $p, 'similarity' => round((float) $pct, 2), 'left_excerpt' => self::excerpt($ta), 'right_excerpt' => self::excerpt($tb));
-            if (count($changed) >= 500) break;
+            if (count($changed) >= 500) { $result_capped=true; break; }
         }
-        return array('left' => $left, 'right' => $right, 'pages_compared' => $max, 'same_pages' => $same, 'pages_without_comparable_ocr' => $missing, 'changed' => $changed, 'derived_from_ocr' => true,'comparison_page_limit'=>1000);
+        $page_scan_capped=$declared_max>1000;
+        $truncated=$result_capped||$page_scan_capped||$processed<$candidate_max;
+        return array('left' => $left, 'right' => $right, 'pages_compared' => $processed, 'candidate_pages' => $candidate_max, 'declared_page_span'=>$declared_max, 'same_pages' => $same, 'pages_without_comparable_ocr' => $missing, 'changed' => $changed, 'changed_page_limit'=>500, 'results_truncated'=>$result_capped, 'page_scan_truncated'=>$page_scan_capped, 'truncated'=>$truncated, 'derived_from_ocr' => true,'comparison_page_limit'=>1000);
     }
 
     private static function excerpt(string $text): string {
