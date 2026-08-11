@@ -50,7 +50,12 @@ final class PLDR_Future_Annotations {
             $lock='pldr_anno_'.substr(hash('sha256',$uid.'|'.$edition_id.'|'.$identity_tag),0,32);$locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,1)',$lock));
             if(1!==$locked){$lock_failures++;$rejected++;continue;}
             try{
+                $wpdb->last_error='';
                 $existing=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('reading_items').' WHERE user_id=%d AND edition_id=%d AND tags_json LIKE %s LIMIT 1',$uid,$edition_id,'%'.$wpdb->esc_like($identity_tag).'%'));
+                if(''!==(string)$wpdb->last_error){
+                    PLDR_Core::audit('edition',$edition_id,'annotation_duplicate_read_failed',array('user_id'=>$uid,'page'=>$page_no,'imported_before_failure'=>$imported));
+                    return array('error'=>PLDR_Core::machine_error('pldr_annotation_duplicate_read','Annotation duplicate state could not be read reliably; this annotation was not inserted and the batch requires reconciliation before retry.',503,array('degraded'=>true,'imported_before_failure'=>$imported,'rejected_before_failure'=>$rejected,'duplicates_before_failure'=>$duplicates)));
+                }
                 if($existing){$duplicates++;continue;}
                 $result=PLDR_Reading::add_item($edition_id,array('type'=>$item_type,'page'=>$page_no,'anchor'=>$anchor,'note'=>$body,'tags'=>array('w3c-import',$identity_tag)),$uid);
                 if(is_wp_error($result))$rejected++;else$imported++;
