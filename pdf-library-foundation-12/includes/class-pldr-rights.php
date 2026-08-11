@@ -75,7 +75,8 @@ final class PLDR_Rights {
     public static function decide(int $case_id,string $decision,string $note,int $reviewer_id=0,$expected_version=0) {
         global $wpdb;
         $reviewer_id=$reviewer_id?:get_current_user_id();
-        $case=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('rights_cases').' WHERE id=%d',$case_id),ARRAY_A);
+        $wpdb->last_error='';$case=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('rights_cases').' WHERE id=%d',$case_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_case_read','Rights-case state could not be read reliably.',503,array('degraded'=>true));
         if(!$case)return PLDR_Core::machine_error('pldr_case_missing','Rights case not found.',404);
         $document_id=(int)$case['document_id'];
         if(!PLDR_Core::authorize('rights',$document_id,$reviewer_id) && !PLDR_Core::authorize('manage',$document_id,$reviewer_id))return PLDR_Core::machine_error('pldr_rights_forbidden','Rights-review authority for this document is required.',403);
@@ -93,7 +94,7 @@ final class PLDR_Rights {
         $reason='rights-case-'.$case_id;
         $transition=null;
 
-        $wpdb->query('START TRANSACTION');
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_case_transaction','Rights decision transaction could not be started.',500);
         $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('rights_cases').' SET state=%s,decision_note=%s,assigned_to=%d,version=version+1,updated_at=%s,closed_at=%s WHERE id=%d AND version=%d',$new_state,$note,$reviewer_id,PLDR_Core::now(),$closed,$case_id,(int)$case['version']));
         if(1!==$updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_conflict','Concurrent rights-case update detected.',409);}
         if($status){
@@ -111,7 +112,8 @@ final class PLDR_Rights {
         global $wpdb;
         $actor_id=$actor_id?:get_current_user_id();
         if(!$actor_id)return PLDR_Core::machine_error('pldr_appeal_login','Log in to appeal.',401);
-        $parent=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('rights_cases').' WHERE id=%d',$case_id),ARRAY_A);
+        $wpdb->last_error='';$parent=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('rights_cases').' WHERE id=%d',$case_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_appeal_parent_read','Appeal parent state could not be read reliably.',503,array('degraded'=>true));
         if(!$parent)return PLDR_Core::machine_error('pldr_case_missing','Rights case not found.',404);
         if(!in_array($parent['state'],array('closed','reviewed'),true))return PLDR_Core::machine_error('pldr_appeal_state','This case is not eligible for appeal yet.',409);
         $document_id=(int)$parent['document_id'];
@@ -152,7 +154,7 @@ final class PLDR_Rights {
         if(1!==$edition_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_edition_publish_conflict','The target edition changed concurrently; publication was rolled back.',409);}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_approve_commit','Document publication could not be committed atomically.',500);}
 
-        PLDR_Access::revoke_document($document_id,'publication-state-change');
+        if(PLDR_Access::revoke_document($document_id,'publication-state-change')<0)return PLDR_Core::machine_error('pldr_publish_revoke_reconcile','Publication was committed but prior delivery grants could not be revoked; reconciliation is required.',503,array('committed'=>true));
         PLDR_Core::audit('document',$document_id,'approved',array('edition_id'=>(int)$edition['id'],'superseded_editions'=>(int)$superseded),$reviewer_id);
         PLDR_Core::emit('PDFDocumentPublished.v1','document',$document_id,array('document_id'=>$doc['public_id'],'edition_id'=>(int)$edition['id']));
         return array('document_id'=>$doc['public_id'],'status'=>'published','version'=>(int)$doc['version']+1);
@@ -162,13 +164,16 @@ final class PLDR_Rights {
 
     private static function transition_document_status_row(int $document_id,string $status) {
         global $wpdb;
-        $doc=PLDR_Core::document($document_id);
+        $wpdb->last_error='';$doc=PLDR_Core::document($document_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_document_state_read','Document state could not be read reliably during rights transition.',503,array('degraded'=>true));
         if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found during rights-state transition.',404);
         $allowed=array('published','restricted','removed','superseded','rights_review','scan');
         if(!in_array($status,$allowed,true))return PLDR_Core::machine_error('pldr_document_status','Invalid document rights state.',400);
         if('published'===$status){
-            $edition=PLDR_Core::latest_edition($document_id);
-            $object=$edition?PLDR_Core::object((int)$edition['object_id']):null;
+            $wpdb->last_error='';$edition=PLDR_Core::latest_edition($document_id);
+            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_restore_edition_read','Current edition could not be read reliably before restoration.',503,array('degraded'=>true));
+            $wpdb->last_error='';$object=$edition?PLDR_Core::object((int)$edition['object_id']):null;
+            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_restore_object_read','Current object could not be read reliably before restoration.',503,array('degraded'=>true));
             if(!$edition||!$object||'available'!==$object['object_status']||'clean'!==$object['scan_status'])return PLDR_Core::machine_error('pldr_restore_unavailable','The document cannot be restored until its current edition has a clean available object.',409);
         }
         $changed=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d',$status,PLDR_Core::now(),$document_id,(int)$doc['version']));
@@ -178,14 +183,15 @@ final class PLDR_Rights {
 
     private static function after_document_status_change(array $doc,string $status,string $reason):void {
         $document_id=(int)$doc['id'];
-        PLDR_Access::revoke_document($document_id,$reason);
+        $revoked=PLDR_Access::revoke_document($document_id,$reason);
+        if($revoked<0){PLDR_Core::audit('document',$document_id,'rights_status_revoke_reconciliation_required',array('status'=>$status,'reason'=>$reason));return;}
         $event='published'===$status?'PDFDocumentPublished.v1':'PDFDocumentAccessChanged.v1';
         PLDR_Core::emit($event,'document',$document_id,array('document_id'=>$doc['public_id'],'status'=>$status,'reason'=>$reason));
     }
 
     private static function set_document_status(int $document_id,string $status,string $reason) {
         global $wpdb;
-        $wpdb->query('START TRANSACTION');
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_document_status_transaction','Document rights-state transaction could not be started.',500);
         $transition=self::transition_document_status_row($document_id,$status);
         if(is_wp_error($transition)){$wpdb->query('ROLLBACK');return $transition;}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_document_status_commit','Document rights-state transition could not be committed.',500);}
@@ -196,11 +202,12 @@ final class PLDR_Rights {
     public static function expire_rights():void {
         global $wpdb;
         $editions=PLDR_Core::table('editions');
-        $rows=$wpdb->get_results($wpdb->prepare(
+        $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare(
             "SELECT e.document_id FROM {$editions} e INNER JOIN (SELECT document_id,MAX(id) current_id FROM {$editions} WHERE status=%s GROUP BY document_id) current ON current.current_id=e.id WHERE e.rights_expires_at IS NOT NULL AND e.rights_expires_at<=%s",
             'published',PLDR_Core::now()
         ),ARRAY_A);
-        foreach($rows as $r){
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'rights_expiry_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return;}
+        foreach(is_array($rows)?$rows:array() as $r){
             $doc=PLDR_Core::document((int)$r['document_id']);
             if($doc && 'published'===$doc['status'])self::set_document_status((int)$doc['id'],'restricted','rights-expired');
         }
@@ -222,14 +229,29 @@ final class PLDR_Book_Packs {
             'pack_key'=>sanitize_key((string)$manifest['pack_key']),'version'=>sanitize_text_field((string)$manifest['version']),'title'=>sanitize_text_field((string)$manifest['title']),'author'=>sanitize_text_field((string)$manifest['author']),'translator'=>sanitize_text_field((string)($manifest['translator']??'')),'edition'=>sanitize_text_field((string)($manifest['edition']??'')),'year'=>absint($manifest['year']??0),'language'=>sanitize_text_field((string)$manifest['language']),'volumes'=>absint($manifest['volumes']??1),'chapters'=>PLDR_Core::sanitize_json_list($manifest['chapters']??array()),'cover'=>sanitize_text_field((string)($manifest['cover']??'')),'table_of_contents'=>$manifest['table_of_contents']??array(),'rights'=>$rights,'checksum'=>strtolower((string)$manifest['checksum']),'search_metadata'=>$manifest['search_metadata']??array(),'update_manifest'=>$manifest['update_manifest'],'provenance'=>sanitize_textarea_field((string)($manifest['provenance']??'')),'document_public_id'=>sanitize_text_field((string)($manifest['document_public_id']??'')),
         );
         if('founder-owned'===$rights && empty($canonical['provenance']))return PLDR_Core::machine_error('pldr_pack_provenance','Founder-owned Book Content Packs require explicit provenance and edition history.',400);
-        $manifest_hash=hash('sha256',wp_json_encode($canonical,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
-        $stored=$wpdb->replace(PLDR_Core::table('book_packs'),array('pack_key'=>$canonical['pack_key'],'pack_version'=>$canonical['version'],'title'=>$canonical['title'],'author'=>$canonical['author'],'translator'=>$canonical['translator'],'rights_basis'=>$rights,'manifest_sha256'=>$manifest_hash,'metadata_json'=>wp_json_encode($canonical),'status'=>'registered','created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
-        if(false===$stored)return PLDR_Core::machine_error('pldr_pack_store','Book Content Pack metadata could not be persisted; no registration event was emitted.',500);
-        $id=(int)$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('book_packs').' WHERE pack_key=%s AND pack_version=%s',$canonical['pack_key'],$canonical['version']));
+        $manifest_json=wp_json_encode($canonical,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        if(!is_string($manifest_json)||strlen($manifest_json)>262144)return PLDR_Core::machine_error('pldr_pack_manifest_size','Book Content Pack manifest could not be encoded within the governed metadata limit.',413,array('max_bytes'=>262144));
+        $manifest_hash=hash('sha256',$manifest_json);
+        $table=PLDR_Core::table('book_packs');
+        $wpdb->last_error='';
+        $existing=$wpdb->get_row($wpdb->prepare('SELECT id,manifest_sha256,status FROM '.$table.' WHERE pack_key=%s AND pack_version=%s LIMIT 1',$canonical['pack_key'],$canonical['version']),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_pack_read','Book Content Pack version state could not be read reliably; registration was not attempted.',503,array('degraded'=>true));
+        if($existing){
+            if(hash_equals((string)$existing['manifest_sha256'],$manifest_hash))return array('id'=>(int)$existing['id'],'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>(string)$existing['status'],'already_registered'=>true,'immutable_version'=>true);
+            return PLDR_Core::machine_error('pldr_pack_version_conflict','This Book Content Pack version is already registered with different immutable metadata; publish a new pack version instead of overwriting history.',409,array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version']));
+        }
+        $stored=$wpdb->insert($table,array('pack_key'=>$canonical['pack_key'],'pack_version'=>$canonical['version'],'title'=>$canonical['title'],'author'=>$canonical['author'],'translator'=>$canonical['translator'],'rights_basis'=>$rights,'manifest_sha256'=>$manifest_hash,'metadata_json'=>$manifest_json,'status'=>'registered','created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+        if(false===$stored){
+            $wpdb->last_error='';
+            $race=$wpdb->get_row($wpdb->prepare('SELECT id,manifest_sha256,status FROM '.$table.' WHERE pack_key=%s AND pack_version=%s LIMIT 1',$canonical['pack_key'],$canonical['version']),ARRAY_A);
+            if(''===(string)$wpdb->last_error&&$race&&hash_equals((string)$race['manifest_sha256'],$manifest_hash))return array('id'=>(int)$race['id'],'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>(string)$race['status'],'already_registered'=>true,'immutable_version'=>true,'concurrent_registration'=>true);
+            return PLDR_Core::machine_error('pldr_pack_store','Book Content Pack metadata could not be persisted or reconciled; no registration event was emitted.',500);
+        }
+        $id=(int)$wpdb->insert_id;
         if($id<1)return PLDR_Core::machine_error('pldr_pack_store','Book Content Pack persistence could not be confirmed; no registration event was emitted.',500);
         PLDR_Core::audit('book_pack',$id,'registered',array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash),$actor_id);
         PLDR_Core::emit('PDFBookPackRegistered.v1','book_pack',$id,array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'document_public_id'=>$canonical['document_public_id']));
-        return array('id'=>$id,'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>'registered');
+        return array('id'=>$id,'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>'registered','immutable_version'=>true);
     }
 
     public static function scan_bundled_manifests():void { $dir=PLDR_DIR.'book-packs'; if(!is_dir($dir))return; foreach(glob($dir.'/*.json')?:array() as $file){$raw=file_get_contents($file);$manifest=json_decode((string)$raw,true);if(is_array($manifest))self::register($manifest,0);} }
@@ -252,8 +274,9 @@ final class PLDR_Integrations {
     public static function dispatch_outbox():void {
         global $wpdb;
         $now=PLDR_Core::now();
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('outbox').' WHERE status IN (%s,%s,%s) AND available_at<=%s ORDER BY id ASC LIMIT 50','pending','retry','processing',$now),ARRAY_A);
-        foreach($rows as $row){
+        $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('outbox').' WHERE status IN (%s,%s,%s) AND available_at<=%s ORDER BY id ASC LIMIT 50','pending','retry','processing',$now),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'outbox_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return;}
+        foreach(is_array($rows)?$rows:array() as $row){
             $lease_until=gmdate('Y-m-d H:i:s',time()+10*MINUTE_IN_SECONDS);
             $claimed=$wpdb->query($wpdb->prepare(
                 'UPDATE '.PLDR_Core::table('outbox').' SET status=%s,available_at=%s WHERE id=%d AND status IN (%s,%s,%s) AND available_at<=%s',
@@ -266,11 +289,12 @@ final class PLDR_Integrations {
                 if(false===$accepted)throw new RuntimeException('A consumer requested retry.');
                 do_action('sabri_domain_event',(string)$row['event_name'],$payload,(string)$row['event_id'],'file-12');
                 do_action('pldr_event',(string)$row['event_name'],$payload,(string)$row['event_id']);
-                $stored=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>'sent','sent_at'=>PLDR_Core::now(),'last_error'=>''),array('id'=>(int)$row['id'],'status'=>'processing'));
-                if(false===$stored)throw new RuntimeException('Dispatched event state could not be persisted.');
+                $stored=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>'sent','sent_at'=>PLDR_Core::now(),'last_error'=>''),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
+                if(1!==$stored)throw new RuntimeException('Dispatched event lease changed or state could not be persisted.');
             }catch(Throwable $e){
                 $attempts=(int)$row['attempts']+1;$status=$attempts>=8?'dead-letter':'retry';$delay=min(3600,30*(2**min($attempts,6)));
-                $wpdb->update(PLDR_Core::table('outbox'),array('status'=>$status,'attempts'=>$attempts,'available_at'=>gmdate('Y-m-d H:i:s',time()+$delay),'last_error'=>sanitize_text_field($e->getMessage())),array('id'=>(int)$row['id'],'status'=>'processing'));
+                $retry=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>$status,'attempts'=>$attempts,'available_at'=>gmdate('Y-m-d H:i:s',time()+$delay),'last_error'=>sanitize_text_field($e->getMessage())),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
+                if(false===$retry)PLDR_Core::audit('outbox',(int)$row['id'],'outbox_retry_persist_failed',array('event_id'=>(string)$row['event_id']));
             }
         }
     }

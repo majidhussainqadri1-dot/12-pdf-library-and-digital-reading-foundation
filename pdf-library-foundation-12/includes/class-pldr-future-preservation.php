@@ -9,11 +9,13 @@ final class PLDR_Future_Preservation {
     public static function assess(int $edition_id,bool $verify=false):array {
         global $wpdb;
         $system=function_exists('wp_doing_cron')&&wp_doing_cron()&&function_exists('doing_action')&&doing_action('pldr_future_preservation_scan');
-        $edition=PLDR_Core::edition($edition_id);
+        $wpdb->last_error='';$edition=PLDR_Core::edition($edition_id);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_edition_read','Edition state could not be read reliably for preservation assessment.',503,array('degraded'=>true)));
         if(!$edition)return array('error'=>PLDR_Core::machine_error('pldr_preservation_edition','Edition not found.',404));
         $document_id=(int)$edition['document_id'];
         if(!$system&&!PLDR_Core::authorize('repair',$document_id)&&!PLDR_Core::authorize('manage',$document_id))return array('error'=>PLDR_Core::machine_error('pldr_preservation_forbidden','Preservation assessment authority is required for this document.',403));
-        $object=PLDR_Core::object((int)$edition['object_id']);
+        $wpdb->last_error='';$object=PLDR_Core::object((int)$edition['object_id']);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_object_read','Object state could not be read reliably for preservation assessment.',503,array('degraded'=>true)));
         if(!$object)return array('error'=>PLDR_Core::machine_error('pldr_preservation_object','Object not found.',404));
         $path=PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);
         $integrity='unknown';$error='';$findings=array();$provider_failure=false;$provider_input_total=0;$provider_requested_quarantine=false;
@@ -31,10 +33,10 @@ final class PLDR_Future_Preservation {
         if('failed'===$integrity){
             $health='quarantined';$findings[]='Plaintext checksum verification failed.';
             if('quarantined'!==$object['object_status']){
-                $updated=$wpdb->update(PLDR_Core::table('objects'),array('object_status'=>'quarantined','updated_at'=>PLDR_Core::now()),array('id'=>(int)$object['id'],'object_status'=>$object['object_status']));
+                $updated=$wpdb->update(PLDR_Core::table('objects'),array('object_status'=>'quarantined','verified_at'=>PLDR_Core::now()),array('id'=>(int)$object['id'],'object_status'=>$object['object_status']));
                 if(1!==$updated)return array('error'=>PLDR_Core::machine_error('pldr_preservation_quarantine_store','Integrity failure was detected but quarantine state could not be persisted; access state must be reconciled before proceeding.',500));
                 $object['object_status']='quarantined';
-                PLDR_Access::revoke_document($document_id,'preservation-integrity-failure');
+                if(PLDR_Access::revoke_document($document_id,'preservation-integrity-failure')<0)return array('error'=>PLDR_Core::machine_error('pldr_preservation_revoke_reconcile','Object was quarantined but delivery-grant revocation could not be confirmed; reconciliation is required.',503,array('committed'=>true)));
                 PLDR_Core::audit('object',(int)$object['id'],'preservation_integrity_quarantined',array('edition_id'=>$edition_id,'error'=>$error));
             }
         }

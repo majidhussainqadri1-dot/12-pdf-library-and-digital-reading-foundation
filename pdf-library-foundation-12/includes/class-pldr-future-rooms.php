@@ -8,8 +8,10 @@ final class PLDR_Future_Rooms {
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_room_login','Log in to create a scholarly reading room.',401);
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return $edition;
-        $doc=PLDR_Core::document((int)$edition['document_id']);
-        if($doc && 'patient-cases'===$doc['category']){
+        $wpdb->last_error='';$doc=PLDR_Core::document((int)$edition['document_id']);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_room_document_read','Document privacy classification could not be read reliably; reading-room creation was denied.',503,array('degraded'=>true));
+        if(!$doc)return PLDR_Core::machine_error('pldr_room_document','Document privacy classification is unavailable; reading-room creation was denied.',503,array('degraded'=>true));
+        if('patient-cases'===$doc['category']){
             try{$patient_case_allowed=(bool)apply_filters('pldr_patient_case_reading_room_allowed',false,$edition_id,$doc);}
             catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'reading_room_patient_policy_provider_failed',array('provider_failure'=>1),$uid);return PLDR_Core::machine_error('pldr_room_policy_provider','Reading-room patient-case policy could not be verified; room creation was denied.',503,array('degraded'=>true,'provider_failure'=>true));}
             if(!$patient_case_allowed)return PLDR_Core::machine_error('pldr_room_patient_case','Patient-case documents require separate privacy approval before a reading room can be created.',403);
@@ -32,13 +34,15 @@ final class PLDR_Future_Rooms {
             $provider=apply_filters('pldr_create_reading_room_provider',null,$uid,$context);
         }catch(Throwable $e){
             $message=self::limit(sanitize_text_field($e->getMessage()),300);
-            $wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'provider-error','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
+            $failed_state=$wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'provider-error','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
+            if(false===$failed_state)PLDR_Core::audit('room_context',$context_id,'provider_failure_state_persist_failed',array('room_key'=>$room_key),$uid);
             PLDR_Core::audit('room_context',$context_id,'provider_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'error'=>$message),$uid);
             return PLDR_Core::machine_error('pldr_room_provider','Reading-room provider failed; the local context remains for safe retry/reconciliation.',503,array('room_key'=>$room_key,'degraded'=>true));
         }
         $provider_ref=is_array($provider)?self::limit(sanitize_text_field((string)($provider['reference']??'')),190):'';
         if(''===$provider_ref){
-            $wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'pending-provider','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
+            $pending=$wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'pending-provider','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
+            if(false===$pending)return PLDR_Core::machine_error('pldr_room_pending_store','Reading-room provider state could not be persisted; reconciliation is required.',500,array('room_key'=>$room_key));
             return PLDR_Core::machine_error('pldr_room_provider','No approved reading-room provider accepted the request; the local context remains pending.',503,array('room_key'=>$room_key,'degraded'=>true));
         }
         $updated=$wpdb->update(PLDR_Core::table('room_contexts'),array('provider_ref'=>$provider_ref,'status'=>'active','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid,'status'=>'pending-provider'));
@@ -73,7 +77,9 @@ final class PLDR_Future_Rooms {
         foreach(array('exact','selection') as $key){if(!empty($anchor[$key]))$texts[]=PLDR_Core::normalize_search((string)$anchor[$key]);}
         $texts=array_values(array_filter($texts,static fn(string $value):bool=>''!==$value));
         if(!$texts)return true;
+        global $wpdb;$wpdb->last_error='';
         $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_room_anchor_source_read','Reading-room source text could not be read reliably; external validation was not attempted.',503,array('degraded'=>true));
         if($rows){
             $haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));
             if(''!==$haystack){

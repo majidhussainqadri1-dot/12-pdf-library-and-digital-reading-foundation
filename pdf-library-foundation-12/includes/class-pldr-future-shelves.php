@@ -8,6 +8,11 @@ final class PLDR_Future_Shelves {
 
     public static function ensure_defaults(int $uid) {
         global $wpdb;
+        if($uid<1)return PLDR_Core::machine_error('pldr_shelf_login','A valid account is required for private shelves.',401);
+        $lock='pldr_shelf_defaults_'.substr(hash('sha256',(string)$uid),0,32);
+        $locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,2)',$lock));
+        if(1!==$locked)return PLDR_Core::machine_error('pldr_shelf_default_lock','Default shelf initialization is temporarily busy; retry shortly.',503,array('retry_after'=>2));
+        try{
         foreach(array('reading'=>'Reading now','later'=>'Read later','complete'=>'Completed','reference'=>'Important reference') as $type=>$name){
             $wpdb->last_error='';
             $exists=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d AND shelf_type=%s LIMIT 1',$uid,$type));
@@ -23,6 +28,7 @@ final class PLDR_Future_Shelves {
             }
         }
         return true;
+        }finally{$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
     }
 
     public static function list():array {

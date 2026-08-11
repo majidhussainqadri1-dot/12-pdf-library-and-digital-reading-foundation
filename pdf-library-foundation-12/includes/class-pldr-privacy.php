@@ -34,7 +34,19 @@ final class PLDR_Privacy {
     private static function table_exists(string $suffix): bool {
         global $wpdb;
         $table = PLDR_Core::table($suffix);
-        return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) === $table;
+        $wpdb->last_error='';
+        $found=$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+        return ''===(string)$wpdb->last_error && $found === $table;
+    }
+
+    private static function table_check_failed(): bool {
+        global $wpdb;
+        return '' !== (string)$wpdb->last_error;
+    }
+
+    private static function export_failure(array $data,string $scope,int $user_id): array {
+        PLDR_Core::audit('privacy',0,'privacy_export_read_failed',array('user_id'=>$user_id,'scope'=>$scope),$user_id);
+        return array('data'=>$data,'done'=>false);
     }
 
     private static function add_export_rows(array &$data, array $rows, string $group_id, string $group_label, string $id_field, callable $mapper): void {
@@ -58,10 +70,13 @@ final class PLDR_Privacy {
         $data = array();
         $counts = array();
 
+        $wpdb->last_error='';
         $states = $wpdb->get_results($wpdb->prepare(
             'SELECT s.*,d.public_id,d.title FROM '.PLDR_Core::table('reading_state').' s JOIN '.PLDR_Core::table('editions').' e ON e.id=s.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE s.user_id=%d ORDER BY s.updated_at DESC LIMIT %d OFFSET %d',
             $user_id, $limit, $offset
-        ), ARRAY_A) ?: array();
+        ), ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return self::export_failure($data,'reading_state',$user_id);
+        $states=is_array($states)?$states:array();
         $counts[] = count($states);
         self::add_export_rows($data, $states, 'pldr-reading-state', __('PDF Library reading progress','pdf-library-digital-reading'), 'edition_id', static function(array $row): array {
             return array(
@@ -72,10 +87,13 @@ final class PLDR_Privacy {
             );
         });
 
+        $wpdb->last_error='';
         $items = $wpdb->get_results($wpdb->prepare(
             'SELECT i.*,d.public_id,d.title FROM '.PLDR_Core::table('reading_items').' i JOIN '.PLDR_Core::table('editions').' e ON e.id=i.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE i.user_id=%d ORDER BY i.id ASC LIMIT %d OFFSET %d',
             $user_id, $limit, $offset
-        ), ARRAY_A) ?: array();
+        ), ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return self::export_failure($data,'reading_items',$user_id);
+        $items=is_array($items)?$items:array();
         $counts[] = count($items);
         self::add_export_rows($data, $items, 'pldr-reading-items', __('PDF Library bookmarks, highlights and private notes','pdf-library-digital-reading'), 'id', static function(array $row): array {
             return array(
@@ -89,11 +107,16 @@ final class PLDR_Privacy {
             );
         });
 
-        if (self::table_exists('access_tokens')) {
+        $access_tokens_exists=self::table_exists('access_tokens');
+        if(self::table_check_failed())return self::export_failure($data,'access_tokens_table',$user_id);
+        if ($access_tokens_exists) {
+            $wpdb->last_error='';
             $tokens=$wpdb->get_results($wpdb->prepare(
                 'SELECT id,edition_id,operation,expires_at,revoked_at,used_count,max_uses,created_at FROM '.PLDR_Core::table('access_tokens').' WHERE user_id=%d ORDER BY id ASC LIMIT %d OFFSET %d',
                 $user_id,$limit,$offset
-            ),ARRAY_A)?:array();
+            ),ARRAY_A);
+            if(''!==(string)$wpdb->last_error)return self::export_failure($data,'access_tokens',$user_id);
+            $tokens=is_array($tokens)?$tokens:array();
             $counts[]=count($tokens);
             self::add_export_rows($data,$tokens,'pldr-delivery-grants',__('PDF Library delivery grant metadata','pdf-library-digital-reading'),'id',static function(array $row):array {
                 return array(
@@ -117,11 +140,16 @@ final class PLDR_Privacy {
         );
 
         foreach ($future_specs as $suffix => $spec) {
-            if (!self::table_exists($suffix)) { $counts[] = 0; continue; }
+            $exists=self::table_exists($suffix);
+            if(self::table_check_failed())return self::export_failure($data,$suffix.'_table',$user_id);
+            if (!$exists) { $counts[] = 0; continue; }
             $table = PLDR_Core::table($suffix);
             $owner_column = 'room_contexts' === $suffix ? 'created_by' : 'user_id';
             $order = preg_replace('/[^a-z0-9_]/i', '', $spec['order']);
-            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE {$owner_column}=%d ORDER BY {$order} ASC LIMIT %d OFFSET %d", $user_id, $limit, $offset), ARRAY_A) ?: array();
+            $wpdb->last_error='';
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE {$owner_column}=%d ORDER BY {$order} ASC LIMIT %d OFFSET %d", $user_id, $limit, $offset), ARRAY_A);
+            if(''!==(string)$wpdb->last_error)return self::export_failure($data,$suffix,$user_id);
+            $rows=is_array($rows)?$rows:array();
             $counts[] = count($rows);
             self::add_export_rows($data, $rows, $spec['group'], $spec['label'], $spec['id'], static function(array $row) use ($spec): array {
                 $out = array();
@@ -146,18 +174,38 @@ final class PLDR_Privacy {
 
     private static function erase_id_batch(string $suffix, string $owner_column, int $user_id): int {
         global $wpdb;
-        if (!self::table_exists($suffix)) return 0;
+        if (!self::table_exists($suffix)) return self::table_check_failed() ? -1 : 0;
         $table = PLDR_Core::table($suffix);
+        $wpdb->last_error='';
         $ids = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$table} WHERE {$owner_column}=%d ORDER BY id ASC LIMIT %d", $user_id, self::BATCH));
+        if(''!==(string)$wpdb->last_error)return -1;
         return self::delete_ids($suffix, 'id', $ids ?: array());
     }
 
     private static function erase_direct_batch(string $suffix, string $owner_column, int $user_id): int {
         global $wpdb;
-        if (!self::table_exists($suffix)) return 0;
+        if (!self::table_exists($suffix)) return self::table_check_failed() ? -1 : 0;
         $table = PLDR_Core::table($suffix);
         $deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE {$owner_column}=%d LIMIT %d", $user_id, self::BATCH));
         return false === $deleted ? -1 : (int)$deleted;
+    }
+
+
+    private static function anonymize_id_batch(string $suffix,string $where_sql,array $where_args,string $set_sql,array $set_args=array()): int {
+        global $wpdb;
+        if(!self::table_exists($suffix))return self::table_check_failed()?-1:0;
+        $table=PLDR_Core::table($suffix);
+        $select="SELECT id FROM {$table} WHERE {$where_sql} ORDER BY id ASC LIMIT %d";
+        $wpdb->last_error='';
+        $ids=$wpdb->get_col($wpdb->prepare($select,array_merge($where_args,array(self::BATCH))));
+        if(''!==(string)$wpdb->last_error)return -1;
+        $safe=array_values(array_filter(array_map('absint',$ids?:array())));
+        if(!$safe)return 0;
+        $in=implode(',',$safe);
+        $query="UPDATE {$table} SET {$set_sql} WHERE id IN ({$in})";
+        if($set_args)$query=$wpdb->prepare($query,$set_args);
+        $updated=$wpdb->query($query);
+        return false===$updated?-1:(int)$updated;
     }
 
     public static function erase(string $email, int $page = 1): array {
@@ -201,20 +249,31 @@ final class PLDR_Privacy {
             if ($result < 0) $errors[] = $spec[0]; else $removed += $result;
         }
 
-        if (self::table_exists('shelves')) {
+        $shelves_exists=self::table_exists('shelves');
+        if(self::table_check_failed())$errors[]='shelves';
+        if ($shelves_exists) {
             $shelves = PLDR_Core::table('shelves');
-            $shelf_ids = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$shelves} WHERE user_id=%d ORDER BY id ASC LIMIT %d", $user_id, self::BATCH)) ?: array();
+            $wpdb->last_error='';
+            $shelf_ids = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$shelves} WHERE user_id=%d ORDER BY id ASC LIMIT %d", $user_id, self::BATCH));
+            if(''!==(string)$wpdb->last_error)$errors[]='shelves';
+            $shelf_ids=is_array($shelf_ids)?$shelf_ids:array();
             if ($shelf_ids) {
                 $shelf_items_remaining=false;
-                if (self::table_exists('shelf_items')) {
+                $shelf_items_exists=self::table_exists('shelf_items');
+                if(self::table_check_failed())$errors[]='shelf_items';
+                if ($shelf_items_exists) {
                     $items = PLDR_Core::table('shelf_items');
                     $in = implode(',', array_map('absint', $shelf_ids));
-                    $item_ids=$wpdb->get_col("SELECT id FROM {$items} WHERE shelf_id IN ({$in}) ORDER BY id ASC LIMIT ".self::BATCH)?:array();
+                    $wpdb->last_error='';
+                    $item_ids=$wpdb->get_col("SELECT id FROM {$items} WHERE shelf_id IN ({$in}) ORDER BY id ASC LIMIT ".self::BATCH);
+                    if(''!==(string)$wpdb->last_error){$errors[]='shelf_items';$item_ids=array();}
+                    $item_ids=is_array($item_ids)?$item_ids:array();
                     if($item_ids){
                         $result=self::delete_ids('shelf_items','id',$item_ids);
                         if($result<0)$errors[]='shelf_items';else$removed+=$result;
                     }
-                    $shelf_items_remaining=(bool)$wpdb->get_var("SELECT id FROM {$items} WHERE shelf_id IN ({$in}) LIMIT 1");
+                    $wpdb->last_error='';$shelf_items_remaining=(bool)$wpdb->get_var("SELECT id FROM {$items} WHERE shelf_id IN ({$in}) LIMIT 1");
+                    if(''!==(string)$wpdb->last_error){$errors[]='shelf_items';$shelf_items_remaining=true;}
                 }
                 if(!$shelf_items_remaining&&!in_array('shelf_items',$errors,true)){
                     $result = self::delete_ids('shelves', 'id', $shelf_ids);
@@ -223,15 +282,12 @@ final class PLDR_Privacy {
             }
         }
 
-        if (self::table_exists('ocr_corrections')) {
-            $table = PLDR_Core::table('ocr_corrections');
-            if (false === $wpdb->query($wpdb->prepare("UPDATE {$table} SET submitted_by=CASE WHEN submitted_by=%d THEN 0 ELSE submitted_by END,reviewed_by=CASE WHEN reviewed_by=%d THEN 0 ELSE reviewed_by END WHERE submitted_by=%d OR reviewed_by=%d", $user_id, $user_id, $user_id, $user_id))) $errors[] = 'ocr_corrections';
-        }
-        if (self::table_exists('a11y_audits')) {
-            $table = PLDR_Core::table('a11y_audits');
-            if (false === $wpdb->update($table, array('verified_by'=>0), array('verified_by'=>$user_id), array('%d'), array('%d'))) $errors[] = 'a11y_audits';
-        }
-        if (false === $wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('rights_cases').' SET reporter_id=0,updated_at=%s WHERE reporter_id=%d AND state=%s', PLDR_Core::now(), $user_id, 'closed'))) $errors[] = 'rights_cases';
+        $ocr_anon=self::anonymize_id_batch('ocr_corrections','submitted_by=%d OR reviewed_by=%d',array($user_id,$user_id),'submitted_by=CASE WHEN submitted_by=%d THEN 0 ELSE submitted_by END,reviewed_by=CASE WHEN reviewed_by=%d THEN 0 ELSE reviewed_by END',array($user_id,$user_id));
+        if($ocr_anon<0)$errors[]='ocr_corrections';else$removed+=$ocr_anon;
+        $a11y_anon=self::anonymize_id_batch('a11y_audits','verified_by=%d',array($user_id),'verified_by=0');
+        if($a11y_anon<0)$errors[]='a11y_audits';else$removed+=$a11y_anon;
+        $rights_anon=self::anonymize_id_batch('rights_cases','reporter_id=%d AND state=%s',array($user_id,'closed'),'reporter_id=0,updated_at=%s',array(PLDR_Core::now()));
+        if($rights_anon<0)$errors[]='rights_cases';else$removed+=$rights_anon;
 
         if ($errors) return array(
             'items_removed'=>$removed > 0,
@@ -245,10 +301,25 @@ final class PLDR_Privacy {
             array('reading_items','user_id'), array('reading_state','user_id'), array('access_tokens','user_id'), array('future_prefs','user_id'), array('shelves','user_id'),
             array('reading_events','user_id'), array('session_handoffs','user_id'), array('room_contexts','created_by')
         ) as $spec) {
-            if (!self::table_exists($spec[0])) continue;
+            $exists=self::table_exists($spec[0]);
+            if(self::table_check_failed()){$errors[]=$spec[0];continue;}
+            if (!$exists) continue;
             $table = PLDR_Core::table($spec[0]);
-            $remaining += (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE {$spec[1]}=%d", $user_id));
+            $wpdb->last_error='';$count=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE {$spec[1]}=%d", $user_id));
+            if(''!==(string)$wpdb->last_error){$errors[]=$spec[0];continue;}
+            $remaining += $count;
         }
+        foreach(array(
+            array('ocr_corrections','submitted_by=%d OR reviewed_by=%d',array($user_id,$user_id)),
+            array('a11y_audits','verified_by=%d',array($user_id)),
+            array('rights_cases','reporter_id=%d AND state=%s',array($user_id,'closed'))
+        ) as $spec){
+            $exists=self::table_exists($spec[0]);if(self::table_check_failed()){$errors[]=$spec[0];continue;}
+            if(!$exists)continue;$table=PLDR_Core::table($spec[0]);$wpdb->last_error='';
+            $count=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE {$spec[1]}",$spec[2]));
+            if(''!==(string)$wpdb->last_error){$errors[]=$spec[0];continue;}$remaining+=$count;
+        }
+        if($errors)return array('items_removed'=>$removed>0,'items_retained'=>true,'messages'=>array(__('File 12 privacy reconciliation could not confirm completion; retry is required.','pdf-library-digital-reading')),'done'=>false);
 
         PLDR_Core::audit('privacy', 0, 'user_reading_erasure_batch', array('user_id'=>$user_id,'removed'=>$removed,'remaining'=>$remaining,'page'=>max(1,$page)));
         return array(

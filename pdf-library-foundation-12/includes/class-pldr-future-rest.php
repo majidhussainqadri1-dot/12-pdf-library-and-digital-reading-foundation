@@ -81,7 +81,7 @@ final class PLDR_Future_REST {
     private static function idempotent(WP_REST_Request $request, string $route, callable $callback) {
         $key = substr(sanitize_text_field((string) $request->get_header('Idempotency-Key')), 0, 200);
         if ('' === $key) {
-            $result=$callback();
+            try{$result=$callback();}catch(Throwable $e){PLDR_Core::audit('rest',0,'future_mutation_callback_failed',array('route'=>$route));return PLDR_Core::machine_error('pldr_future_mutation_failed','The requested mutation failed before completion.',500);}
             if(is_array($result)&&isset($result['error'])&&is_wp_error($result['error']))$result=$result['error'];
             return is_wp_error($result)?$result:rest_ensure_response($result);
         }
@@ -91,7 +91,8 @@ final class PLDR_Future_REST {
         if ('hit' === ($claim['state'] ?? '')) return new WP_REST_Response($claim['body'], $claim['status']);
         if ('pending' === ($claim['state'] ?? '')) return PLDR_Core::machine_error('pldr_future_idempotency_in_progress','A request with this Idempotency-Key is already in progress.',409,array('retry_after'=>2));
         if ('reserved' !== ($claim['state'] ?? '')) return PLDR_Core::machine_error('pldr_future_idempotency_unavailable','Idempotency protection could not be reserved; the mutation was not executed.',503);
-        $result = $callback();
+        try{$result=$callback();}
+        catch(Throwable $e){$result=PLDR_Core::machine_error('pldr_future_mutation_failed','The requested mutation failed before completion.',500);PLDR_Core::audit('rest',0,'future_mutation_callback_failed',array('route'=>$route));}
         if (is_array($result) && isset($result['error']) && is_wp_error($result['error'])) $result = $result['error'];
         $response = is_wp_error($result) ? rest_convert_error_to_response($result) : rest_ensure_response($result);
         $status = $response instanceof WP_REST_Response ? $response->get_status() : 200;
@@ -116,7 +117,9 @@ final class PLDR_Future_REST {
     public static function heatmap(WP_REST_Request $r) { return self::response(PLDR_Future_Search::heatmap(absint($r['edition']),(string)$r['q'])); }
     public static function offline_grant(WP_REST_Request $r) {
         $b=self::body($r);
+        global $wpdb;$wpdb->last_error='';
         $edition=PLDR_Core::edition(absint($b['edition_id']??0));
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_offline_edition_read','Offline-grant edition state could not be read reliably.',503,array('degraded'=>true));
         if(!$edition)return PLDR_Core::machine_error('pldr_offline_edition','Edition not found.',404);
         $uid=get_current_user_id();
         try {
@@ -129,7 +132,8 @@ final class PLDR_Future_REST {
         $valid=time()+$ttl;
         if(!empty($edition['rights_expires_at'])){
             $rights=strtotime((string)$edition['rights_expires_at']);
-            if($rights)$valid=min($valid,$rights);
+            if(false===$rights)return PLDR_Core::machine_error('pldr_offline_rights_state','Offline rights expiry could not be interpreted safely; no grant was issued.',503,array('degraded'=>true));
+            $valid=min($valid,$rights);
         }
         if($valid<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);
         $grant_ttl=max(60,min(900,$valid-time()));

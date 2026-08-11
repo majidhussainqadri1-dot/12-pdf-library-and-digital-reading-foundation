@@ -119,11 +119,15 @@ final class PLDR_Future {
 
     public static function cleanup(): void {
         global $wpdb;
-        $retention = (int) apply_filters('pldr_private_reading_event_retention_days', 365);
-        $retention = max(30, min(730, $retention));
-        $wpdb->query($wpdb->prepare('DELETE FROM ' . PLDR_Core::table('reading_events') . ' WHERE created_at<%s', gmdate('Y-m-d H:i:s', time() - $retention * DAY_IN_SECONDS)));
-        $wpdb->query($wpdb->prepare('DELETE FROM ' . PLDR_Core::table('authority_cache') . ' WHERE expires_at<%s', gmdate('Y-m-d H:i:s', time() - 7 * DAY_IN_SECONDS)));
-        $wpdb->query($wpdb->prepare('DELETE FROM ' . PLDR_Core::table('room_contexts') . ' WHERE status=%s AND created_at<%s', 'pending-provider', gmdate('Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS)));
+        try{$retention=(int)apply_filters('pldr_private_reading_event_retention_days',365);}
+        catch(Throwable $e){PLDR_Core::audit('system',0,'future_retention_policy_provider_failed',array('provider_failure'=>true));return;}
+        $retention=max(30,min(730,$retention));
+        $queries=array(
+            'reading_events'=>$wpdb->prepare('DELETE FROM '.PLDR_Core::table('reading_events').' WHERE created_at<%s ORDER BY id ASC LIMIT 1000',gmdate('Y-m-d H:i:s',time()-$retention*DAY_IN_SECONDS)),
+            'authority_cache'=>$wpdb->prepare('DELETE FROM '.PLDR_Core::table('authority_cache').' WHERE expires_at<%s ORDER BY id ASC LIMIT 1000',gmdate('Y-m-d H:i:s',time()-7*DAY_IN_SECONDS)),
+            'room_contexts'=>$wpdb->prepare('DELETE FROM '.PLDR_Core::table('room_contexts').' WHERE status=%s AND created_at<%s ORDER BY id ASC LIMIT 1000','pending-provider',gmdate('Y-m-d H:i:s',time()-30*DAY_IN_SECONDS)),
+        );
+        foreach($queries as $scope=>$sql){if(false===$wpdb->query($sql))PLDR_Core::audit('system',0,'future_cleanup_failed',array('scope'=>$scope,'db_error'=>substr((string)$wpdb->last_error,0,500)));}
     }
 
     public static function mark_vault_purge(): void {

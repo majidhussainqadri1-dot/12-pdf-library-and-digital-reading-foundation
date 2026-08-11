@@ -246,16 +246,22 @@ final class PLDR_Future_Schema {
             'preservation_records'=>array('PRIMARY','object_id','format_health'),
             'scan_fingerprints'=>array('PRIMARY','fingerprint_value','metadata_hash'),
         );
-        $missing_tables=array();$missing_columns=array();$missing_indexes=array();
+        $missing_tables=array();$missing_columns=array();$missing_indexes=array();$read_errors=array();
         foreach($expected as $suffix=>$columns){
-            $table=PLDR_Core::table($suffix);
-            if($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table))!==$table){$missing_tables[]=$suffix;continue;}
-            $safe='`'.str_replace('`','',$table).'`';
+            $table=PLDR_Core::table($suffix);$wpdb->last_error='';
+            $exists=$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table));
+            if(''!==(string)$wpdb->last_error){$read_errors[]=$suffix.'.table';continue;}
+            if($exists!==$table){$missing_tables[]=$suffix;continue;}
+            $safe='`'.str_replace('`','',$table).'`';$wpdb->last_error='';
             $found=$wpdb->get_col("SHOW COLUMNS FROM {$safe}");
+            if(''!==(string)$wpdb->last_error){$read_errors[]=$suffix.'.columns';continue;}
+            $found=is_array($found)?$found:array();
             foreach($columns as $column)if(!in_array($column,$found,true))$missing_columns[]=$suffix.'.'.$column;
-            $indexes=$wpdb->get_results("SHOW INDEX FROM {$safe}",ARRAY_A)?:array();$index_names=array_values(array_unique(array_map(static fn($row)=>(string)$row['Key_name'],$indexes)));
+            $wpdb->last_error='';$indexes=$wpdb->get_results("SHOW INDEX FROM {$safe}",ARRAY_A);
+            if(''!==(string)$wpdb->last_error){$read_errors[]=$suffix.'.indexes';continue;}
+            $indexes=is_array($indexes)?$indexes:array();$index_names=array_values(array_unique(array_map(static fn($row)=>(string)$row['Key_name'],$indexes)));
             foreach($required_indexes[$suffix]??array() as $index)if(!in_array($index,$index_names,true))$missing_indexes[]=$suffix.'.'.$index;
         }
-        return array('ok'=>!$missing_tables&&!$missing_columns&&!$missing_indexes,'missing_tables'=>$missing_tables,'missing_columns'=>$missing_columns,'missing_indexes'=>$missing_indexes);
+        return array('ok'=>!$read_errors&&!$missing_tables&&!$missing_columns&&!$missing_indexes,'read_errors'=>$read_errors,'missing_tables'=>$missing_tables,'missing_columns'=>$missing_columns,'missing_indexes'=>$missing_indexes);
     }
 }

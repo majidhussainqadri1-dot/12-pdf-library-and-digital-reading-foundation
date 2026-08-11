@@ -62,15 +62,19 @@ final class PLDR_Ingest {
             return PLDR_Core::machine_error('pldr_checksum', 'The PDF checksum could not be computed.', 500);
         }
 
+        $wpdb->last_error='';
         $duplicate = $wpdb->get_row($wpdb->prepare(
             'SELECT e.id,e.document_id,d.public_id,d.title FROM ' . PLDR_Core::table('editions') . ' e INNER JOIN ' . PLDR_Core::table('documents') . ' d ON d.id=e.document_id WHERE e.sha256=%s LIMIT 1',
             $sha256
         ), ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_duplicate_read','Duplicate-check state could not be read reliably; ingest was not attempted.',503,array('degraded'=>true));
         if ($duplicate) {
             return PLDR_Core::machine_error('pldr_exact_duplicate', 'This exact PDF object already exists in the canonical library.', 409, array('document_id' => $duplicate['public_id'], 'edition_id' => (int) $duplicate['id']));
         }
 
+        $wpdb->last_error='';
         $similar = self::similar_candidate($data);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_similarity_read','Similarity-check state could not be read reliably; ingest was not attempted.',503,array('degraded'=>true));
         if ($similar && (!$existing_doc || (string)($similar['public_id']??'') !== (string)$existing_doc['public_id']) && empty($data['confirm_distinct_scan'])) {
             return PLDR_Core::machine_error('pldr_metadata_duplicate_candidate', 'A similar document or edition exists. Confirm that this is a distinct scan/edition before ingest.', 409, array('candidate' => $similar));
         }
@@ -110,7 +114,7 @@ final class PLDR_Ingest {
         $document_id = $existing_doc ? (int)$existing_doc['id'] : 0;
         $edition_id = 0;
 
-        $wpdb->query('START TRANSACTION');
+        if(false===$wpdb->query('START TRANSACTION')){PLDR_Storage::delete($allocation['path']);return PLDR_Core::machine_error('pldr_ingest_transaction_start','PDF ingest transaction could not be started; committed storage was removed.',500);}
         try {
             $ok = $wpdb->insert(PLDR_Core::table('objects'), array(
                 'storage_name' => $allocation['name'],
@@ -200,13 +204,15 @@ final class PLDR_Ingest {
             if (false === $ok) throw new RuntimeException('Access policy could not be saved.');
 
             if ($existing_doc && 'published' === $edition_status) {
-                $wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,updated_at=%s WHERE document_id=%d AND id<>%d AND status=%s','superseded',PLDR_Core::now(),$document_id,$edition_id,'published'));
-                $wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d','published',PLDR_Core::now(),$document_id));
+                $superseded=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,updated_at=%s WHERE document_id=%d AND id<>%d AND status=%s','superseded',PLDR_Core::now(),$document_id,$edition_id,'published'));
+                if(false===$superseded)throw new RuntimeException('Existing published editions could not be superseded.');
+                $published=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d','published',PLDR_Core::now(),$document_id));
+                if(false===$published)throw new RuntimeException('Canonical document publication state could not be updated.');
                 $document_status='published';
             }
 
             if (!empty($data['rights_evidence_ref'])) {
-                $wpdb->insert(PLDR_Core::table('rights_cases'), array(
+                $rights_saved=$wpdb->insert(PLDR_Core::table('rights_cases'), array(
                     'case_key' => PLDR_Core::uuid(),
                     'document_id' => $document_id,
                     'reporter_id' => $actor_id,
@@ -221,8 +227,9 @@ final class PLDR_Ingest {
                     'updated_at' => PLDR_Core::now(),
                     'closed_at' => PLDR_Core::now(),
                 ));
+                if(false===$rights_saved)throw new RuntimeException('Restricted rights-evidence reference could not be recorded.');
             }
-            $wpdb->query('COMMIT');
+            if(false===$wpdb->query('COMMIT'))throw new RuntimeException('PDF ingest transaction could not be committed atomically.');
         } catch (Throwable $e) {
             $wpdb->query('ROLLBACK');
             PLDR_Storage::delete($allocation['path']);
@@ -247,7 +254,9 @@ final class PLDR_Ingest {
             return PLDR_Core::machine_error('pldr_upload_error', 'The PDF upload did not complete successfully.', 400);
         }
         $size = (int) ($pdf['size'] ?? 0);
-        $max = (int) apply_filters('pldr_max_pdf_bytes', min(1024 * MB_IN_BYTES, max(1, wp_max_upload_size())));
+        try{$max=(int)apply_filters('pldr_max_pdf_bytes',min(1024 * MB_IN_BYTES,max(1,wp_max_upload_size())));}
+        catch(Throwable $e){return PLDR_Core::machine_error('pldr_pdf_size_policy','PDF size policy could not be verified; upload was not accepted.',503,array('degraded'=>true,'provider_failure'=>true));}
+        $max=max(1024,min(1024*MB_IN_BYTES,$max));
         if ($size < 32 || $size > $max) {
             return PLDR_Core::machine_error('pldr_pdf_size', 'The PDF is empty or exceeds the governed File 12 size limit.', 413, array('max_bytes' => $max));
         }
@@ -285,7 +294,8 @@ final class PLDR_Ingest {
     }
 
     private static function scan_file(string $path, array $data) {
-        $result = apply_filters('pldr_malware_scan', null, $path, array('filename' => basename((string) ($data['filename'] ?? 'document.pdf')), 'sha256' => hash_file('sha256', $path)));
+        try{$result=apply_filters('pldr_malware_scan',null,$path,array('filename'=>basename((string)($data['filename']??'document.pdf')),'sha256'=>hash_file('sha256',$path)));}
+        catch(Throwable $e){return PLDR_Core::machine_error('pldr_scanner_provider_failed','Malware scanner provider failed; ingest is fail-closed.',503,array('degraded'=>true,'provider_failure'=>true));}
         if (is_array($result) && isset($result['status'])) {
             $status = sanitize_key((string) $result['status']);
             if ('infected' === $status || 'quarantined' === $status) {
@@ -478,7 +488,8 @@ final class PLDR_Ingest {
 
     private static function generate_ocr(array $edition, string $plain): void {
         global $wpdb;
-        $rights = apply_filters('pldr_ocr_allowed', true, $edition);
+        try{$rights=apply_filters('pldr_ocr_allowed',true,$edition);}
+        catch(Throwable $e){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_rights_provider_failed',array('provider_failure'=>true));return;}
         if (!$rights) {
             $wpdb->replace(PLDR_Core::table('derivatives'), array(
                 'edition_id' => (int) $edition['id'], 'derivative_type' => 'ocr-status', 'page_number' => 0, 'object_id' => 0, 'language' => $edition['language'],
@@ -486,7 +497,8 @@ final class PLDR_Ingest {
             ));
             return;
         }
-        $result = apply_filters('pldr_ocr_extract_text', null, $plain, $edition);
+        try{$result=apply_filters('pldr_ocr_extract_text',null,$plain,$edition);}
+        catch(Throwable $e){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_provider_failed',array('provider_failure'=>true));$result=null;}
         if (!is_array($result) || empty($result['pages']) || !is_array($result['pages'])) {
             $wpdb->replace(PLDR_Core::table('derivatives'), array(
                 'edition_id' => (int) $edition['id'], 'derivative_type' => 'ocr-status', 'page_number' => 0, 'object_id' => 0, 'language' => $edition['language'],

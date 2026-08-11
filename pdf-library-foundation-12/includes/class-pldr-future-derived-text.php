@@ -10,8 +10,11 @@ final class PLDR_Future_Derived_Text {
         if(is_wp_error($edition))return array('error'=>$edition);
         $page=absint($page);
         if($page<1||$page>(int)$edition['pages'])return array('error'=>PLDR_Core::machine_error('pldr_derive_page','Derived text must be bound to a valid page in this edition.',400));
-        $doc=PLDR_Core::document((int)$edition['document_id']);
-        if($doc && 'patient-cases'===$doc['category']){
+        global $wpdb;
+        $wpdb->last_error='';$doc=PLDR_Core::document((int)$edition['document_id']);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_derive_document_read','Document privacy classification could not be read reliably; external derived-text processing was denied.',503,array('degraded'=>true)));
+        if(!$doc)return array('error'=>PLDR_Core::machine_error('pldr_derive_document','Document privacy classification is unavailable; external derived-text processing was denied.',503,array('degraded'=>true)));
+        if('patient-cases'===$doc['category']){
             try{$patient_case_allowed=(bool)apply_filters('pldr_derived_text_patient_case_allowed',false,$edition_id,$doc);}
             catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'derived_text_patient_policy_provider_failed',array('provider_failure'=>1));return array('error'=>PLDR_Core::machine_error('pldr_derive_policy_provider','Patient-case derived-text policy could not be verified; provider processing was denied.',503,array('degraded'=>true,'provider_failure'=>true)));}
             if(!$patient_case_allowed)return array('error'=>PLDR_Core::machine_error('pldr_derive_patient_case','Patient-case text is not sent to translation/transliteration providers without separate privacy approval.',403));

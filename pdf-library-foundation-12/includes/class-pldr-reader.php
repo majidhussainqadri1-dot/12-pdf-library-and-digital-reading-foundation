@@ -231,12 +231,14 @@ final class PLDR_Reader {
         if (!$edition || !PLDR_Access::can_access_edition((int)$edition['id'], 'read', get_current_user_id())) return self::state_html('restricted');
         $dto = PLDR_Core::public_document_dto($doc, $edition);
         $cover = self::cover_token((int)$edition['id']);
+        try{$related_html=(string)apply_filters('pldr_related_content_html','',(int)$edition['id'],$dto);}
+        catch(Throwable $e){$related_html='';PLDR_Core::audit('edition',(int)$edition['id'],'related_content_provider_failed',array('provider_failure'=>true));}
         ob_start(); ?>
         <main class="pldr-shell pldr-document" dir="auto">
             <nav class="pldr-local-nav" aria-label="<?php esc_attr_e('Document navigation', 'pdf-library-digital-reading'); ?>"><a href="<?php echo esc_url(home_url('/')); ?>"><?php esc_html_e('Home', 'pdf-library-digital-reading'); ?></a><a href="<?php echo esc_url(PLDR_Core::route_url('library')); ?>"><?php esc_html_e('PDF Library', 'pdf-library-digital-reading'); ?></a></nav>
             <section class="pldr-document-hero"><?php if ($cover): ?><img src="<?php echo esc_url($cover); ?>" alt="<?php echo esc_attr(sprintf(__('Cover of %s','pdf-library-digital-reading'),$dto['title'])); ?>"><?php endif; ?><div><span class="pldr-kicker"><?php echo esc_html(PLDR_Core::DOCUMENT_TYPES[$dto['type']]??$dto['type']); ?></span><h1><?php echo esc_html($dto['title']); ?></h1><p><?php echo esc_html((string)$dto['edition']['author']); ?></p><dl><dt><?php esc_html_e('Edition','pdf-library-digital-reading'); ?></dt><dd><?php echo esc_html((string)$dto['edition']['label']); ?></dd><dt><?php esc_html_e('Year','pdf-library-digital-reading'); ?></dt><dd><?php echo absint((int)$dto['edition']['year']); ?></dd><dt><?php esc_html_e('Pages','pdf-library-digital-reading'); ?></dt><dd><?php echo absint((int)$dto['edition']['pages']); ?></dd><dt><?php esc_html_e('License','pdf-library-digital-reading'); ?></dt><dd><?php echo esc_html((string)$dto['edition']['license']); ?></dd></dl><div class="pldr-actions"><a class="pldr-primary" href="<?php echo esc_url(PLDR_Core::route_url('read',array('id'=>$dto['id']))); ?>"><?php esc_html_e('Read online','pdf-library-digital-reading'); ?></a><?php if ($dto['permissions']['download']): ?><a class="pldr-primary" href="<?php echo esc_url(PLDR_Core::route_url('read',array('id'=>$dto['id'])) . '#download'); ?>"><?php esc_html_e('Download Manager','pdf-library-digital-reading'); ?></a><?php endif; ?></div></div></section>
             <section class="pldr-panel"><h2><?php esc_html_e('Stable citation','pdf-library-digital-reading'); ?></h2><p><?php echo esc_html(self::citation($edition,1,'sabri')); ?></p></section>
-            <?php echo wp_kses_post((string)apply_filters('pldr_related_content_html','',(int)$edition['id'],$dto)); ?>
+            <?php echo wp_kses_post($related_html); ?>
         </main>
         <?php return (string)ob_get_clean();
     }

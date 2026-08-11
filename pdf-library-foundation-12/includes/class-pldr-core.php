@@ -167,18 +167,21 @@ final class PLDR_Core {
 
     public static function document(int $id): ?array {
         global $wpdb;
+        $wpdb->last_error='';
         $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . self::table('documents') . ' WHERE id=%d', $id), ARRAY_A);
         return $row ?: null;
     }
 
     public static function document_by_public_id(string $public_id): ?array {
         global $wpdb;
+        $wpdb->last_error='';
         $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . self::table('documents') . ' WHERE public_id=%s', $public_id), ARRAY_A);
         return $row ?: null;
     }
 
     public static function edition(int $edition_id): ?array {
         global $wpdb;
+        $wpdb->last_error='';
         $row = $wpdb->get_row($wpdb->prepare(
             'SELECT e.*, d.public_id, d.title, d.slug, d.status AS document_status, d.access_mode AS document_access_mode, d.version AS document_version FROM ' . self::table('editions') . ' e INNER JOIN ' . self::table('documents') . ' d ON d.id=e.document_id WHERE e.id=%d',
             $edition_id
@@ -188,25 +191,34 @@ final class PLDR_Core {
 
     public static function current_edition(int $document_id): ?array {
         global $wpdb;
+        $wpdb->last_error='';
         $row = $wpdb->get_row($wpdb->prepare('SELECT e.* FROM '.self::table('editions').' e WHERE e.document_id=%d AND e.status=%s ORDER BY e.id DESC LIMIT 1',$document_id,'published'),ARRAY_A);
-        if(!$row) $row=$wpdb->get_row($wpdb->prepare('SELECT e.* FROM '.self::table('editions').' e WHERE e.document_id=%d ORDER BY e.id DESC LIMIT 1',$document_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return null;
+        if(!$row){
+            $wpdb->last_error='';
+            $row=$wpdb->get_row($wpdb->prepare('SELECT e.* FROM '.self::table('editions').' e WHERE e.document_id=%d ORDER BY e.id DESC LIMIT 1',$document_id),ARRAY_A);
+            if(''!==(string)$wpdb->last_error)return null;
+        }
         return $row ?: null;
     }
 
     public static function latest_edition(int $document_id): ?array {
         global $wpdb;
+        $wpdb->last_error='';
         $row=$wpdb->get_row($wpdb->prepare('SELECT e.* FROM '.self::table('editions').' e WHERE e.document_id=%d ORDER BY e.id DESC LIMIT 1',$document_id),ARRAY_A);
         return $row ?: null;
     }
 
     public static function policy(int $document_id): ?array {
         global $wpdb;
+        $wpdb->last_error='';
         $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . self::table('access_policies') . ' WHERE document_id=%d ORDER BY version DESC, id DESC LIMIT 1',$document_id), ARRAY_A);
         return $row ?: null;
     }
 
     public static function object(int $object_id): ?array {
         global $wpdb;
+        $wpdb->last_error='';
         $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . self::table('objects') . ' WHERE id=%d', $object_id), ARRAY_A);
         return $row ?: null;
     }
@@ -262,14 +274,19 @@ final class PLDR_Core {
         if(''===$key)return array('state'=>'disabled');
         [$route,$hash]=self::idempotency_identity($route,$key);
         $now=self::now();
-        $wpdb->query($wpdb->prepare('DELETE FROM '.self::table('idempotency').' WHERE actor_id=%d AND route=%s AND key_hash=%s AND expires_at<=%s',$actor_id,$route,$hash,$now));
+        $wpdb->last_error='';
+        $expired_cleanup=$wpdb->query($wpdb->prepare('DELETE FROM '.self::table('idempotency').' WHERE actor_id=%d AND route=%s AND key_hash=%s AND expires_at<=%s',$actor_id,$route,$hash,$now));
+        if(false===$expired_cleanup)return array('state'=>'error','db_error'=>(string)$wpdb->last_error,'phase'=>'expired-cleanup');
         $expires=gmdate('Y-m-d H:i:s',time()+DAY_IN_SECONDS);
+        $wpdb->last_error='';
         $inserted=$wpdb->insert(self::table('idempotency'),array(
             'actor_id'=>$actor_id,'route'=>$route,'key_hash'=>$hash,'response_json'=>'','status_code'=>0,'expires_at'=>$expires,'created_at'=>$now,
         ),array('%d','%s','%s','%s','%d','%s','%s'));
         if(1===$inserted)return array('state'=>'reserved');
+        $wpdb->last_error='';
         $row=$wpdb->get_row($wpdb->prepare('SELECT response_json,status_code,expires_at FROM '.self::table('idempotency').' WHERE actor_id=%d AND route=%s AND key_hash=%s AND expires_at>%s LIMIT 1',$actor_id,$route,$hash,$now),ARRAY_A);
-        if(!$row)return array('state'=>'error','db_error'=>(string)$wpdb->last_error);
+        if(''!==(string)$wpdb->last_error)return array('state'=>'error','db_error'=>(string)$wpdb->last_error,'phase'=>'existing-read');
+        if(!$row)return array('state'=>'error','db_error'=>'idempotency reservation could not be confirmed','phase'=>'existing-read');
         if(0===(int)$row['status_code'])return array('state'=>'pending');
         return array('state'=>'hit','body'=>json_decode((string)$row['response_json'],true),'status'=>(int)$row['status_code']);
     }
