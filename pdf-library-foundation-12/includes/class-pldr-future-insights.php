@@ -49,8 +49,14 @@ final class PLDR_Future_Insights {
         $group_scan_truncated=count($groups)>self::REPORT_GROUP_LIMIT;if($group_scan_truncated)$groups=array_slice($groups,0,self::REPORT_GROUP_LIMIT);
         $seconds=0;$pages=0;$editions=0;$recent=array();$hidden=0;
         foreach($groups as $row){$edition_id=(int)$row['edition_id'];if(!PLDR_Access::can_access_edition($edition_id,'read',$uid)){$hidden++;continue;}$editions++;$seconds+=(int)$row['seconds'];$pages+=(int)$row['distinct_pages'];if(count($recent)<10)$recent[]=array('edition_id'=>$edition_id,'seconds'=>(int)$row['seconds'],'title'=>(string)$row['title']);}
-        $completed=0;$completed_rows=$wpdb->get_col($wpdb->prepare('SELECT edition_id FROM '.PLDR_Core::table('reading_state').' WHERE user_id=%d AND percent>=%f AND updated_at>=%s ORDER BY updated_at DESC LIMIT %d',$uid,99.5,$since,self::COMPLETION_SCAN_LIMIT+1))?:array();
-        $completion_scan_truncated=count($completed_rows)>self::COMPLETION_SCAN_LIMIT;if($completion_scan_truncated)$completed_rows=array_slice($completed_rows,0,self::COMPLETION_SCAN_LIMIT);
+        $wpdb->last_error='';
+        $completed_rows=$wpdb->get_col($wpdb->prepare('SELECT edition_id FROM '.PLDR_Core::table('reading_state').' WHERE user_id=%d AND percent>=%f AND updated_at>=%s ORDER BY updated_at DESC LIMIT %d',$uid,99.5,$since,self::COMPLETION_SCAN_LIMIT+1));
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('user',$uid,'reading_insights_completion_read_failed',array('days'=>$days));
+            return array('error'=>PLDR_Core::machine_error('pldr_insight_completion_read','Private reading-completion state could not be read reliably; no partial report was returned.',503,array('degraded'=>true)));
+        }
+        $completed_rows=is_array($completed_rows)?$completed_rows:array();
+        $completed=0;$completion_scan_truncated=count($completed_rows)>self::COMPLETION_SCAN_LIMIT;if($completion_scan_truncated)$completed_rows=array_slice($completed_rows,0,self::COMPLETION_SCAN_LIMIT);
         foreach($completed_rows as $edition_id)if(PLDR_Access::can_access_edition((int)$edition_id,'read',$uid))$completed++;
         return array(
             'days'=>$days,
