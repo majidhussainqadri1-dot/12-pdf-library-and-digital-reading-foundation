@@ -89,6 +89,25 @@ final class PLDR_Privacy {
             );
         });
 
+        if (self::table_exists('access_tokens')) {
+            $tokens=$wpdb->get_results($wpdb->prepare(
+                'SELECT id,edition_id,operation,expires_at,revoked_at,used_count,max_uses,created_at FROM '.PLDR_Core::table('access_tokens').' WHERE user_id=%d ORDER BY id ASC LIMIT %d OFFSET %d',
+                $user_id,$limit,$offset
+            ),ARRAY_A)?:array();
+            $counts[]=count($tokens);
+            self::add_export_rows($data,$tokens,'pldr-delivery-grants',__('PDF Library delivery grant metadata','pdf-library-digital-reading'),'id',static function(array $row):array {
+                return array(
+                    array('name'=>'Edition','value'=>(int)$row['edition_id']),
+                    array('name'=>'Operation','value'=>(string)$row['operation']),
+                    array('name'=>'Expires','value'=>(string)$row['expires_at']),
+                    array('name'=>'Revoked','value'=>(string)($row['revoked_at']??'')),
+                    array('name'=>'Uses','value'=>(int)$row['used_count']),
+                    array('name'=>'Maximum uses','value'=>(int)$row['max_uses']),
+                    array('name'=>'Created','value'=>(string)$row['created_at']),
+                );
+            });
+        }
+
         $future_specs = array(
             'future_prefs' => array('id'=>'preference_key','order'=>'preference_key','group'=>'pldr-future-preferences','label'=>__('PDF Library advanced reading preferences','pdf-library-digital-reading'),'fields'=>array('preference_key','preference_json','version','updated_at')),
             'shelves' => array('id'=>'shelf_key','order'=>'id','group'=>'pldr-future-shelves','label'=>__('PDF Library private shelves','pdf-library-digital-reading'),'fields'=>array('shelf_key','name','shelf_type','sort_order','version','created_at','updated_at')),
@@ -160,6 +179,7 @@ final class PLDR_Privacy {
         foreach (array(
             array('reading_items','user_id','id'),
             array('reading_state','user_id','direct'),
+            array('access_tokens','user_id','id'),
             array('future_prefs','user_id','direct'),
             array('reading_events','user_id','id'),
             array('session_handoffs','user_id','direct'),
@@ -204,7 +224,7 @@ final class PLDR_Privacy {
 
         $remaining = 0;
         foreach (array(
-            array('reading_items','user_id'), array('reading_state','user_id'), array('future_prefs','user_id'), array('shelves','user_id'),
+            array('reading_items','user_id'), array('reading_state','user_id'), array('access_tokens','user_id'), array('future_prefs','user_id'), array('shelves','user_id'),
             array('reading_events','user_id'), array('session_handoffs','user_id'), array('room_contexts','created_by')
         ) as $spec) {
             if (!self::table_exists($spec[0])) continue;
@@ -216,7 +236,7 @@ final class PLDR_Privacy {
         return array(
             'items_removed'=>$removed > 0,
             'items_retained'=>$remaining > 0,
-            'messages'=>array(__('Private File 12 reading data was erased in a bounded batch; durable review records were anonymized where no hold applied.','pdf-library-digital-reading')),
+            'messages'=>array(__('Private File 12 reading data and user-bound delivery grants were erased in a bounded batch; durable review records were anonymized where no hold applied.','pdf-library-digital-reading')),
             'done'=>0 === $remaining,
         );
     }
