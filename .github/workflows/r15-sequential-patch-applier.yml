@@ -40,6 +40,6 @@ jobs:
           set -euo pipefail
           git config user.name 'Sabri File 12 R15 Corrective Review'
           git config user.email 'actions@users.noreply.github.com'
-          git add pdf-library-foundation-12
+          git add -A
           git commit -m "Apply R15 patch: $(basename '${{ steps.patch.outputs.file }}')"
           git push origin "HEAD:${GITHUB_REF_NAME}"
