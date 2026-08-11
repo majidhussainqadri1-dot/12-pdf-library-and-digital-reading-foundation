@@ -263,9 +263,26 @@ final class PLDR_Access {
             flush();
         }, $meta, $error);
         if (!$ok) {
+            self::quarantine_delivery_failure($row,$object,$error);
             error_log('[PLDR][' . PLDR_Core::trace_id() . '] delivery-integrity-failure ' . sanitize_text_field($error));
         }
         exit;
+    }
+
+    private static function quarantine_delivery_failure(array $grant,array $object,string $error): void {
+        global $wpdb;
+        $object_id=(int)($object['id']??0);$edition_id=(int)($grant['edition_id']??0);
+        if($object_id<1||$edition_id<1)return;
+        $changed=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET object_status=%s,updated_at=%s WHERE id=%d AND object_status=%s','quarantined',PLDR_Core::now(),$object_id,'available'));
+        $edition=PLDR_Core::edition($edition_id);$document_id=(int)($edition['document_id']??0);
+        if(1===$changed){
+            if($document_id>0)self::revoke_document($document_id,'delivery-integrity-failure');
+            PLDR_Core::audit('object',$object_id,'delivery_integrity_quarantined',array('edition_id'=>$edition_id,'document_id'=>$document_id,'error'=>substr(sanitize_text_field($error),0,500)));
+            return;
+        }
+        $current=PLDR_Core::object($object_id);
+        if($current&&'quarantined'===(string)$current['object_status'])return;
+        PLDR_Core::audit('object',$object_id,'delivery_integrity_reconciliation_failed',array('edition_id'=>$edition_id,'document_id'=>$document_id,'db_error'=>substr((string)$wpdb->last_error,0,500)));
     }
 
     private static function parse_range(int $size): array {
