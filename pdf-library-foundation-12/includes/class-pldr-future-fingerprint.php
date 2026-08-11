@@ -8,7 +8,12 @@ final class PLDR_Future_Fingerprint {
         $edition=PLDR_Core::edition($edition_id);
         if(!$edition)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_edition','Edition not found.',404));
         if(!self::can_compute($edition))return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_compute_forbidden','Scan-fingerprint computation requires document review or repair authority.',403));
+        $wpdb->last_error='';
         $pages=PLDR_Future_Data::ocr_pages($edition_id,0,12,0);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_ocr_read_failed',array('sample_limit'=>12));
+            return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_ocr_read','Scan-fingerprint OCR evidence could not be read reliably; no fingerprint evidence was persisted.',503,array('degraded'=>true)));
+        }
         $sample=''; foreach($pages as $row)$sample.=' '.PLDR_Core::normalize_search((string)$row['text_content']);
         $ocr=self::simhash($sample);
         $visual=self::visual_fingerprint($edition_id);
