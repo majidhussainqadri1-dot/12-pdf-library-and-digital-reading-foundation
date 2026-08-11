@@ -62,6 +62,7 @@ final class PLDR_Future_Rooms {
         if(isset($anchor['region'])&&is_array($anchor['region'])){
             $region=array('x'=>max(0,min(1,(float)($anchor['region']['x']??0))),'y'=>max(0,min(1,(float)($anchor['region']['y']??0))),'w'=>max(0,min(1,(float)($anchor['region']['w']??0))),'h'=>max(0,min(1,(float)($anchor['region']['h']??0))));
             if($region['w']<=0||$region['h']<=0)return PLDR_Core::machine_error('pldr_room_region','Reading-room anchor region must have a positive width and height.',400);
+            if(($region['x']+$region['w'])>1||($region['y']+$region['h'])>1)return PLDR_Core::machine_error('pldr_room_region_bounds','Reading-room anchor region must remain fully inside the requested page.',400);
             $out['region']=$region;
         }
         return $out;
