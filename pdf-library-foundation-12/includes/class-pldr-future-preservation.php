@@ -63,25 +63,37 @@ final class PLDR_Future_Preservation {
         }
         if('failed'===$integrity||'quarantined'===$object['object_status'])$health='quarantined';
         $findings=array_values(array_unique(array_slice($findings,0,self::PROVIDER_FINDINGS_LIMIT+10)));
-        $derivatives=$wpdb->get_results($wpdb->prepare('SELECT derivative_type,status,COUNT(*) count FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d GROUP BY derivative_type,status',$edition_id),ARRAY_A)?:array();
+
+        $wpdb->last_error='';
+        $derivatives=$wpdb->get_results($wpdb->prepare('SELECT derivative_type,status,COUNT(*) count FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d GROUP BY derivative_type,status',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_derivative_read','Preservation derivative state could not be read; no assessment record was written.',503,array('degraded'=>true)));
+        $derivatives=is_array($derivatives)?$derivatives:array();
+
+        $wpdb->last_error='';
         $existing=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('preservation_records').' WHERE edition_id=%d',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_record_read','Existing preservation evidence could not be read; checksum generation was not advanced.',503,array('degraded'=>true)));
+
         $verified_now=$verify&&in_array($integrity,array('verified','failed'),true);
         $generation=max(1,(int)($existing['checksum_generation']??0)+($verified_now?1:0));
         $last_verified_at=$verified_now?PLDR_Core::now():($existing['last_verified_at']??null);
         $assessment=array('integrity'=>$integrity,'findings'=>$findings,'error'=>self::limit($error,1000),'provider_failure'=>$provider_failure,'provider_requested_quarantine'=>$provider_requested_quarantine,'provider_input_total'=>$provider_input_total,'provider_findings_limit'=>self::PROVIDER_FINDINGS_LIMIT,'provider_input_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT);
         $assessment_json=wp_json_encode($assessment);
         if(!is_string($assessment_json))return array('error'=>PLDR_Core::machine_error('pldr_preservation_encode','Preservation assessment could not be encoded.',500));
-        $stored=$wpdb->replace(PLDR_Core::table('preservation_records'),array('edition_id'=>$edition_id,'object_id'=>(int)$object['id'],'format_health'=>$health,'checksum_generation'=>$generation,'sha256'=>(string)$object['sha256'],'encrypted_sha256'=>(string)$object['encrypted_sha256'],'derivative_status_json'=>wp_json_encode($derivatives),'assessment_json'=>$assessment_json,'last_verified_at'=>$last_verified_at,'updated_at'=>PLDR_Core::now()));
+        $derivative_json=wp_json_encode($derivatives);
+        if(!is_string($derivative_json))return array('error'=>PLDR_Core::machine_error('pldr_preservation_derivative_encode','Preservation derivative state could not be encoded safely.',500));
+        $stored=$wpdb->replace(PLDR_Core::table('preservation_records'),array('edition_id'=>$edition_id,'object_id'=>(int)$object['id'],'format_health'=>$health,'checksum_generation'=>$generation,'sha256'=>(string)$object['sha256'],'encrypted_sha256'=>(string)$object['encrypted_sha256'],'derivative_status_json'=>$derivative_json,'assessment_json'=>$assessment_json,'last_verified_at'=>$last_verified_at,'updated_at'=>PLDR_Core::now()));
         if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_preservation_store','Preservation assessment could not be stored.',500));
         return array('edition_id'=>$edition_id,'format_health'=>$health,'checksum_generation'=>$generation,'sha256'=>$object['sha256'],'encrypted_sha256'=>$object['encrypted_sha256'],'integrity'=>$integrity,'findings'=>$findings,'derivatives'=>$derivatives,'provider_failure'=>$provider_failure,'provider_requested_quarantine'=>$provider_requested_quarantine,'provider_findings_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT,'original_immutable'=>true,'preservation_derivative_policy'=>'separate object only; never overwrite original');
     }
 
     public static function scheduled_scan():void {
         global $wpdb;
+        $wpdb->last_error='';
         $ids=$wpdb->get_col(
             'SELECT e.id FROM '.PLDR_Core::table('editions').' e LEFT JOIN '.PLDR_Core::table('preservation_records').' p ON p.edition_id=e.id WHERE e.status=\'published\' ORDER BY CASE WHEN p.last_verified_at IS NULL THEN 0 ELSE 1 END ASC,p.last_verified_at ASC,e.id ASC LIMIT 5'
         );
-        foreach($ids as $id)self::assess((int)$id,true);
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('preservation',0,'preservation_schedule_read_failed',array('provider_failure'=>false));return;}
+        foreach((array)$ids as $id){$result=self::assess((int)$id,true);if(isset($result['error']))PLDR_Core::audit('edition',(int)$id,'preservation_scheduled_assessment_failed',array('error_code'=>is_wp_error($result['error'])?$result['error']->get_error_code():'unknown'));}
     }
 
     private static function limit(string $value,int $length):string {
