@@ -17,6 +17,7 @@ final class PLDR_Future_Fingerprint {
         $sample=''; foreach($pages as $row)$sample.=' '.PLDR_Core::normalize_search((string)$row['text_content']);
         $ocr=self::simhash($sample);
         $visual=self::visual_fingerprint($edition_id);
+        if(is_wp_error($visual))return array('error'=>$visual);
         $meta=hash('sha256',PLDR_Core::normalize_search((string)$edition['title'].' '.(string)$edition['author_name'].' '.(string)$edition['publication_year'].' '.(string)$edition['pages']));
         $now=PLDR_Core::now();
         if(!$ocr&&!$visual)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_unavailable','No lawful OCR or visual evidence was available to compute a scan fingerprint.',409,array('degraded'=>true)));
@@ -73,9 +74,15 @@ final class PLDR_Future_Fingerprint {
         return PLDR_Core::authorize('manage',$document_id)||PLDR_Core::authorize('rights',$document_id)||PLDR_Core::authorize('repair',$document_id);
     }
 
-    private static function visual_fingerprint(int $edition_id): string {
+    private static function visual_fingerprint(int $edition_id) {
         global $wpdb;if(!class_exists('Imagick'))return '';
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT object_id,page_number FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT 3',$edition_id,'thumbnail','available'),ARRAY_A)?:array();if(!$rows)return '';
+        $wpdb->last_error='';
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT object_id,page_number FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT 3',$edition_id,'thumbnail','available'),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_visual_read_failed',array('sample_limit'=>3));
+            return PLDR_Core::machine_error('pldr_fingerprint_visual_read','Visual scan-fingerprint derivative evidence could not be read reliably; no fingerprint evidence was persisted.',503,array('degraded'=>true));
+        }
+        $rows=is_array($rows)?$rows:array();if(!$rows)return '';
         $hashes=array();
         foreach($rows as $row){$object=PLDR_Core::object((int)$row['object_id']);if(!$object)continue;$path=PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);if(is_wp_error($path))continue;$tmp=PLDR_Storage::temp('fingerprint');if(is_wp_error($tmp))continue;$error='';if(!PLDR_Crypto::decrypt_to_file((string)$path,(string)$tmp,$error)){PLDR_Storage::delete((string)$tmp);continue;}try{$im=new Imagick((string)$tmp);$im->setImageColorspace(Imagick::COLORSPACE_GRAY);$im->resizeImage(8,8,Imagick::FILTER_BOX,1);$pixels=$im->exportImagePixels(0,0,8,8,'I',Imagick::PIXEL_CHAR);$avg=$pixels?array_sum($pixels)/count($pixels):0;$bits='';foreach((array)$pixels as $px)$bits.=$px>=$avg?'1':'0';if(64===strlen($bits))$hashes[]=$bits;$im->clear();}catch(Throwable $e){}PLDR_Storage::delete((string)$tmp);}
         if(!$hashes)return '';$majority='';for($i=0;$i<64;$i++){$ones=0;foreach($hashes as $bits)$ones+=($bits[$i]??'0')==='1'?1:0;$majority.=$ones>=(count($hashes)/2)?'1':'0';}$hex='';for($i=0;$i<64;$i+=4)$hex.=base_convert(substr($majority,$i,4),2,16);return str_pad($hex,16,'0',STR_PAD_LEFT);
