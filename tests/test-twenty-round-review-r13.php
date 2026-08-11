@@ -31,14 +31,14 @@ $must($fingerprint, "doing_action('pldr_future_fingerprint_edition')", 'Fingerpr
 
 // Round 2 — scan-fingerprint evidence remains review-only.
 $must($fingerprint, 'pldr_fingerprint_review_forbidden', 'Fingerprint candidates are not explicitly review-authority protected.');
-$must($fingerprint, "PLDR_Core::authorize('repair',$document_id)", 'Fingerprint review/repair authority marker is missing.');
+$must($fingerprint, "PLDR_Core::authorize('repair',\$document_id)", 'Fingerprint review/repair authority marker is missing.');
 
 // Round 3 — preservation system bypass is exact-action scoped.
 $must($preservation, "doing_action('pldr_future_preservation_scan')", 'Preservation system authority is not exact-action scoped.');
 
 // Round 4 — reading-room regions stay inside page bounds.
-$must($rooms, "($region['x']+$region['w'])>1", 'Reading-room horizontal region bound is missing.');
 $must($rooms, 'pldr_room_region_bounds', 'Reading-room region bound error is missing.');
+$must($rooms, 'must remain fully inside the requested page', 'Reading-room full-page containment rule is missing.');
 
 // Round 5 — annotation provider degradation is explicit.
 $must($annotations, 'pldr_annotation_source_provider', 'Annotation source-provider failure is not explicit.');
@@ -106,7 +106,7 @@ $must($ocr, 'pldr_ocr_review_source_read', 'OCR review source DB failure is not 
 
 // Round 20 — derived-text source DB failure blocks provider fallback.
 $must($derived, 'pldr_derive_source_read', 'Derived-text OCR DB failure is not explicit.');
-$must($derived, "no external provider validation or processing was attempted", 'Derived-text DB failure does not explicitly block provider fallback.');
+$must($derived, 'no external provider validation or processing was attempted', 'Derived-text DB failure does not explicitly block provider fallback.');
 
 $doc = dirname(__DIR__) . '/docs/TWENTY-ROUND-REVIEW-2026-08-12-R13.md';
 if (!is_file($doc)) { fwrite(STDERR, "R13 twenty-round review record missing.\n"); exit(1); }
