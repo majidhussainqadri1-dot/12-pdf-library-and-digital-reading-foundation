@@ -3,16 +3,25 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Future_Insights {
+    private const MAX_EVENTS_PER_HOUR = 1200;
+
     public static function event(int $edition_id,string $type,int $page,int $duration,array $context=array()) {
-        global $wpdb;$uid=get_current_user_id();if(!$uid)return PLDR_Core::machine_error('pldr_insight_login','Log in to synchronize private reading insights.',401);
+        global $wpdb;
+        $uid=get_current_user_id();
+        if(!$uid)return PLDR_Core::machine_error('pldr_insight_login','Log in to synchronize private reading insights.',401);
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return $edition;
         $type=sanitize_key($type);if(!in_array($type,array('open','heartbeat','page','close'),true))return PLDR_Core::machine_error('pldr_insight_type','Unsupported reading event.',400);
         $page=max(1,min((int)$edition['pages'],$page));$duration=max(0,min(900,$duration));
+        $since=gmdate('Y-m-d H:i:s',time()-HOUR_IN_SECONDS);
+        $recent=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('reading_events').' WHERE user_id=%d AND created_at>=%s',$uid,$since));
+        $limit=(int)apply_filters('pldr_reading_event_hourly_limit',self::MAX_EVENTS_PER_HOUR,$uid,$edition_id);
+        $limit=max(60,min(5000,$limit));
+        if($recent>=$limit)return PLDR_Core::machine_error('pldr_insight_rate_limit','Private reading-event synchronization is temporarily rate limited.',429,array('retry_after'=>60,'hourly_limit'=>$limit));
         $device=sanitize_text_field((string)($context['device']??''));$device=function_exists('mb_substr')?mb_substr($device,0,80,'UTF-8'):substr($device,0,80);
         $layout=sanitize_key((string)($context['layout']??''));if(!in_array($layout,array('','single','continuous','spread-ltr','spread-rtl','horizontal','presentation'),true))$layout='';
         $stored=$wpdb->insert(PLDR_Core::table('reading_events'),array('event_id'=>PLDR_Core::uuid(),'user_id'=>$uid,'edition_id'=>$edition_id,'event_type'=>$type,'page_number'=>$page,'duration_seconds'=>$duration,'context_json'=>wp_json_encode(array('layout'=>$layout,'device'=>$device)),'created_at'=>PLDR_Core::now()));
         if(false===$stored)return PLDR_Core::machine_error('pldr_insight_store','Private reading event could not be stored.',500);
-        return array('stored'=>true,'private'=>true,'non_gamified'=>true);
+        return array('stored'=>true,'private'=>true,'non_gamified'=>true,'hourly_limit'=>$limit);
     }
 
     public static function report(int $days=30):array {
