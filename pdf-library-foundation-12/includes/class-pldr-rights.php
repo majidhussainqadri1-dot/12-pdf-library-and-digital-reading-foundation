@@ -177,17 +177,26 @@ final class PLDR_Integrations {
 
     public static function dispatch_outbox():void {
         global $wpdb;
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('outbox').' WHERE status IN (%s,%s) AND available_at<=%s ORDER BY id ASC LIMIT 50','pending','retry',PLDR_Core::now()),ARRAY_A);
+        $now=PLDR_Core::now();
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('outbox').' WHERE status IN (%s,%s,%s) AND available_at<=%s ORDER BY id ASC LIMIT 50','pending','retry','processing',$now),ARRAY_A);
         foreach($rows as $row){
+            $lease_until=gmdate('Y-m-d H:i:s',time()+10*MINUTE_IN_SECONDS);
+            $claimed=$wpdb->query($wpdb->prepare(
+                'UPDATE '.PLDR_Core::table('outbox').' SET status=%s,available_at=%s WHERE id=%d AND status IN (%s,%s,%s) AND available_at<=%s',
+                'processing',$lease_until,(int)$row['id'],'pending','retry','processing',$now
+            ));
+            if(1!==$claimed)continue;
             $payload=json_decode((string)$row['payload_json'],true)?:array();
             try{
                 $accepted=apply_filters('pldr_dispatch_event',true,(string)$row['event_name'],$payload,(string)$row['event_id']);
                 if(false===$accepted)throw new RuntimeException('A consumer requested retry.');
                 do_action('sabri_domain_event',(string)$row['event_name'],$payload,(string)$row['event_id'],'file-12');
                 do_action('pldr_event',(string)$row['event_name'],$payload,(string)$row['event_id']);
-                $wpdb->update(PLDR_Core::table('outbox'),array('status'=>'sent','sent_at'=>PLDR_Core::now(),'last_error'=>''),array('id'=>(int)$row['id']));
+                $stored=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>'sent','sent_at'=>PLDR_Core::now(),'last_error'=>''),array('id'=>(int)$row['id'],'status'=>'processing'));
+                if(false===$stored)throw new RuntimeException('Dispatched event state could not be persisted.');
             }catch(Throwable $e){
-                $attempts=(int)$row['attempts']+1;$status=$attempts>=8?'dead-letter':'retry';$delay=min(3600,30*(2**min($attempts,6)));$wpdb->update(PLDR_Core::table('outbox'),array('status'=>$status,'attempts'=>$attempts,'available_at'=>gmdate('Y-m-d H:i:s',time()+$delay),'last_error'=>sanitize_text_field($e->getMessage())),array('id'=>(int)$row['id']));
+                $attempts=(int)$row['attempts']+1;$status=$attempts>=8?'dead-letter':'retry';$delay=min(3600,30*(2**min($attempts,6)));
+                $wpdb->update(PLDR_Core::table('outbox'),array('status'=>$status,'attempts'=>$attempts,'available_at'=>gmdate('Y-m-d H:i:s',time()+$delay),'last_error'=>sanitize_text_field($e->getMessage())),array('id'=>(int)$row['id'],'status'=>'processing'));
             }
         }
     }
