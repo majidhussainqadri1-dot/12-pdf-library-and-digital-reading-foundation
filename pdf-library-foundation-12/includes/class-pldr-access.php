@@ -153,11 +153,17 @@ final class PLDR_Access {
         }
 
         $size = (int) $object['byte_size'];
+        if ($size < 1) self::fail_delivery(503, 'Document object has an invalid byte size.');
         [$start, $end, $partial] = self::parse_range($size);
-        $wpdb->query($wpdb->prepare(
-            'UPDATE ' . PLDR_Core::table('access_tokens') . ' SET used_count=used_count+1 WHERE id=%d AND used_count<max_uses',
-            (int) $row['id']
-        ));
+        $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if ('HEAD' !== $method) {
+            $consumed = $wpdb->query($wpdb->prepare(
+                'UPDATE ' . PLDR_Core::table('access_tokens') . ' SET used_count=used_count+1 WHERE id=%d AND revoked_at IS NULL AND expires_at>%s AND used_count<max_uses',
+                (int) $row['id'],
+                PLDR_Core::now()
+            ));
+            if (1 !== $consumed) self::fail_delivery(410, 'Access grant was exhausted, expired or revoked before delivery began.');
+        }
 
         while (ob_get_level()) ob_end_clean();
         nocache_headers();
@@ -177,7 +183,7 @@ final class PLDR_Access {
         header('Content-Length: ' . ($end - $start + 1));
         header('X-PLDR-SHA256: ' . (string) $object['sha256']);
 
-        if ('HEAD' === strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'))) exit;
+        if ('HEAD' === $method) exit;
 
         $meta = array(); $error = '';
         $ok = PLDR_Crypto::stream_range($path, $start, $end, static function (string $chunk): void {
