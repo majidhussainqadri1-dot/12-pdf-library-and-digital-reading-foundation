@@ -1,1 +1,0 @@
-This branch is the File 12 Future-24 implementation line. The canonical implementation is assembled in a single Git tree and committed separately; this note records recovery continuity only and may be removed after final QA.
