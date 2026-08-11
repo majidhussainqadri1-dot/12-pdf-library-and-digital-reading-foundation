@@ -11,14 +11,20 @@ final class PLDR_Future_Derived_Text {
         $page=absint($page);
         if($page<1||$page>(int)$edition['pages'])return array('error'=>PLDR_Core::machine_error('pldr_derive_page','Derived text must be bound to a valid page in this edition.',400));
         $doc=PLDR_Core::document((int)$edition['document_id']);
-        if($doc && 'patient-cases'===$doc['category'] && !apply_filters('pldr_derived_text_patient_case_allowed',false,$edition_id,$doc))return array('error'=>PLDR_Core::machine_error('pldr_derive_patient_case','Patient-case text is not sent to translation/transliteration providers without separate privacy approval.',403));
+        if($doc && 'patient-cases'===$doc['category']){
+            try{$patient_case_allowed=(bool)apply_filters('pldr_derived_text_patient_case_allowed',false,$edition_id,$doc);}
+            catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'derived_text_patient_policy_provider_failed',array('provider_failure'=>1));return array('error'=>PLDR_Core::machine_error('pldr_derive_policy_provider','Patient-case derived-text policy could not be verified; provider processing was denied.',503,array('degraded'=>true,'provider_failure'=>true)));}
+            if(!$patient_case_allowed)return array('error'=>PLDR_Core::machine_error('pldr_derive_patient_case','Patient-case text is not sent to translation/transliteration providers without separate privacy approval.',403));
+        }
         $mode=sanitize_key($mode);
         if(!in_array($mode,array('translate','transliterate'),true))return array('error'=>PLDR_Core::machine_error('pldr_derive_mode','Use translate or transliterate mode.',400));
         $text=self::limit(trim(wp_strip_all_tags($text)),5000);
         if(''===$text)return array('error'=>PLDR_Core::machine_error('pldr_derive_text','Text selection is required.',400));
         $target=self::limit(sanitize_text_field($target),60);
         if(''===$target)return array('error'=>PLDR_Core::machine_error('pldr_derive_target','Target language or script is required.',400));
-        if(!self::selection_belongs($edition_id,$page,$text,$edition))return array('error'=>PLDR_Core::machine_error('pldr_derive_selection','The selected text could not be verified against the requested document page.',403));
+        $selection_match=self::selection_belongs($edition_id,$page,$text,$edition);
+        if(is_wp_error($selection_match))return array('error'=>$selection_match);
+        if(!$selection_match)return array('error'=>PLDR_Core::machine_error('pldr_derive_selection','The selected text could not be verified against the requested document page.',403));
         $rate=self::consume_rate_slot($edition_id);
         if(is_wp_error($rate))return array('error'=>$rate);
         $filter='translate'===$mode?'pldr_translate_text':'pldr_transliterate_text';
@@ -46,7 +52,8 @@ final class PLDR_Future_Derived_Text {
         if(1!==$locked)return PLDR_Core::machine_error('pldr_derive_rate_lock','Derived-text provider capacity is temporarily unavailable; retry shortly.',503,array('retry_after'=>2));
         try{
             $count=(int)get_transient($bucket);
-            $limit=(int)apply_filters('pldr_derived_text_hourly_limit',self::MAX_PROVIDER_CALLS_PER_HOUR,$uid,$edition_id);
+            try{$limit=(int)apply_filters('pldr_derived_text_hourly_limit',self::MAX_PROVIDER_CALLS_PER_HOUR,$uid,$edition_id);}
+            catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'derived_text_rate_policy_provider_failed',array('provider_failure'=>1));return PLDR_Core::machine_error('pldr_derive_rate_policy','Derived-text rate policy is temporarily unavailable; no provider call was executed.',503,array('degraded'=>true,'provider_failure'=>true));}
             $limit=max(10,min(1000,$limit));
             if($count>=$limit)return PLDR_Core::machine_error('pldr_derive_rate_limit','Derived-text provider requests are temporarily rate limited.',429,array('retry_after'=>60,'hourly_limit'=>$limit));
             if(!set_transient($bucket,$count+1,HOUR_IN_SECONDS+120))return PLDR_Core::machine_error('pldr_derive_rate_store','Derived-text rate-limit state could not be stored; the provider call was not executed.',503);
@@ -56,7 +63,7 @@ final class PLDR_Future_Derived_Text {
         }
     }
 
-    private static function selection_belongs(int $edition_id,int $page,string $text,array $edition):bool {
+    private static function selection_belongs(int $edition_id,int $page,string $text,array $edition) {
         $needle=PLDR_Core::normalize_search($text);
         if(''===$needle)return false;
         $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
@@ -64,7 +71,8 @@ final class PLDR_Future_Derived_Text {
             $haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));
             if(''!==$haystack&&false!==strpos($haystack,$needle))return true;
         }
-        return (bool)apply_filters('pldr_derived_text_selection_allowed',false,$edition_id,$page,$text,$edition);
+        try{return (bool)apply_filters('pldr_derived_text_selection_allowed',false,$edition_id,$page,$text,$edition);}
+        catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'derived_text_selection_provider_failed',array('page'=>$page,'provider_failure'=>1));return PLDR_Core::machine_error('pldr_derive_selection_provider','Derived-text source validation is temporarily unavailable; the selection was not sent to a provider.',503,array('degraded'=>true,'provider_failure'=>true));}
     }
 
     private static function limit(string $value,int $length):string {
