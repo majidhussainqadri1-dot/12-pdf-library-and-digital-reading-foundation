@@ -9,8 +9,15 @@ final class PLDR_Future_IIIF {
         global $wpdb;
         $doc=PLDR_Core::document_by_public_id($public_id);if(!$doc)return PLDR_Core::machine_error('pldr_iiif_missing','Document not found.',404);
         $edition=PLDR_Core::current_edition((int)$doc['id']);if(!$edition||!PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id()))return PLDR_Core::machine_error('pldr_iiif_forbidden','IIIF manifest is unavailable for this document.',404);
-        $canvas_limit=(int)apply_filters('pldr_iiif_canvas_limit',500,(int)$edition['id']);$canvas_limit=max(25,min(1000,$canvas_limit));
-        $preview_grant_limit=(int)apply_filters('pldr_iiif_preview_grant_limit',self::PREVIEW_GRANT_LIMIT,(int)$edition['id']);$preview_grant_limit=max(1,min(100,$preview_grant_limit));
+        try {
+            $canvas_limit=(int)apply_filters('pldr_iiif_canvas_limit',500,(int)$edition['id']);
+            $preview_grant_limit=(int)apply_filters('pldr_iiif_preview_grant_limit',self::PREVIEW_GRANT_LIMIT,(int)$edition['id']);
+        } catch (Throwable $e) {
+            PLDR_Core::audit('edition',(int)$edition['id'],'iiif_limit_policy_provider_failed',array('provider_failure'=>1));
+            return PLDR_Core::machine_error('pldr_iiif_limit_policy','IIIF delivery-limit policy is temporarily unavailable; no preview grants were issued.',503,array('degraded'=>true,'provider_failure'=>true));
+        }
+        $canvas_limit=max(25,min(1000,$canvas_limit));
+        $preview_grant_limit=max(1,min(100,$preview_grant_limit));
         $edition_pages=max(0,(int)$edition['pages']);$canvas_count=min($edition_pages,$canvas_limit);
         $thumbs=$canvas_count>0?$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s AND page_number BETWEEN 1 AND %d ORDER BY page_number ASC LIMIT %d',(int)$edition['id'],'thumbnail','available',$canvas_count,$canvas_count),ARRAY_A):array();
         $thumb_by_page=array();foreach($thumbs?:array() as $row)$thumb_by_page[(int)$row['page_number']]=$row;
