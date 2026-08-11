@@ -46,9 +46,15 @@ final class PLDR_Future_Anchors {
     }
 
     private static function quote_belongs(int $edition_id,int $page,string $exact,array $edition) {
+        global $wpdb;
         $needle=PLDR_Core::normalize_search($exact);
         if(''===$needle)return false;
+        $wpdb->last_error='';
         $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'precise_anchor_source_read_failed',array('page'=>$page));
+            return PLDR_Core::machine_error('pldr_anchor_source_read','Precise-anchor source text could not be read reliably; external validation was not attempted.',503,array('degraded'=>true));
+        }
         if($rows){
             $haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));
             if(''!==$haystack&&false!==strpos($haystack,$needle))return true;
