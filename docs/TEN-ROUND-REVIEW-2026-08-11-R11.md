@@ -98,8 +98,14 @@ Clean rounds: **none**
 
 Every discovered R11 defect was corrected before the next numbered review round began.
 
+## Exact-head closure evidence
+
+The R11 regression contract is `tests/test-ten-round-review-r11.php` and is wired into the File 12 Future-24 Quality Gate. Exact final HEAD, workflow-run identity and package digest are recorded in the PR/release evidence after the final quality gate; this document intentionally does not embed a self-invalidating current-HEAD value.
+
+A QA-harness literal marker was corrected before closure so the offline-grant source check uses a literal nowdoc rather than PHP variable interpolation. That harness correction did not change production behavior.
+
 ## Production-truth boundary
 
-R11 is repository/source corrective-review evidence only until exact-head CI/package evidence is generated. Even after exact-head automated QA is green, Hostinger staging and live remain separate realities requiring deployed package/checksum parity, deployed DB/schema/migration inspection, real-role and browser/device workflows, provider outage/recovery, privacy/rights/offline tests, backup/restore/rollback, Founder acceptance, production deployment, and live re-test.
+R11 repository source, automated-QA and package evidence do not by themselves prove Hostinger staging or live state. Required separate gates remain exact artifact deployment to staging; deployed plugin/package/checksum parity; deployed DB/schema/migration inspection; real-role and browser/device workflows; provider outage/recovery; privacy/rights/offline/RTL/accessibility/weak-network tests; backup/restore/rollback; Founder acceptance; production deployment; live re-test; and final repository/deployed parity confirmation.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
