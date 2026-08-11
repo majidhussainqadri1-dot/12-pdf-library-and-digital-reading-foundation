@@ -125,12 +125,20 @@ final class PLDR_Privacy {
         return false === $deleted ? -1 : (int)$deleted;
     }
 
-    private static function erase_owned_batch(string $suffix, string $owner_column, int $user_id, string $id_column = 'id'): int {
+    private static function erase_id_batch(string $suffix, string $owner_column, int $user_id): int {
         global $wpdb;
         if (!self::table_exists($suffix)) return 0;
         $table = PLDR_Core::table($suffix);
-        $ids = $wpdb->get_col($wpdb->prepare("SELECT {$id_column} FROM {$table} WHERE {$owner_column}=%d ORDER BY {$id_column} ASC LIMIT %d", $user_id, self::BATCH));
-        return self::delete_ids($suffix, $id_column, $ids ?: array());
+        $ids = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$table} WHERE {$owner_column}=%d ORDER BY id ASC LIMIT %d", $user_id, self::BATCH));
+        return self::delete_ids($suffix, 'id', $ids ?: array());
+    }
+
+    private static function erase_direct_batch(string $suffix, string $owner_column, int $user_id): int {
+        global $wpdb;
+        if (!self::table_exists($suffix)) return 0;
+        $table = PLDR_Core::table($suffix);
+        $deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE {$owner_column}=%d LIMIT %d", $user_id, self::BATCH));
+        return false === $deleted ? -1 : (int)$deleted;
     }
 
     public static function erase(string $email, int $page = 1): array {
@@ -149,17 +157,18 @@ final class PLDR_Privacy {
         $removed = 0;
         $errors = array();
 
-        foreach (array('reading_items','reading_state','future_prefs','reading_events','session_handoffs','room_contexts') as $suffix) {
-            $owner = 'room_contexts' === $suffix ? 'created_by' : 'user_id';
-            $result = self::erase_owned_batch($suffix, $owner, $user_id, 'id');
-            if ('future_prefs' === $suffix || 'session_handoffs' === $suffix) {
-                if (self::table_exists($suffix)) {
-                    $table = PLDR_Core::table($suffix);
-                    $result = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE {$owner}=%d LIMIT %d", $user_id, self::BATCH));
-                    $result = false === $result ? -1 : (int)$result;
-                }
-            }
-            if ($result < 0) $errors[] = $suffix; else $removed += $result;
+        foreach (array(
+            array('reading_items','user_id','id'),
+            array('reading_state','user_id','direct'),
+            array('future_prefs','user_id','direct'),
+            array('reading_events','user_id','id'),
+            array('session_handoffs','user_id','direct'),
+            array('room_contexts','created_by','id'),
+        ) as $spec) {
+            $result = 'id' === $spec[2]
+                ? self::erase_id_batch($spec[0], $spec[1], $user_id)
+                : self::erase_direct_batch($spec[0], $spec[1], $user_id);
+            if ($result < 0) $errors[] = $spec[0]; else $removed += $result;
         }
 
         if (self::table_exists('shelves')) {
