@@ -15,7 +15,9 @@ final class PLDR_Future_Context {
         if($page<1||$page>(int)$edition['pages'])return array('error'=>PLDR_Core::machine_error('pldr_context_page','Knowledge context must be bound to a valid page.',400));
         $selection=self::limit(trim(wp_strip_all_tags($selection)),1200);
         if(''===$selection)return array('items'=>array(),'source_bound'=>true);
-        if(!self::selection_belongs($edition_id,$page,$selection,$edition))return array('error'=>PLDR_Core::machine_error('pldr_context_selection','The selected text could not be verified against this document page.',403));
+        $selection_match=self::selection_belongs($edition_id,$page,$selection,$edition);
+        if(is_wp_error($selection_match))return array('error'=>$selection_match);
+        if(!$selection_match)return array('error'=>PLDR_Core::machine_error('pldr_context_selection','The selected text could not be verified against this document page.',403));
         $rate=self::consume_rate_slot($edition_id);
         if(is_wp_error($rate))return array('error'=>$rate);
         $context=array('edition_id'=>$edition_id,'document_id'=>$edition['public_id'],'page'=>$page,'selection'=>$selection);
@@ -54,13 +56,19 @@ final class PLDR_Future_Context {
         }finally{$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
     }
 
-    private static function selection_belongs(int $edition_id,int $page,string $selection,array $edition):bool {
+    private static function selection_belongs(int $edition_id,int $page,string $selection,array $edition) {
+        global $wpdb;
         $needle=PLDR_Core::normalize_search($selection);if(''===$needle)return false;
+        $wpdb->last_error='';
         $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'context_source_read_failed',array('page'=>$page));
+            return PLDR_Core::machine_error('pldr_context_source_read','Knowledge-context source text could not be read reliably; companion lookup was not attempted.',503,array('degraded'=>true));
+        }
         foreach($rows as $row){$haystack=PLDR_Core::normalize_search((string)($row['text_content']??''));if(''!==$haystack&&false!==strpos($haystack,$needle))return true;}
         try{return (bool)apply_filters('pldr_knowledge_context_selection_allowed',false,$edition_id,$page,$selection,$edition);}catch(Throwable $e){
             PLDR_Core::audit('edition',$edition_id,'context_selection_provider_failed',array('page'=>$page,'provider_failure'=>true));
-            return false;
+            return PLDR_Core::machine_error('pldr_context_selection_provider','Knowledge-context source validation is temporarily unavailable; companion lookup was not attempted.',503,array('degraded'=>true,'provider_failure'=>true));
         }
     }
 
