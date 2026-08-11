@@ -18,11 +18,17 @@ final class PLDR_Future_Derived_Text {
         if(''===$target)return array('error'=>PLDR_Core::machine_error('pldr_derive_target','Target language or script is required.',400));
         if(!self::selection_belongs($edition_id,$page,$text,$edition))return array('error'=>PLDR_Core::machine_error('pldr_derive_selection','The selected text could not be verified against the requested document page.',403));
         $filter='translate'===$mode?'pldr_translate_text':'pldr_transliterate_text';
-        $result=apply_filters($filter,null,$text,array('edition_id'=>$edition_id,'page'=>$page,'source_language'=>$edition['language'],'target_language'=>$target));
+        try{
+            $result=apply_filters($filter,null,$text,array('edition_id'=>$edition_id,'page'=>$page,'source_language'=>$edition['language'],'target_language'=>$target));
+        }catch(Throwable $e){
+            return array('error'=>PLDR_Core::machine_error('pldr_derive_provider','The approved translation/transliteration provider failed; no derived text was substituted.',503,array('degraded'=>true,'provider_failure'=>true)));
+        }
         if(!is_array($result)||empty($result['text']))return array('error'=>PLDR_Core::machine_error('pldr_derive_provider','No approved translation/transliteration provider is configured.',503,array('degraded'=>true)));
+        $provider=self::limit(sanitize_text_field((string)($result['provider']??'')),80);
+        if(''===$provider)return array('error'=>PLDR_Core::machine_error('pldr_derive_provenance','Derived text provider identity is required; anonymous provider output was rejected.',502,array('degraded'=>true)));
         $derived=self::limit(wp_strip_all_tags((string)$result['text']),10000);
         if(''===trim($derived))return array('error'=>PLDR_Core::machine_error('pldr_derive_provider','The approved provider returned no usable derived text.',502));
-        return array('mode'=>$mode,'text'=>$derived,'provider'=>self::limit(sanitize_text_field((string)($result['provider']??'adapter')),80),'target_language'=>$target,'derived'=>true,'not_authorial_text'=>true,'original_unchanged'=>true,'source_bound'=>true);
+        return array('mode'=>$mode,'text'=>$derived,'provider'=>$provider,'source_language'=>self::limit(sanitize_text_field((string)$edition['language']),35),'target_language'=>$target,'derived'=>true,'not_authorial_text'=>true,'original_unchanged'=>true,'source_bound'=>true,'provider_generated'=>true);
     }
 
     private static function selection_belongs(int $edition_id,int $page,string $text,array $edition):bool {
