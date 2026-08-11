@@ -16,17 +16,20 @@ final class PLDR_Future_Fingerprint {
         $now=PLDR_Core::now();
         if(!$ocr&&!$visual)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_unavailable','No lawful OCR or visual evidence was available to compute a scan fingerprint.',409,array('degraded'=>true)));
         if(false===$wpdb->query('START TRANSACTION'))return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_transaction','Scan fingerprint persistence could not start.',500));
+        $versions=array();
         if($ocr){
-            $stored=$wpdb->replace(PLDR_Core::table('scan_fingerprints'),array('edition_id'=>$edition_id,'fingerprint_type'=>'ocr-simhash64','fingerprint_value'=>$ocr,'metadata_hash'=>$meta,'version'=>1,'created_at'=>$now,'updated_at'=>$now));
-            if(false===$stored){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_store','OCR scan fingerprint could not be stored.',500));}
+            $stored=self::store_fingerprint($edition_id,'ocr-simhash64',$ocr,$meta,$now);
+            if(is_wp_error($stored)){$wpdb->query('ROLLBACK');return array('error'=>$stored);}
+            $versions['ocr-simhash64']=$stored;
         }
         if($visual){
-            $stored=$wpdb->replace(PLDR_Core::table('scan_fingerprints'),array('edition_id'=>$edition_id,'fingerprint_type'=>'visual-ahash','fingerprint_value'=>$visual,'metadata_hash'=>$meta,'version'=>1,'created_at'=>$now,'updated_at'=>$now));
-            if(false===$stored){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_store','Visual scan fingerprint could not be stored.',500));}
+            $stored=self::store_fingerprint($edition_id,'visual-ahash',$visual,$meta,$now);
+            if(is_wp_error($stored)){$wpdb->query('ROLLBACK');return array('error'=>$stored);}
+            $versions['visual-ahash']=$stored;
         }
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_commit','Scan fingerprint persistence could not be committed.',500));}
-        PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_computed',array('visual'=>(bool)$visual,'ocr'=>(bool)$ocr));
-        return array('edition_id'=>$edition_id,'visual_fingerprint'=>$visual,'ocr_fingerprint'=>$ocr,'metadata_hash'=>$meta,'automatic_merge'=>false,'immutable_scan_family_evidence'=>true,'ocr_pages_sampled'=>count($pages),'atomic_persistence'=>true);
+        PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_computed',array('visual'=>(bool)$visual,'ocr'=>(bool)$ocr,'versions'=>$versions));
+        return array('edition_id'=>$edition_id,'visual_fingerprint'=>$visual,'ocr_fingerprint'=>$ocr,'metadata_hash'=>$meta,'fingerprint_versions'=>$versions,'automatic_merge'=>false,'immutable_scan_family_evidence'=>true,'ocr_pages_sampled'=>count($pages),'atomic_persistence'=>true,'versioned_provenance'=>true);
     }
 
     public static function candidates(int $edition_id): array {
@@ -48,6 +51,21 @@ final class PLDR_Future_Fingerprint {
             if(count($out)>=50)break;
         }
         return $out;
+    }
+
+    private static function store_fingerprint(int $edition_id,string $type,string $value,string $meta,string $now) {
+        global $wpdb;
+        $table=PLDR_Core::table('scan_fingerprints');
+        $existing=$wpdb->get_row($wpdb->prepare('SELECT version,created_at FROM '.$table.' WHERE edition_id=%d AND fingerprint_type=%s',$edition_id,$type),ARRAY_A);
+        if($existing){
+            $current=max(1,(int)$existing['version']);$next=$current+1;
+            $updated=$wpdb->query($wpdb->prepare('UPDATE '.$table.' SET fingerprint_value=%s,metadata_hash=%s,version=%d,updated_at=%s WHERE edition_id=%d AND fingerprint_type=%s AND version=%d',$value,$meta,$next,$now,$edition_id,$type,$current));
+            if(1!==$updated)return PLDR_Core::machine_error('pldr_fingerprint_conflict','Scan fingerprint changed concurrently; persistence was rolled back.',409,array('fingerprint_type'=>$type));
+            return $next;
+        }
+        $inserted=$wpdb->insert($table,array('edition_id'=>$edition_id,'fingerprint_type'=>$type,'fingerprint_value'=>$value,'metadata_hash'=>$meta,'version'=>1,'created_at'=>$now,'updated_at'=>$now));
+        if(1!==$inserted)return PLDR_Core::machine_error('pldr_fingerprint_store','Scan fingerprint could not be stored.',500,array('fingerprint_type'=>$type));
+        return 1;
     }
 
     private static function can_inspect(array $edition): bool {
