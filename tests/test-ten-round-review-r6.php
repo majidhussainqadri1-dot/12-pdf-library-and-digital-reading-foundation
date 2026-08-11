@@ -28,7 +28,7 @@ $must($citations, "'PLDR-edition-id'=>\$edition_id", 'CSL projection lacks expli
 $must($annotations, 'private const EXPORT_LIMIT = 1000', 'Annotation export limit is missing.');
 $must($annotations, "add_query_arg('edition',\$edition_id", 'Annotation source is not edition-bound.');
 $must($annotations, "'input_truncated'=>\$input_total>self::IMPORT_LIMIT", 'Annotation import truncation disclosure is missing.');
-$must($annotations, "'bookmarking'==\$motivation?'bookmark'", 'Annotation motivation fidelity is missing.');
+$must($annotations, "'bookmarking'===\$motivation?'bookmark'", 'Annotation motivation fidelity is missing.');
 
 // Round 3 — truthful heatmap accounting.
 $must($search, "'scan_truncated'=>\$scan_capped", 'Heatmap scan truncation is not separately disclosed.');
