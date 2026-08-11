@@ -55,7 +55,7 @@ $must($corpus, 'pldr_corpus_policy_provider', 'AI corpus fail-closed provider er
 
 // Round 10 — annotation source-validator failure rejects safely rather than fatals.
 $must($annotations, 'annotation_source_provider_failed', 'Annotation source-provider containment missing.');
-$must($annotations, "catch(Throwable $e)", 'Annotation source-provider Throwable guard missing.');
+$must($annotations, 'catch(Throwable $e)', 'Annotation source-provider Throwable guard missing.');
 
 $doc = dirname(__DIR__) . '/docs/TEN-ROUND-REVIEW-2026-08-11-R10.md';
 if (!is_file($doc)) { fwrite(STDERR, "Tenth ten-round review record missing.\n"); exit(1); }
