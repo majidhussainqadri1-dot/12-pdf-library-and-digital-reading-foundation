@@ -63,6 +63,7 @@ final class PLDR_Future_Fingerprint {
     }
 
     private static function can_compute(array $edition): bool {
+        if(function_exists('wp_doing_cron')&&wp_doing_cron()&&function_exists('doing_action')&&doing_action('pldr_future_fingerprint_edition'))return true;
         $document_id=(int)($edition['document_id']??0);
         return PLDR_Core::authorize('manage',$document_id)||PLDR_Core::authorize('rights',$document_id)||PLDR_Core::authorize('repair',$document_id);
     }
