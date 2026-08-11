@@ -87,7 +87,16 @@ final class PLDR_Future_Data {
             $text = self::limit_text(wp_strip_all_tags((string) ($row['text_content'] ?? $row['text'] ?? '')),200000);
             if ('' !== trim($text)) $items[] = array('page' => $item_page, 'text' => $text, 'language' => self::limit_text(sanitize_text_field((string) ($row['language'] ?? $edition['language'])),35), 'quality' => max(0,min(100,(float) ($row['quality_score'] ?? 0))));
         }
-        $ocr_total=$external_used?$external_input_total:($page>0?count($items):(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id)));
+        if($external_used)$ocr_total=$external_input_total;
+        elseif($page>0)$ocr_total=count($items);
+        else{
+            $wpdb->last_error='';
+            $ocr_total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id));
+            if(''!==(string)$wpdb->last_error){
+                PLDR_Core::audit('edition',$edition_id,'reflow_source_count_failed',array());
+                return array('error'=>PLDR_Core::machine_error('pldr_reflow_source_count','Reflow OCR source total could not be verified; no misleading completeness metadata was returned.',503,array('degraded'=>true)));
+            }
+        }
         $truncated=$external_used?$external_input_total>count($items):($page===0&&$ocr_total>count($items));
         return array('edition_id' => $edition_id,'requested_page'=>$page ?: null,'provider' => $provider,'pages' => $items,'available' => (bool) $items,'derived' => true,'original_immutable' => true,'page_window_limit'=>$page>0?1:self::REFLOW_WINDOW_LIMIT,'ocr_pages_total'=>$ocr_total,'provider_input_total'=>$external_input_total,'provider_input_truncated'=>$external_used&&$external_input_total>$limit,'truncated'=>$truncated);
     }
