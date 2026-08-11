@@ -55,7 +55,13 @@ final class PLDR_Future_Fingerprint {
             $rowsCurrent=is_array($rowsCurrent)?$rowsCurrent:array();
         }
         $current=array_column($rowsCurrent,null,'fingerprint_type'); if(!$current)return array();
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT f.*,e.document_id,e.edition_label,d.public_id,d.title FROM '.PLDR_Core::table('scan_fingerprints').' f JOIN '.PLDR_Core::table('editions').' e ON e.id=f.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE f.edition_id<>%d ORDER BY f.updated_at DESC LIMIT 1000',$edition_id),ARRAY_A)?:array();
+        $wpdb->last_error='';
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT f.*,e.document_id,e.edition_label,d.public_id,d.title FROM '.PLDR_Core::table('scan_fingerprints').' f JOIN '.PLDR_Core::table('editions').' e ON e.id=f.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE f.edition_id<>%d ORDER BY f.updated_at DESC LIMIT 1000',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_candidate_read_failed',array('limit'=>1000));
+            return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_candidate_read','Scan-fingerprint comparison evidence could not be read reliably; no empty candidate result was returned.',503,array('degraded'=>true)));
+        }
+        $rows=is_array($rows)?$rows:array();
         $grouped=array(); foreach($rows as $row)$grouped[(int)$row['edition_id']][]=$row;
         $out=array();
         foreach($grouped as $otherId=>$fingerprints){$other=PLDR_Core::edition((int)$otherId);if(!$other||!self::can_inspect($other))continue;$visualDistance=null;$ocrDistance=null;$meta=false;$info=$fingerprints[0];foreach($fingerprints as $row){$meta=$meta||hash_equals((string)($current['ocr-simhash64']['metadata_hash']??$current['visual-ahash']['metadata_hash']??''),(string)$row['metadata_hash']);if('visual-ahash'===$row['fingerprint_type']&&isset($current['visual-ahash']))$visualDistance=self::hamming((string)$current['visual-ahash']['fingerprint_value'],(string)$row['fingerprint_value']);if('ocr-simhash64'===$row['fingerprint_type']&&isset($current['ocr-simhash64']))$ocrDistance=self::hamming((string)$current['ocr-simhash64']['fingerprint_value'],(string)$row['fingerprint_value']);}
