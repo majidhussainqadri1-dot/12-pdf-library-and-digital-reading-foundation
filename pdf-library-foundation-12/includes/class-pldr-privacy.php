@@ -165,7 +165,17 @@ final class PLDR_Privacy {
         $user_id = self::user_id($email);
         if (!$user_id) return array('items_removed'=>false,'items_retained'=>false,'messages'=>array(),'done'=>true);
 
-        $hold = (bool) apply_filters('pldr_privacy_legal_hold', false, $user_id);
+        try {
+            $hold = (bool) apply_filters('pldr_privacy_legal_hold', false, $user_id);
+        } catch (Throwable $e) {
+            PLDR_Core::audit('privacy',0,'privacy_legal_hold_provider_failed',array('user_id'=>$user_id,'provider_failure'=>true),$user_id);
+            return array(
+                'items_removed'=>false,
+                'items_retained'=>true,
+                'messages'=>array(__('File 12 legal-hold status could not be verified, so erasure was not performed. Retry after the privacy provider is reconciled.','pdf-library-digital-reading')),
+                'done'=>false,
+            );
+        }
         if ($hold) return array(
             'items_removed'=>false,
             'items_retained'=>true,
