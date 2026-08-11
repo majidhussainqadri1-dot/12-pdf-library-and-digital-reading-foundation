@@ -26,17 +26,17 @@ $must($data, 'provider_input_truncated', 'Reflow provider truncation disclosure 
 
 // Round 2.
 $must($data, 'outline_provider_failed', 'Outline provider exception containment missing.');
-$must($data, "'provider_failure'=>$external_failure", 'Outline degraded fallback disclosure missing.');
+$must($data, '\'provider_failure\'=>$external_failure', 'Outline degraded fallback disclosure missing.');
 if (strpos($data, "external['provider']??'adapter'") !== false) { fwrite(STDERR, "Ninth ten-round regression: fabricated outline provider fallback returned.\n"); exit(1); }
 
 // Round 3.
 $must($context, 'EXPECTED_OWNERS', 'Knowledge Context governed-owner allowlist missing.');
 $must($context, 'provenance_rejected', 'Knowledge Context provenance rejection accounting missing.');
-$must($context, "true!==($item['canonical']??false)", 'Knowledge Context canonical assertion guard missing.');
+$must($context, 'true!==($item[\'canonical\']??false)', 'Knowledge Context canonical assertion guard missing.');
 
 // Round 4.
 $must($preservation, 'provider_requested_quarantine', 'Provider quarantine request disclosure missing.');
-$must($preservation, "external_health='needs-review'", 'Provider quarantine is not downgraded to review-only state.');
+$must($preservation, 'external_health=\'needs-review\'', 'Provider quarantine is not downgraded to review-only state.');
 
 // Round 5.
 $must($a11y, 'pldr_a11y_verify_conflict', 'Accessibility verification CAS conflict missing.');
