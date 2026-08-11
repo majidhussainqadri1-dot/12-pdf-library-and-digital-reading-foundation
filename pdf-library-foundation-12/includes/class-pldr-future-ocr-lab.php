@@ -42,19 +42,32 @@ final class PLDR_Future_OCR_Lab {
         $edition = PLDR_Future_Data::require_edition($edition_id);
         if (is_wp_error($edition)) return $edition;
         $uid=get_current_user_id();
-        $hourly_limit=(int)apply_filters('pldr_ocr_correction_hourly_limit',100,$uid,$edition_id);
-        $hourly_limit=max(10,min(500,$hourly_limit));
-        $since=gmdate('Y-m-d H:i:s',time()-HOUR_IN_SECONDS);
-        $recent=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_corrections').' WHERE submitted_by=%d AND created_at>=%s',$uid,$since));
-        if($recent>=$hourly_limit)return PLDR_Core::machine_error('pldr_ocr_correction_rate','OCR correction submission limit reached. Retry after the current hourly window.',429,array('retry_after'=>3600,'hourly_limit'=>$hourly_limit));
         $original = self::limit(sanitize_textarea_field($original),4000); $corrected = self::limit(sanitize_textarea_field($corrected),4000);
         if ($page < 1 || $page > (int) $edition['pages'] || '' === trim($original) || '' === trim($corrected)) return PLDR_Core::machine_error('pldr_ocr_correction_input', 'A valid page, original OCR excerpt and corrected text are required.', 400);
         $source = (string) $wpdb->get_var($wpdb->prepare('SELECT text_content FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d AND page_number=%d', $edition_id, $page));
         if ('' === $source || false === strpos($source, $original)) return PLDR_Core::machine_error('pldr_ocr_correction_stale', 'The submitted original excerpt does not match the current OCR source layer.', 409);
-        $stored=$wpdb->insert(PLDR_Core::table('ocr_corrections'), array('edition_id'=>$edition_id,'page_number'=>$page,'original_text'=>$original,'corrected_text'=>$corrected,'status'=>'pending','submitted_by'=>$uid,'reviewed_by'=>0,'review_note'=>'','version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
-        if(false===$stored||!(int)$wpdb->insert_id)return PLDR_Core::machine_error('pldr_ocr_correction_store','OCR correction could not be stored.',500);
-        $id=(int)$wpdb->insert_id; PLDR_Core::audit('ocr_correction',$id,'submitted',array('edition_id'=>$edition_id,'page'=>$page));
-        return array('id'=>$id,'status'=>'pending','original_scan_immutable'=>true,'rate_limit'=>array('hourly'=>$hourly_limit));
+
+        $lock='pldr_ocr_corr_'.substr(hash('sha256',(string)$uid),0,32);
+        $locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,1)',$lock));
+        if(1!==$locked)return PLDR_Core::machine_error('pldr_ocr_correction_rate_lock','OCR correction capacity is temporarily unavailable; retry shortly.',503,array('retry_after'=>2));
+        try {
+            try {
+                $hourly_limit=(int)apply_filters('pldr_ocr_correction_hourly_limit',100,$uid,$edition_id);
+            } catch (Throwable $e) {
+                PLDR_Core::audit('edition',$edition_id,'ocr_correction_rate_policy_provider_failed',array('provider_failure'=>1),$uid);
+                return PLDR_Core::machine_error('pldr_ocr_correction_rate_policy','OCR correction rate policy is temporarily unavailable; the correction was not stored.',503,array('degraded'=>true,'provider_failure'=>true));
+            }
+            $hourly_limit=max(10,min(500,$hourly_limit));
+            $since=gmdate('Y-m-d H:i:s',time()-HOUR_IN_SECONDS);
+            $recent=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_corrections').' WHERE submitted_by=%d AND created_at>=%s',$uid,$since));
+            if($recent>=$hourly_limit)return PLDR_Core::machine_error('pldr_ocr_correction_rate','OCR correction submission limit reached. Retry after the current hourly window.',429,array('retry_after'=>3600,'hourly_limit'=>$hourly_limit));
+            $stored=$wpdb->insert(PLDR_Core::table('ocr_corrections'), array('edition_id'=>$edition_id,'page_number'=>$page,'original_text'=>$original,'corrected_text'=>$corrected,'status'=>'pending','submitted_by'=>$uid,'reviewed_by'=>0,'review_note'=>'','version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+            if(false===$stored||!(int)$wpdb->insert_id)return PLDR_Core::machine_error('pldr_ocr_correction_store','OCR correction could not be stored.',500);
+            $id=(int)$wpdb->insert_id; PLDR_Core::audit('ocr_correction',$id,'submitted',array('edition_id'=>$edition_id,'page'=>$page));
+            return array('id'=>$id,'status'=>'pending','original_scan_immutable'=>true,'rate_accounting_serialized'=>true,'rate_limit'=>array('hourly'=>$hourly_limit));
+        } finally {
+            $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));
+        }
     }
 
     public static function review(int $correction_id, string $decision, string $note) {
