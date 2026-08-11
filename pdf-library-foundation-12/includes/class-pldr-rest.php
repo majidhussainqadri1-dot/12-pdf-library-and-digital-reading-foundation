@@ -73,8 +73,20 @@ final class PLDR_REST {
     public static function save_progress(WP_REST_Request $request) { return self::idempotent($request,'reading-progress',static fn()=>PLDR_Reading::save_progress(absint($request['edition_id']),absint($request['page']))); }
     public static function reading_items(WP_REST_Request $request) { return rest_ensure_response(array('items'=>PLDR_Reading::items(absint($request['edition_id'])))); }
     public static function add_reading_item(WP_REST_Request $request) { return self::idempotent($request,'reading-item',static fn()=>PLDR_Reading::add_item(absint($request['edition_id']),$request->get_json_params()?:$request->get_params())); }
-    public static function delete_reading_item(WP_REST_Request $request) { return rest_ensure_response(array('deleted'=>PLDR_Reading::delete_item(absint($request['id'])))); }
-    public static function citation(WP_REST_Request $request) { $edition=PLDR_Core::edition(absint($request['edition']));if(!$edition||!PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id()))return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$page=absint($request['page']);$style=sanitize_key((string)($request['style']?:'sabri'));return rest_ensure_response(array('citation'=>PLDR_Reader::citation($edition,$page,$style),'style'=>$style,'page'=>$page)); }
+
+    private static function delete_reading_item_owned(int $item_id) {
+        global $wpdb;
+        $user_id=get_current_user_id();
+        if(!$user_id)return PLDR_Core::machine_error('pldr_item_login','Log in to delete a private reading item.',401);
+        $row=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('reading_items').' WHERE id=%d AND user_id=%d',$item_id,$user_id),ARRAY_A);
+        if(!$row)return PLDR_Core::machine_error('pldr_item_missing','Private reading item was not found.',404);
+        $deleted=$wpdb->delete(PLDR_Core::table('reading_items'),array('id'=>$item_id,'user_id'=>$user_id),array('%d','%d'));
+        if(1!==$deleted)return PLDR_Core::machine_error('pldr_item_delete','Private reading item could not be deleted.',500);
+        return array('deleted'=>true,'id'=>$item_id);
+    }
+
+    public static function delete_reading_item(WP_REST_Request $request) { return self::idempotent($request,'reading-item-delete',static fn()=>self::delete_reading_item_owned(absint($request['id']))); }
+    public static function citation(WP_REST_Request $request) { $edition=PLDR_Core::edition(absint($request['edition']));if(!$edition||!PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id()))return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$page=absint($request['page']);if($page>(int)$edition['pages'])return PLDR_Core::machine_error('pldr_citation_page','Citation page is outside this document edition.',400,array('pages'=>(int)$edition['pages']));$style=sanitize_key((string)($request['style']?:'sabri'));return rest_ensure_response(array('citation'=>PLDR_Reader::citation($edition,$page,$style),'style'=>$style,'page'=>$page)); }
     public static function download_session(WP_REST_Request $request) { $edition=PLDR_Core::edition(absint($request['edition_id']));if(!$edition)return PLDR_Core::machine_error('pldr_edition_missing','Edition not found.',404);$grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'download',get_current_user_id(),900);if(is_wp_error($grant))return $grant;PLDR_Core::audit('edition',(int)$edition['id'],'download_session_issued',array('size'=>$grant['size'],'sha256'=>$grant['sha256']));return rest_ensure_response(array('job_id'=>PLDR_Core::uuid(),'delivery'=>$grant,'range_bytes'=>2*MB_IN_BYTES,'checksum'=>'sha256:'.$grant['sha256'],'resume_supported'=>true,'revocation_rechecked'=>true)); }
     public static function rights_case(WP_REST_Request $request) { $doc=PLDR_Core::document_by_public_id(sanitize_text_field((string)$request['document_id']));if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);return self::idempotent($request,'rights-case',static fn()=>PLDR_Rights::file_case((int)$doc['id'],(string)$request['reason'],(array)($request['evidence']?:array()))); }
     public static function rights_decision(WP_REST_Request $request) { return self::idempotent($request,'rights-decision',static fn()=>PLDR_Rights::decide(absint($request['id']),(string)$request['decision'],(string)$request['note'],0,absint($request['expected_version']))); }
