@@ -33,14 +33,26 @@ final class PLDR_Future_Fingerprint {
     public static function candidates(int $edition_id): array {
         global $wpdb;
         $edition=PLDR_Core::edition($edition_id);if(!$edition)return array();if(!self::can_inspect($edition))return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_review_forbidden','Scan-fingerprint candidates are review evidence and require document review or repair authority.',403));
-        $rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A)?:array();
+        $wpdb->last_error='';
+        $rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_current_read_failed',array());
+            return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_current_read','Current scan-fingerprint evidence could not be read reliably; recomputation and comparison were not attempted.',503,array('degraded'=>true)));
+        }
+        $rowsCurrent=is_array($rowsCurrent)?$rowsCurrent:array();
         $current_types=array_column($rowsCurrent,null,'fingerprint_type');
         $needs_ocr=!isset($current_types['ocr-simhash64']);
         $needs_visual=class_exists('Imagick')&&!isset($current_types['visual-ahash']);
         if((!$rowsCurrent||$needs_ocr||$needs_visual)&&self::can_compute($edition)){
             $computed=self::compute_and_store($edition_id);
-            if(isset($computed['error'])&&!$rowsCurrent)return array();
-            $rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A)?:array();
+            if(isset($computed['error']))return array('error'=>$computed['error']);
+            $wpdb->last_error='';
+            $rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A);
+            if(''!==(string)$wpdb->last_error){
+                PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_current_reread_failed',array());
+                return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_current_read','Current scan-fingerprint evidence could not be re-read reliably after computation; comparison was not attempted.',503,array('degraded'=>true)));
+            }
+            $rowsCurrent=is_array($rowsCurrent)?$rowsCurrent:array();
         }
         $current=array_column($rowsCurrent,null,'fingerprint_type'); if(!$current)return array();
         $rows=$wpdb->get_results($wpdb->prepare('SELECT f.*,e.document_id,e.edition_label,d.public_id,d.title FROM '.PLDR_Core::table('scan_fingerprints').' f JOIN '.PLDR_Core::table('editions').' e ON e.id=f.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE f.edition_id<>%d ORDER BY f.updated_at DESC LIMIT 1000',$edition_id),ARRAY_A)?:array();
