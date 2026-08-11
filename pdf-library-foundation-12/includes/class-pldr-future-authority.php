@@ -3,6 +3,7 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Future_Authority {
+    private const MAX_PROVIDER_CALLS_PER_HOUR = 120;
     public static function lookup(string $type, string $value, bool $force = false) {
         global $wpdb;
         $type = sanitize_key($type); $value = trim(sanitize_text_field($value)); $value = function_exists('mb_substr') ? mb_substr($value,0,190,'UTF-8') : substr($value,0,190);
@@ -17,6 +18,8 @@ final class PLDR_Future_Authority {
                 PLDR_Core::audit('authority',(int)$row['id'],'corrupt_cache_discarded',array('identifier_type'=>$type));
             }
         }
+        $slot=self::consume_provider_slot($type);
+        if(is_wp_error($slot))return $slot;
         try{
             $result = apply_filters('pldr_authority_lookup', null, $type, $value);
         }catch(Throwable $e){
@@ -37,5 +40,26 @@ final class PLDR_Future_Authority {
         if(false===$stored)return PLDR_Core::machine_error('pldr_authority_cache_store','Bibliographic authority provenance could not be persisted.',500);
         PLDR_Core::audit('authority', 0, 'external_enrichment_cached', array('identifier_type'=>$type,'provider'=>$provider));
         return array('status' => 'fresh', 'provider' => $provider, 'result' => $result['data'], 'provenance' => $provenance, 'canonical_overwrite' => false);
+    }
+
+    private static function consume_provider_slot(string $type) {
+        global $wpdb;
+        $uid=get_current_user_id();
+        $identity=$uid>0?'u:'.$uid:'a:'.hash('sha256',(string)($_SERVER['REMOTE_ADDR']??'unknown').'|'.wp_salt('auth'));
+        $bucket='pldr_authority_rate_'.substr(hash('sha256',$identity.'|'.gmdate('YmdH')),0,32);
+        $lock='pldr_authority_'.substr(hash('sha256',$identity),0,32);
+        $locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,1)',$lock));
+        if(1!==$locked)return PLDR_Core::machine_error('pldr_authority_rate_lock','Bibliographic authority capacity is temporarily unavailable; retry shortly.',503,array('retry_after'=>2));
+        try{
+            $count=(int)get_transient($bucket);
+            try{$limit=(int)apply_filters('pldr_authority_hourly_limit',self::MAX_PROVIDER_CALLS_PER_HOUR,$uid,$type);}catch(Throwable $e){
+                PLDR_Core::audit('authority',0,'rate_policy_provider_failed',array('identifier_type'=>$type));
+                return PLDR_Core::machine_error('pldr_authority_rate_policy','Bibliographic authority rate policy could not be verified; no provider request was made.',503,array('degraded'=>true));
+            }
+            $limit=max(10,min(1000,$limit));
+            if($count>=$limit)return PLDR_Core::machine_error('pldr_authority_rate_limit','Bibliographic authority requests are temporarily rate limited.',429,array('retry_after'=>60,'hourly_limit'=>$limit));
+            if(!set_transient($bucket,$count+1,HOUR_IN_SECONDS+120))return PLDR_Core::machine_error('pldr_authority_rate_store','Bibliographic authority rate state could not be stored; no provider request was made.',503);
+            return true;
+        }finally{$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
     }
 }
