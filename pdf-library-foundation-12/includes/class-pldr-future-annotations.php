@@ -54,7 +54,7 @@ final class PLDR_Future_Annotations {
     }
 
     private static function canonical_source(array $edition,int $edition_id):string {return add_query_arg('edition',$edition_id,PLDR_Core::route_url('read',array('id'=>$edition['public_id'])));}
-    private static function annotation_id(int $uid,int $edition_id,int $item_id):string {return 'urn:pldr:annotation:'.hash_hmac('sha256',$uid.'|'.$edition_id.'|'.$item_id,wp_salt('auth'));}
+    private static function annotation_id(int $uid,int $edition_id,int $item_id):string {return 'urn:pldr:annotation:'.hash('sha256','pldr-annotation-v1|'.$uid.'|'.$edition_id.'|'.$item_id);}
     private static function selector(array $selector):array {$type=sanitize_text_field((string)($selector['type']??''));$out=array('type'=>$type);foreach(array('exact'=>260,'prefix'=>80,'suffix'=>80,'value'=>300) as $key=>$limit){if(isset($selector[$key]))$out[$key]=self::limit(wp_strip_all_tags((string)$selector[$key]),$limit);}if(isset($selector['refinedBy'])&&is_array($selector['refinedBy'])){$ref=(array)$selector['refinedBy'];$ref_type=sanitize_text_field((string)($ref['type']??''));if('FragmentSelector'===$ref_type){$value=self::limit(wp_strip_all_tags((string)($ref['value']??'')),300);if(''!==$value)$out['refinedBy']=array('type'=>'FragmentSelector','conformsTo'=>'https://www.w3.org/TR/media-frags/','value'=>$value);}}return $out;}
     private static function quote_belongs(int $edition_id,int $page,string $exact,array $edition) {
         $needle=PLDR_Core::normalize_search($exact);if(''===$needle)return false;
