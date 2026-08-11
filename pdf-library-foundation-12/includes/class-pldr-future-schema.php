@@ -234,9 +234,17 @@ final class PLDR_Future_Schema {
             'scan_fingerprints'=>array('edition_id','fingerprint_type','fingerprint_value','metadata_hash','version','created_at','updated_at'),
         );
         $required_indexes = array(
-            'future_prefs'=>array('PRIMARY'), 'shelves'=>array('shelf_key'), 'shelf_items'=>array('shelf_edition'),
-            'reading_events'=>array('event_id'), 'session_handoffs'=>array('PRIMARY'), 'authority_cache'=>array('authority_key'),
-            'a11y_audits'=>array('PRIMARY'), 'room_contexts'=>array('room_key'), 'preservation_records'=>array('PRIMARY'), 'scan_fingerprints'=>array('PRIMARY'),
+            'future_prefs'=>array('PRIMARY'),
+            'shelves'=>array('PRIMARY','shelf_key','user_id'),
+            'shelf_items'=>array('PRIMARY','shelf_edition','edition_id'),
+            'reading_events'=>array('PRIMARY','event_id','user_created','edition_id'),
+            'session_handoffs'=>array('PRIMARY','updated_at'),
+            'ocr_corrections'=>array('PRIMARY','edition_page','status'),
+            'authority_cache'=>array('PRIMARY','authority_key','expires_at'),
+            'a11y_audits'=>array('PRIMARY','status'),
+            'room_contexts'=>array('PRIMARY','room_key','edition_id','created_by'),
+            'preservation_records'=>array('PRIMARY','object_id','format_health'),
+            'scan_fingerprints'=>array('PRIMARY','fingerprint_value','metadata_hash'),
         );
         $missing_tables=array();$missing_columns=array();$missing_indexes=array();
         foreach($expected as $suffix=>$columns){
