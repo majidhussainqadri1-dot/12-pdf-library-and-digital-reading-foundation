@@ -8,8 +8,8 @@ final class PLDR_Future_Fingerprint {
         $edition=PLDR_Core::edition($edition_id);
         if(!$edition)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_edition','Edition not found.',404));
         if(!self::can_inspect($edition))return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_forbidden','Scan-fingerprint inspection is unavailable for this edition.',403));
-        $pages=PLDR_Future_Data::ocr_pages($edition_id);
-        $sample=''; foreach(array_slice($pages,0,12) as $row)$sample.=' '.PLDR_Core::normalize_search((string)$row['text_content']);
+        $pages=PLDR_Future_Data::ocr_pages($edition_id,0,12,0);
+        $sample=''; foreach($pages as $row)$sample.=' '.PLDR_Core::normalize_search((string)$row['text_content']);
         $ocr=self::simhash($sample);
         $meta=hash('sha256',PLDR_Core::normalize_search((string)$edition['title'].' '.(string)$edition['author_name'].' '.(string)$edition['publication_year'].' '.(string)$edition['pages']));
         $now=PLDR_Core::now();
@@ -17,7 +17,7 @@ final class PLDR_Future_Fingerprint {
         $visual=self::visual_fingerprint($edition_id);
         if($visual){$stored=$wpdb->replace(PLDR_Core::table('scan_fingerprints'),array('edition_id'=>$edition_id,'fingerprint_type'=>'visual-ahash','fingerprint_value'=>$visual,'metadata_hash'=>$meta,'version'=>1,'created_at'=>$now,'updated_at'=>$now));if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_store','Visual scan fingerprint could not be stored.',500));}
         PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_computed',array('visual'=>(bool)$visual,'ocr'=>(bool)$ocr));
-        return array('edition_id'=>$edition_id,'visual_fingerprint'=>$visual,'ocr_fingerprint'=>$ocr,'metadata_hash'=>$meta,'automatic_merge'=>false,'immutable_scan_family_evidence'=>true);
+        return array('edition_id'=>$edition_id,'visual_fingerprint'=>$visual,'ocr_fingerprint'=>$ocr,'metadata_hash'=>$meta,'automatic_merge'=>false,'immutable_scan_family_evidence'=>true,'ocr_pages_sampled'=>count($pages));
     }
 
     public static function candidates(int $edition_id): array {
@@ -37,7 +37,6 @@ final class PLDR_Future_Fingerprint {
         }
         return $out;
     }
-
 
     private static function can_inspect(array $edition): bool {
         $edition_id=(int)($edition['id']??0);$document_id=(int)($edition['document_id']??0);
