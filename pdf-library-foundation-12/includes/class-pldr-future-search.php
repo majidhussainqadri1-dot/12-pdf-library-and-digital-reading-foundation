@@ -6,6 +6,7 @@ final class PLDR_Future_Search {
     private const MAX_REQUESTS_PER_HOUR = 180;
 
     public static function heatmap(int $edition_id,string $query):array {
+        global $wpdb;
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return array('error'=>$edition);
         $needle=PLDR_Core::normalize_search($query);
         $len=function_exists('mb_strlen')?mb_strlen($needle,'UTF-8'):strlen($needle);
@@ -25,7 +26,12 @@ final class PLDR_Future_Search {
         $items=array();$total=0;$scanned=0;$offset=0;$batch=250;$result_capped=false;$source_exhausted=false;
         while($scanned<$scan_limit){
             $take=min($batch,$scan_limit-$scanned);
+            $wpdb->last_error='';
             $rows=PLDR_Future_Data::ocr_pages($edition_id,0,$take,$offset);
+            if(''!==(string)$wpdb->last_error){
+                PLDR_Core::audit('edition',$edition_id,'heatmap_ocr_read_failed',array('offset'=>$offset,'limit'=>$take));
+                return array('error'=>PLDR_Core::machine_error('pldr_heatmap_source_read','Search-heatmap OCR state could not be read reliably; no partial result was returned.',503,array('degraded'=>true,'pages_scanned'=>$scanned)));
+            }
             if(!$rows){$source_exhausted=true;break;}
             $count=count($rows);
             foreach($rows as $row){
