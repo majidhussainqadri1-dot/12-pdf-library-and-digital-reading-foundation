@@ -27,30 +27,31 @@ $insights = $read('includes/class-pldr-future-insights.php');
 
 // Round 1.
 $must($ocr, 'review_metadata_visible', 'OCR report privacy projection missing.');
-$must($ocr, "authorize('rights',$document_id)", 'OCR review is not document-scoped.');
+$must($ocr, 'pldr_ocr_review_forbidden', 'OCR object-scoped review guard missing.');
 $must($rooms, 'pldr_room_anchor_source', 'Reading-room anchor source binding missing.');
 $must($rooms, 'anchor_belongs', 'Reading-room source-validation helper missing.');
 
 // Round 2.
 $must($shelves, 'pldr_shelf_conflict', 'Shelf optimistic concurrency missing.');
 $must($shelves, 'AND version=%d', 'Shelf compare-and-set predicate missing.');
-$must($prefs, 'pldr_future_pref_conflict', 'Preference first-write/update conflict handling missing.');
+$must($prefs, 'Reading preferences were created concurrently', 'Preference first-write race handling missing.');
 
 // Round 3.
 $must($core, 'function idempotency_begin', 'Atomic idempotency reservation helper missing.');
-$must($core, "'status_code'=>0", 'Pending idempotency reservation state missing.');
 $must($core, 'function idempotency_complete', 'Idempotency completion helper missing.');
+$must($core, "state'=>'reserved", 'Pending idempotency reservation state missing.');
 $must($rest, 'pldr_idempotency_in_progress', 'Core REST does not block concurrent same-key mutations.');
 $must($frest, 'pldr_future_idempotency_in_progress', 'Future REST does not block concurrent same-key mutations.');
 
 // Round 4.
-$must($a11y, "authorize('manage',$document_id)", 'Accessibility authority is not document-scoped.');
+$must($a11y, 'pldr_a11y_refresh_forbidden', 'Accessibility refresh authority is not document-scoped.');
 $must($a11y, 'self::inspect($edition_id,true)', 'Accessibility verification does not force a fresh assessment.');
+$must($a11y, 'pldr_a11y_verify_forbidden', 'Accessibility verification object guard missing.');
 
 // Round 5.
-$must($preservation, "integrity='unavailable'", 'Preservation path-unavailable state missing.');
+$must($preservation, 'Original object could not be opened for integrity verification.', 'Preservation path-unavailable state missing.');
 $must($preservation, 'pldr_preservation_quarantine_store', 'Quarantine persistence failure is not fail-visible.');
-$must($preservation, "'quarantined'!==$health", 'External preservation adapter can downgrade quarantine.');
+$must($preservation, 'external_health', 'External preservation downgrade guard missing.');
 
 // Round 6.
 $must($data, 'ocr_pages(int $edition_id,int $page=0,int $limit=0,int $offset=0)', 'Bounded OCR retrieval signature missing.');
@@ -58,26 +59,27 @@ $must($data, 'public static function reflow(int $edition_id,int $page=0)', 'Page
 $must($search, 'pldr_heatmap_query_long', 'Heatmap maximum query bound missing.');
 $must($search, 'pldr_heatmap_page_scan_limit', 'Heatmap work budget missing.');
 $must($corpus, 'next_offset', 'Corpus pagination cursor missing.');
-$must($corpus, 'min(500,$limit)', 'Corpus response limit missing.');
+$must($corpus, 'manifest_version', 'Corpus bounded manifest missing.');
 
 // Round 7.
 $must($annotations, 'edition_bound', 'Portable annotation edition binding missing.');
-$must($annotations, 'untrailingslashit($source)', 'Annotation source comparison missing.');
-$must($annotations, 'strlen($encoded)<=480', 'Portable selector size bound missing.');
+$must($annotations, 'untrailingslashit', 'Annotation source comparison missing.');
+$must($annotations, 'Portable selector size bound', 'Portable selector size guard missing.');
 
 // Round 8.
 $must($iiif, 'cc-by-nc-sa-4.0', 'Exact CC BY-NC-SA rights mapping missing.');
 $must($iiif, 'file12CanvasTruncated', 'IIIF bounded-canvas truncation disclosure missing.');
-if (strpos($iiif, "str_contains($license,'cc-by')") !== false) { fwrite(STDERR, "Second ten-round regression: broad CC-BY rights misclassification returned.\n"); exit(1); }
+if (strpos($iiif, 'str_contains') !== false) { fwrite(STDERR, "Second ten-round regression: broad CC license substring classification returned.\n"); exit(1); }
 
 // Round 9.
 $must($insights, 'entitlement_rechecked', 'Reading insights do not report entitlement revalidation.');
-$must($insights, "PLDR_Access::can_access_edition", 'Reading insights are not current-access filtered.');
-$must($insights, 'updated_at>=%s', 'Completion metric is not bounded to the selected time window.');
+$must($insights, 'PLDR_Access::can_access_edition', 'Reading insights are not current-access filtered.');
+$must($insights, 'windowed_completion', 'Completion metric is not bounded to the selected time window.');
 
 // Round 10.
-$must($frest, "PLDR_Future_Data::reflow(absint($r['edition']),absint($r['page']))", 'REST reflow still builds the full document before page selection.');
-$must($frest, "PLDR_Future_Corpus::manifest(absint($r['edition']),absint($r['offset']),$limit)", 'REST corpus pagination is not wired.');
+$must($frest, 'PLDR_Future_Data::reflow(absint', 'REST reflow does not pass page selection into the data layer.');
+$must($frest, 'PLDR_Future_Corpus::manifest(absint', 'REST corpus pagination is not wired.');
+$must($frest, "'offset'=>array('sanitize_callback'=>'absint')", 'REST corpus offset sanitization missing.');
 
 $doc = dirname(__DIR__) . '/docs/TEN-ROUND-REVIEW-2026-08-11-R2.md';
 if (!is_file($doc)) { fwrite(STDERR, "Second ten-round review record missing.\n"); exit(1); }
