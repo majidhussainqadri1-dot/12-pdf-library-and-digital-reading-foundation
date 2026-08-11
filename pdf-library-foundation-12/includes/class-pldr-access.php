@@ -27,10 +27,15 @@ final class PLDR_Access {
 
         $entitlement_key = trim((string)($policy['entitlement_key'] ?? ''));
         if ('' === $entitlement_key) return false;
-        $allowed = apply_filters('pldr_user_entitled', null, $user_id, $edition_id, $entitlement_key, $audience);
-        if (is_bool($allowed)) return $allowed;
-        if (function_exists('smc_has_entitlement')) {
-            return (bool) smc_has_entitlement($user_id, $entitlement_key);
+        try {
+            $allowed = apply_filters('pldr_user_entitled', null, $user_id, $edition_id, $entitlement_key, $audience);
+            if (is_bool($allowed)) return $allowed;
+            if (function_exists('smc_has_entitlement')) {
+                return (bool) smc_has_entitlement($user_id, $entitlement_key);
+            }
+        } catch (Throwable $e) {
+            PLDR_Core::audit('edition',$edition_id,'entitlement_provider_failed',array('audience'=>$audience,'provider_failure'=>true),$user_id);
+            return false;
         }
         return PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id);
     }
