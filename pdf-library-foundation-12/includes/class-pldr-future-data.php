@@ -149,7 +149,12 @@ final class PLDR_Future_Data {
                 if (count($items) >= 300) break 2;
             }
         }
+        $wpdb->last_error='';
         $ocr_total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d',$edition_id));
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'outline_source_count_failed',array());
+            return array('error'=>PLDR_Core::machine_error('pldr_outline_source_count','Outline OCR source total could not be verified; no misleading completeness metadata was returned.',503,array('degraded'=>true,'provider_failure'=>$external_failure)));
+        }
         return array('items' => $items, 'provider' => 'ocr-heading-heuristic', 'derived' => true, 'original_immutable' => true,'scan_page_limit'=>1000,'ocr_pages_scanned'=>count($rows),'ocr_pages_total'=>$ocr_total,'truncated'=>$ocr_total>count($rows)||count($items)>=300,'provider_failure'=>$external_failure,'provider_error'=>$external_error);
     }
 
