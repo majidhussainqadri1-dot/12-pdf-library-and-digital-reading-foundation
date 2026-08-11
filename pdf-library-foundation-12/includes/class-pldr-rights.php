@@ -39,11 +39,20 @@ final class PLDR_Rights {
         $new_state='reviewed'; $closed=null;
         if(in_array($decision,array('remove','restore','dismiss'),true)){ $new_state='closed'; $closed=PLDR_Core::now(); }
         if('request-evidence'===$decision)$new_state='reviewed';
+        $status_map=array('restrict'=>'restricted','remove'=>'removed','restore'=>'published');
+        $status=$status_map[$decision]??'';
+        $reason='rights-case-'.$case_id;
+        $transition=null;
+
+        $wpdb->query('START TRANSACTION');
         $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('rights_cases').' SET state=%s,decision_note=%s,assigned_to=%d,version=version+1,updated_at=%s,closed_at=%s WHERE id=%d AND version=%d',$new_state,sanitize_textarea_field($note),$reviewer_id,PLDR_Core::now(),$closed,$case_id,(int)$case['version']));
-        if(1!==$updated)return PLDR_Core::machine_error('pldr_case_conflict','Concurrent rights-case update detected.',409);
-        if('restrict'===$decision) self::set_document_status($document_id,'restricted','rights-case-'.$case_id);
-        if('remove'===$decision) self::set_document_status($document_id,'removed','rights-case-'.$case_id);
-        if('restore'===$decision) self::set_document_status($document_id,'published','rights-case-'.$case_id);
+        if(1!==$updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_conflict','Concurrent rights-case update detected.',409);}
+        if($status){
+            $transition=self::transition_document_status_row($document_id,$status);
+            if(is_wp_error($transition)){$wpdb->query('ROLLBACK');return $transition;}
+        }
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_commit','Rights decision could not be committed atomically.',500);}
+        if(is_array($transition))self::after_document_status_change($transition['document'],$status,$reason);
         PLDR_Core::audit('rights_case',$case_id,'decided',array('decision'=>$decision,'document_id'=>$document_id),$reviewer_id);
         PLDR_Core::emit('PDFRightsCaseDecided.v1','rights_case',$case_id,array('case_id'=>$case_id,'document_id'=>$document_id,'decision'=>$decision,'state'=>$new_state));
         return array('case_id'=>$case_id,'state'=>$new_state,'decision'=>$decision,'version'=>(int)$case['version']+1);
@@ -89,11 +98,38 @@ final class PLDR_Rights {
     }
 
     private static function temporary_restrict(int $document_id,string $reason):void { self::set_document_status($document_id,'restricted','temporary-'.$reason); }
-    private static function set_document_status(int $document_id,string $status,string $reason):void {
-        global $wpdb; $doc=PLDR_Core::document($document_id); if(!$doc)return;
-        $allowed=array('published','restricted','removed','superseded','rights_review','scan'); if(!in_array($status,$allowed,true))return;
-        if('published'===$status){$edition=PLDR_Core::latest_edition($document_id);$object=$edition?PLDR_Core::object((int)$edition['object_id']):null;if(!$edition||!$object||'available'!==$object['object_status']||'clean'!==$object['scan_status'])return;}
-        $wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d',$status,PLDR_Core::now(),$document_id)); PLDR_Access::revoke_document($document_id,$reason); $event='published'===$status?'PDFDocumentPublished.v1':'PDFDocumentAccessChanged.v1'; PLDR_Core::emit($event,'document',$document_id,array('document_id'=>$doc['public_id'],'status'=>$status,'reason'=>$reason));
+
+    private static function transition_document_status_row(int $document_id,string $status) {
+        global $wpdb;
+        $doc=PLDR_Core::document($document_id);
+        if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found during rights-state transition.',404);
+        $allowed=array('published','restricted','removed','superseded','rights_review','scan');
+        if(!in_array($status,$allowed,true))return PLDR_Core::machine_error('pldr_document_status','Invalid document rights state.',400);
+        if('published'===$status){
+            $edition=PLDR_Core::latest_edition($document_id);
+            $object=$edition?PLDR_Core::object((int)$edition['object_id']):null;
+            if(!$edition||!$object||'available'!==$object['object_status']||'clean'!==$object['scan_status'])return PLDR_Core::machine_error('pldr_restore_unavailable','The document cannot be restored until its current edition has a clean available object.',409);
+        }
+        $changed=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d',$status,PLDR_Core::now(),$document_id,(int)$doc['version']));
+        if(1!==$changed)return PLDR_Core::machine_error('pldr_document_conflict','Document state changed concurrently; the rights decision was not committed.',409);
+        return array('document'=>$doc,'version'=>(int)$doc['version']+1);
+    }
+
+    private static function after_document_status_change(array $doc,string $status,string $reason):void {
+        $document_id=(int)$doc['id'];
+        PLDR_Access::revoke_document($document_id,$reason);
+        $event='published'===$status?'PDFDocumentPublished.v1':'PDFDocumentAccessChanged.v1';
+        PLDR_Core::emit($event,'document',$document_id,array('document_id'=>$doc['public_id'],'status'=>$status,'reason'=>$reason));
+    }
+
+    private static function set_document_status(int $document_id,string $status,string $reason) {
+        global $wpdb;
+        $wpdb->query('START TRANSACTION');
+        $transition=self::transition_document_status_row($document_id,$status);
+        if(is_wp_error($transition)){$wpdb->query('ROLLBACK');return $transition;}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_document_status_commit','Document rights-state transition could not be committed.',500);}
+        self::after_document_status_change($transition['document'],$status,$reason);
+        return true;
     }
 
     public static function expire_rights():void { global $wpdb; $rows=$wpdb->get_results($wpdb->prepare('SELECT DISTINCT document_id FROM '.PLDR_Core::table('editions').' WHERE rights_expires_at IS NOT NULL AND rights_expires_at<=%s',PLDR_Core::now()),ARRAY_A); foreach($rows as $r){$doc=PLDR_Core::document((int)$r['document_id']); if($doc && 'published'===$doc['status'])self::set_document_status((int)$doc['id'],'restricted','rights-expired');} }
