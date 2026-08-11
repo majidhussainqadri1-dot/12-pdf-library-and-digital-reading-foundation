@@ -43,7 +43,11 @@ final class PLDR_Future_Context {
         if(1!==$locked)return PLDR_Core::machine_error('pldr_context_rate_lock','Knowledge-context provider capacity is temporarily unavailable; retry shortly.',503,array('retry_after'=>2));
         try{
             $count=(int)get_transient($bucket);
-            $limit=(int)apply_filters('pldr_context_hourly_limit',self::MAX_PROVIDER_CALLS_PER_HOUR,$uid,$edition_id);$limit=max(20,min(2000,$limit));
+            try{$limit=(int)apply_filters('pldr_context_hourly_limit',self::MAX_PROVIDER_CALLS_PER_HOUR,$uid,$edition_id);}catch(Throwable $e){
+                PLDR_Core::audit('edition',$edition_id,'context_rate_policy_provider_failed',array('provider_failure'=>true));
+                return PLDR_Core::machine_error('pldr_context_rate_policy','Knowledge-context rate policy could not be verified; the provider call was not executed.',503,array('degraded'=>true));
+            }
+            $limit=max(20,min(2000,$limit));
             if($count>=$limit)return PLDR_Core::machine_error('pldr_context_rate_limit','Knowledge-context provider requests are temporarily rate limited.',429,array('retry_after'=>60,'hourly_limit'=>$limit));
             if(!set_transient($bucket,$count+1,HOUR_IN_SECONDS+120))return PLDR_Core::machine_error('pldr_context_rate_store','Knowledge-context rate-limit state could not be stored; the provider call was not executed.',503);
             return true;
@@ -54,7 +58,10 @@ final class PLDR_Future_Context {
         $needle=PLDR_Core::normalize_search($selection);if(''===$needle)return false;
         $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
         foreach($rows as $row){$haystack=PLDR_Core::normalize_search((string)($row['text_content']??''));if(''!==$haystack&&false!==strpos($haystack,$needle))return true;}
-        return (bool)apply_filters('pldr_knowledge_context_selection_allowed',false,$edition_id,$page,$selection,$edition);
+        try{return (bool)apply_filters('pldr_knowledge_context_selection_allowed',false,$edition_id,$page,$selection,$edition);}catch(Throwable $e){
+            PLDR_Core::audit('edition',$edition_id,'context_selection_provider_failed',array('page'=>$page,'provider_failure'=>true));
+            return false;
+        }
     }
 
     private static function limit(string $value,int $length):string {return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length);}
