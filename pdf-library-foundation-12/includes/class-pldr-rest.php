@@ -3,6 +3,8 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_REST {
+    private const READER_THUMB_LIMIT = 300;
+
     public static function register(): void {
         register_rest_route('pldr/v1','/library',array('methods'=>'GET','callback'=>array(__CLASS__,'library'),'permission_callback'=>'__return_true','args'=>array('q'=>array('sanitize_callback'=>'sanitize_text_field'),'type'=>array('sanitize_callback'=>'sanitize_key'),'category'=>array('sanitize_callback'=>'sanitize_key'),'language'=>array('sanitize_callback'=>'sanitize_text_field'),'page'=>array('sanitize_callback'=>'absint'),'per_page'=>array('sanitize_callback'=>'absint'))));
         register_rest_route('pldr/v1','/document/(?P<id>[a-f0-9\-]{36})',array('methods'=>'GET','callback'=>array(__CLASS__,'document'),'permission_callback'=>'__return_true'));
@@ -62,10 +64,37 @@ final class PLDR_REST {
     }
 
     public static function reader_manifest(WP_REST_Request $request) {
-        global $wpdb;$edition_id=absint($request['edition']);$edition=PLDR_Core::edition($edition_id);if(!$edition||!PLDR_Access::can_access_edition($edition_id,'read',get_current_user_id()))return PLDR_Core::machine_error('pldr_reader_forbidden','Reader manifest is unavailable.',404);
-        $object=PLDR_Core::object((int)$edition['object_id']);if(!$object)return PLDR_Core::machine_error('pldr_object_missing','Document object not found.',404);$grant=PLDR_Access::issue_token($edition_id,(int)$object['id'],'read',get_current_user_id(),900);if(is_wp_error($grant))return $grant;
-        $thumb_rows=$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC',$edition_id,'thumbnail','available'),ARRAY_A);$thumbs=array();foreach($thumb_rows as $row){$g=PLDR_Access::issue_token($edition_id,(int)$row['object_id'],'preview',get_current_user_id(),900);if(is_array($g))$thumbs[(int)$row['page_number']]=$g['url'];}
-        $policy=PLDR_Core::policy((int)$edition['document_id']);return rest_ensure_response(array('edition_id'=>$edition_id,'title'=>$edition['title'],'pages'=>(int)$edition['pages'],'language'=>$edition['language'],'version'=>(int)$edition['version'],'delivery'=>$grant,'thumbnails'=>$thumbs,'reading'=>PLDR_Reading::state($edition_id),'permissions'=>array('download'=>!empty($policy['download_allowed']),'print'=>!empty($policy['print_allowed']),'offline'=>!empty($policy['offline_allowed'])),'accessibility'=>self::accessibility_metadata($edition_id,$edition)));
+        global $wpdb;
+        $edition_id=absint($request['edition']);
+        $edition=PLDR_Core::edition($edition_id);
+        if(!$edition||!PLDR_Access::can_access_edition($edition_id,'read',get_current_user_id()))return PLDR_Core::machine_error('pldr_reader_forbidden','Reader manifest is unavailable.',404);
+        $object=PLDR_Core::object((int)$edition['object_id']);
+        if(!$object)return PLDR_Core::machine_error('pldr_object_missing','Document object not found.',404);
+        $grant=PLDR_Access::issue_token($edition_id,(int)$object['id'],'read',get_current_user_id(),900);
+        if(is_wp_error($grant))return $grant;
+
+        $thumb_table=PLDR_Core::table('derivatives');
+        $thumb_total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.$thumb_table.' WHERE edition_id=%d AND derivative_type=%s AND status=%s',$edition_id,'thumbnail','available'));
+        $thumb_rows=$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.$thumb_table.' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT %d',$edition_id,'thumbnail','available',self::READER_THUMB_LIMIT),ARRAY_A)?:array();
+        $thumbs=array();
+        foreach($thumb_rows as $row){
+            $g=PLDR_Access::issue_token($edition_id,(int)$row['object_id'],'preview',get_current_user_id(),900);
+            if(is_array($g))$thumbs[(int)$row['page_number']]=$g['url'];
+        }
+        $policy=PLDR_Core::policy((int)$edition['document_id']);
+        return rest_ensure_response(array(
+            'edition_id'=>$edition_id,
+            'title'=>$edition['title'],
+            'pages'=>(int)$edition['pages'],
+            'language'=>$edition['language'],
+            'version'=>(int)$edition['version'],
+            'delivery'=>$grant,
+            'thumbnails'=>$thumbs,
+            'thumbnails_meta'=>array('limit'=>self::READER_THUMB_LIMIT,'returned'=>count($thumbs),'total'=>$thumb_total,'truncated'=>$thumb_total>self::READER_THUMB_LIMIT),
+            'reading'=>PLDR_Reading::state($edition_id),
+            'permissions'=>array('download'=>!empty($policy['download_allowed']),'print'=>!empty($policy['print_allowed']),'offline'=>!empty($policy['offline_allowed'])),
+            'accessibility'=>self::accessibility_metadata($edition_id,$edition),
+        ));
     }
 
     private static function accessibility_metadata(int $edition_id,array $edition):array { global $wpdb;$ocr=$wpdb->get_row($wpdb->prepare('SELECT status,quality_score,language FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s LIMIT 1',$edition_id,'ocr-status'),ARRAY_A);$thumbs=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s',$edition_id,'thumbnail','available'));return array('title'=>$edition['title'],'author'=>$edition['author_name'],'language'=>$edition['language'],'pages'=>(int)$edition['pages'],'ocr_status'=>$ocr['status']??'unknown','ocr_quality'=>isset($ocr['quality_score'])?(float)$ocr['quality_score']:0,'ocr_language'=>$ocr['language']??$edition['language'],'thumbnail_pages'=>$thumbs,'screen_reader_fallback'=>$ocr&&'available'===$ocr['status']?'ocr-text':'document-metadata'); }
