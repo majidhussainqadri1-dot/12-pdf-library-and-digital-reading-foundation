@@ -350,10 +350,42 @@ final class PLDR_Schema {
         ) $charset;";
 
         foreach ($sql as $statement) dbDelta($statement);
-        $required_tables=array('documents','editions','objects','access_policies','reading_state','reading_items','rights_cases','derivatives','ocr_text','access_tokens','outbox','audit','book_packs','idempotency');
-        $missing=array();
-        foreach($required_tables as $suffix){$table=PLDR_Core::table($suffix);if($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table))!==$table)$missing[]=$suffix;}
-        if($missing){update_option('pldr_schema_error',array('missing'=>$missing,'last_error'=>(string)$wpdb->last_error,'at'=>PLDR_Core::now()),false);self::release_migration_lock($lock_payload);return false;}
+        $required_schema = array(
+            'documents'=>array('columns'=>array('id','public_id','status','access_mode','version','updated_at'),'indexes'=>array('PRIMARY','public_id','status_type')),
+            'editions'=>array('columns'=>array('id','document_id','pages','sha256','object_id','status','version'),'indexes'=>array('PRIMARY','document_id','sha256')),
+            'objects'=>array('columns'=>array('id','storage_name','sha256','encrypted_sha256','key_id','scan_status','object_status'),'indexes'=>array('PRIMARY','storage_name','object_status')),
+            'access_policies'=>array('columns'=>array('id','document_id','audience','entitlement_key','download_allowed','offline_allowed','version'),'indexes'=>array('PRIMARY','document_version')),
+            'reading_state'=>array('columns'=>array('user_id','edition_id','last_page','percent','edition_version'),'indexes'=>array('PRIMARY','edition_id')),
+            'reading_items'=>array('columns'=>array('id','user_id','edition_id','item_type','page_number','version'),'indexes'=>array('PRIMARY','user_edition')),
+            'rights_cases'=>array('columns'=>array('id','case_key','document_id','reporter_id','state','version'),'indexes'=>array('PRIMARY','case_key','document_state')),
+            'derivatives'=>array('columns'=>array('id','edition_id','derivative_type','page_number','object_id','status'),'indexes'=>array('PRIMARY','edition_type_page')),
+            'ocr_text'=>array('columns'=>array('edition_id','page_number','quality_score','text_content','normalized_text'),'indexes'=>array('PRIMARY')),
+            'access_tokens'=>array('columns'=>array('id','token_hash','user_id','edition_id','object_id','operation','expires_at','revoked_at','used_count','max_uses'),'indexes'=>array('PRIMARY','token_hash','edition_operation')),
+            'outbox'=>array('columns'=>array('id','event_id','event_name','status','attempts','available_at','sent_at'),'indexes'=>array('PRIMARY','event_id','dispatch')),
+            'audit'=>array('columns'=>array('id','trace_id','object_type','object_id','action','actor_id','created_at'),'indexes'=>array('PRIMARY','object_lookup')),
+            'book_packs'=>array('columns'=>array('id','pack_key','pack_version','manifest_sha256','status'),'indexes'=>array('PRIMARY','pack_version')),
+            'idempotency'=>array('columns'=>array('actor_id','route','key_hash','response_json','status_code','expires_at'),'indexes'=>array('PRIMARY','expires_at')),
+        );
+        $missing_tables=array();$missing_columns=array();$missing_indexes=array();
+        foreach($required_schema as $suffix=>$spec){
+            $table=PLDR_Core::table($suffix);
+            if($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table))!==$table){$missing_tables[]=$suffix;continue;}
+            $columns=$wpdb->get_col("SHOW COLUMNS FROM `{$table}`");
+            $indexes=$wpdb->get_col("SHOW INDEX FROM `{$table}`",2);
+            foreach($spec['columns'] as $column)if(!in_array($column,$columns,true))$missing_columns[]=$suffix.'.'.$column;
+            foreach($spec['indexes'] as $index)if(!in_array($index,$indexes,true))$missing_indexes[]=$suffix.'.'.$index;
+        }
+        if($missing_tables||$missing_columns||$missing_indexes){
+            update_option('pldr_schema_error',array(
+                'missing_tables'=>$missing_tables,
+                'missing_columns'=>$missing_columns,
+                'missing_indexes'=>$missing_indexes,
+                'last_error'=>(string)$wpdb->last_error,
+                'at'=>PLDR_Core::now(),
+            ),false);
+            self::release_migration_lock($lock_payload);
+            return false;
+        }
         delete_option('pldr_schema_error');
 
         update_option('pldr_db_version', PLDR_DB_VERSION, false);
