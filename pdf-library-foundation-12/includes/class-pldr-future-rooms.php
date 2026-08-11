@@ -12,6 +12,7 @@ final class PLDR_Future_Rooms {
         if($doc && 'patient-cases'===$doc['category'] && !apply_filters('pldr_patient_case_reading_room_allowed',false,$edition_id,$doc))return PLDR_Core::machine_error('pldr_room_patient_case','Patient-case documents require separate privacy approval before a reading room can be created.',403);
         $page=max(1,min((int)$edition['pages'],$page));
         $anchor=self::anchor($anchor);
+        if(!self::anchor_belongs($edition_id,$page,$anchor,$edition))return PLDR_Core::machine_error('pldr_room_anchor_source','Reading-room text anchors must match the requested document page.',403);
         $encoded=wp_json_encode($anchor,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         if(false===$encoded||strlen($encoded)>1600)return PLDR_Core::machine_error('pldr_room_anchor','Reading-room anchor is too large.',400);
         $room_key=PLDR_Core::uuid();
@@ -27,7 +28,7 @@ final class PLDR_Future_Rooms {
             if(false===$updated)return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; the local pending context remains for reconciliation.',500,array('room_key'=>$room_key));
         }
         PLDR_Core::emit('PDFReadingRoomRequested.v1','edition',$edition_id,array('room_key'=>$room_key,'document_id'=>$edition['public_id'],'page'=>$page,'provider_ref'=>$provider_ref));
-        return array('room_key'=>$room_key,'status'=>$status,'provider_ref'=>$provider_ref,'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
+        return array('room_key'=>$room_key,'status'=>$status,'provider_ref'=>$provider_ref,'source_bound'=>true,'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
     }
 
     private static function anchor(array $anchor):array {
@@ -38,5 +39,21 @@ final class PLDR_Future_Rooms {
         if(isset($anchor['region'])&&is_array($anchor['region']))$out['region']=array('x'=>max(0,min(1,(float)($anchor['region']['x']??0))),'y'=>max(0,min(1,(float)($anchor['region']['y']??0))),'w'=>max(0,min(1,(float)($anchor['region']['w']??0))),'h'=>max(0,min(1,(float)($anchor['region']['h']??0))));
         return $out;
     }
+
+    private static function anchor_belongs(int $edition_id,int $page,array $anchor,array $edition):bool {
+        $texts=array();
+        foreach(array('exact','selection') as $key){if(!empty($anchor[$key]))$texts[]=PLDR_Core::normalize_search((string)$anchor[$key]);}
+        $texts=array_values(array_filter($texts,static fn(string $value):bool=>''!==$value));
+        if(!$texts)return true;
+        foreach(PLDR_Future_Data::ocr_pages($edition_id) as $row){
+            if((int)($row['page_number']??0)!==$page)continue;
+            $haystack=PLDR_Core::normalize_search((string)($row['text_content']??''));
+            if(''===$haystack)break;
+            foreach($texts as $needle){if(false===strpos($haystack,$needle))return (bool)apply_filters('pldr_reading_room_anchor_allowed',false,$edition_id,$page,$anchor,$edition);}
+            return true;
+        }
+        return (bool)apply_filters('pldr_reading_room_anchor_allowed',false,$edition_id,$page,$anchor,$edition);
+    }
+
     private static function limit(string $value,int $length):string {return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length);}
 }
