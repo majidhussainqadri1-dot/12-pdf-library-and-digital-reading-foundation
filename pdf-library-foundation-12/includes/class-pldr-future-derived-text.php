@@ -20,17 +20,18 @@ final class PLDR_Future_Derived_Text {
         $filter='translate'===$mode?'pldr_translate_text':'pldr_transliterate_text';
         $result=apply_filters($filter,null,$text,array('edition_id'=>$edition_id,'page'=>$page,'source_language'=>$edition['language'],'target_language'=>$target));
         if(!is_array($result)||empty($result['text']))return array('error'=>PLDR_Core::machine_error('pldr_derive_provider','No approved translation/transliteration provider is configured.',503,array('degraded'=>true)));
-        return array('mode'=>$mode,'text'=>wp_strip_all_tags((string)$result['text']),'provider'=>sanitize_text_field((string)($result['provider']??'adapter')),'target_language'=>$target,'derived'=>true,'not_authorial_text'=>true,'original_unchanged'=>true,'source_bound'=>true);
+        $derived=self::limit(wp_strip_all_tags((string)$result['text']),10000);
+        if(''===trim($derived))return array('error'=>PLDR_Core::machine_error('pldr_derive_provider','The approved provider returned no usable derived text.',502));
+        return array('mode'=>$mode,'text'=>$derived,'provider'=>self::limit(sanitize_text_field((string)($result['provider']??'adapter')),80),'target_language'=>$target,'derived'=>true,'not_authorial_text'=>true,'original_unchanged'=>true,'source_bound'=>true);
     }
 
     private static function selection_belongs(int $edition_id,int $page,string $text,array $edition):bool {
         $needle=PLDR_Core::normalize_search($text);
         if(''===$needle)return false;
-        foreach(PLDR_Future_Data::ocr_pages($edition_id) as $row){
-            if((int)($row['page_number']??0)!==$page)continue;
-            $haystack=PLDR_Core::normalize_search((string)($row['text_content']??''));
+        $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if($rows){
+            $haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));
             if(''!==$haystack&&false!==strpos($haystack,$needle))return true;
-            break;
         }
         return (bool)apply_filters('pldr_derived_text_selection_allowed',false,$edition_id,$page,$text,$edition);
     }
