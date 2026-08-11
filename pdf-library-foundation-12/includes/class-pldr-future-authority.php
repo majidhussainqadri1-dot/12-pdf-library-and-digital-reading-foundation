@@ -23,7 +23,11 @@ final class PLDR_Future_Authority {
             return PLDR_Core::machine_error('pldr_authority_provider', 'Bibliographic authority provider failed; canonical metadata was left unchanged.', 503, array('degraded' => true, 'provider_failure'=>true));
         }
         if (!is_array($result) || empty($result['data'])) return PLDR_Core::machine_error('pldr_authority_provider', 'No bibliographic authority provider is configured for this identifier.', 503, array('degraded' => true));
-        $provider = sanitize_text_field((string) ($result['provider'] ?? 'adapter')); $provider = function_exists('mb_substr') ? mb_substr($provider,0,80,'UTF-8') : substr($provider,0,80);
+        $provider = sanitize_text_field((string) ($result['provider'] ?? '')); $provider = function_exists('mb_substr') ? mb_substr($provider,0,80,'UTF-8') : substr($provider,0,80);
+        if ('' === trim($provider)) {
+            PLDR_Core::audit('authority', 0, 'anonymous_provider_rejected', array('identifier_type'=>$type));
+            return PLDR_Core::machine_error('pldr_authority_provenance', 'Bibliographic authority output was rejected because provider provenance was missing.', 502, array('degraded'=>true,'provenance_missing'=>true));
+        }
         $encoded = wp_json_encode($result['data']);
         if (!is_string($encoded) || strlen($encoded) > 524288) return PLDR_Core::machine_error('pldr_authority_payload', 'Bibliographic authority provider response exceeded the governed payload limit.', 502);
         $provenance = array('provider' => $provider, 'retrieved_at' => PLDR_Core::now(), 'identifier_type' => $type, 'identifier_value' => $value, 'external_enrichment' => true, 'canonical_overwrite' => false);
