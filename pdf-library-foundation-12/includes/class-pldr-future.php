@@ -135,8 +135,9 @@ final class PLDR_Future {
         if (empty($_COOKIE['pldr_vault_purge'])) return;
         wp_register_script('pldr-vault-purge', '', array(), PLDR_VERSION, true);
         wp_enqueue_script('pldr-vault-purge');
-        wp_add_inline_script('pldr-vault-purge', "if(window.indexedDB){indexedDB.deleteDatabase('pldr-offline-v1');}");
-        if (!headers_sent()) setcookie('pldr_vault_purge', '', array('expires'=>time()-3600,'path'=>COOKIEPATH ?: '/','domain'=>COOKIE_DOMAIN ?: '','secure'=>is_ssl(),'httponly'=>false,'samesite'=>'Lax'));
+        $cookie = 'pldr_vault_purge=; Max-Age=0; Path=' . (COOKIEPATH ?: '/') . '; SameSite=Lax' . (is_ssl() ? '; Secure' : '') . (COOKIE_DOMAIN ? '; Domain=' . COOKIE_DOMAIN : '');
+        $script = "(function(){var clear=function(){document.cookie=" . wp_json_encode($cookie) . ";};if(!window.indexedDB){clear();return;}var r=indexedDB.deleteDatabase('pldr-offline-v1');r.onsuccess=clear;r.onerror=function(){};r.onblocked=function(){};})();";
+        wp_add_inline_script('pldr-vault-purge', $script);
     }
 
     public static function schema_notice(): void {

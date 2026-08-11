@@ -13,10 +13,40 @@ final class PLDR_Future_Data {
 
     public static function ocr_pages(int $edition_id): array {
         global $wpdb;
-        return $wpdb->get_results($wpdb->prepare(
+        $rows = $wpdb->get_results($wpdb->prepare(
             'SELECT page_number,language,quality_score,text_content,normalized_text FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d ORDER BY page_number ASC',
             $edition_id
         ), ARRAY_A) ?: array();
+        if (!$rows) return array();
+        $corrections = $wpdb->get_results($wpdb->prepare(
+            'SELECT page_number,original_text,corrected_text FROM ' . PLDR_Core::table('ocr_corrections') . ' WHERE edition_id=%d AND status=%s ORDER BY page_number ASC,id ASC',
+            $edition_id,
+            'approved'
+        ), ARRAY_A) ?: array();
+        $by_page = array();
+        foreach ($corrections as $correction) $by_page[(int) $correction['page_number']][] = $correction;
+        foreach ($rows as &$row) {
+            $page = (int) $row['page_number'];
+            $text = (string) $row['text_content'];
+            $applied = 0;
+            foreach ($by_page[$page] ?? array() as $correction) {
+                $original = (string) $correction['original_text'];
+                $replacement = (string) $correction['corrected_text'];
+                if ('' === $original) continue;
+                $pos = strpos($text, $original);
+                if (false === $pos) continue;
+                $text = substr_replace($text, $replacement, $pos, strlen($original));
+                $applied++;
+            }
+            if ($applied) {
+                $row['text_content'] = $text;
+                $row['normalized_text'] = PLDR_Core::normalize_search($text);
+                $row['approved_corrections_applied'] = $applied;
+                $row['derived_correction_layer'] = true;
+            }
+        }
+        unset($row);
+        return $rows;
     }
 
     public static function reflow(int $edition_id): array {

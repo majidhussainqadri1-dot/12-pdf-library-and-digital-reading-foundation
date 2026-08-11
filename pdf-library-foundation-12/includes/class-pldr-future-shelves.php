@@ -3,11 +3,103 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Future_Shelves {
-    public static function ensure_defaults(int $uid):void { global $wpdb;foreach(array('reading'=>'Reading now','later'=>'Read later','complete'=>'Completed','reference'=>'Important reference') as $type=>$name){$exists=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d AND shelf_type=%s LIMIT 1',$uid,$type));if(!$exists)$wpdb->insert(PLDR_Core::table('shelves'),array('shelf_key'=>PLDR_Core::uuid(),'user_id'=>$uid,'name'=>$name,'shelf_type'=>$type,'sort_order'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));} }
-    public static function list():array { global $wpdb;$uid=get_current_user_id();if(!$uid)return array();self::ensure_defaults($uid);$rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d ORDER BY sort_order ASC,id ASC',$uid),ARRAY_A)?:array();foreach($rows as &$row){$row['id']=(int)$row['id'];$row['count']=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d',$row['id']));}return $rows; }
-    public static function create(string $name):array { global $wpdb;$uid=get_current_user_id();if(!$uid)return array('error'=>PLDR_Core::machine_error('pldr_shelf_login','Log in to create a private shelf.',401));$name=trim(sanitize_text_field($name));if(''===$name)return array('error'=>PLDR_Core::machine_error('pldr_shelf_name','Shelf name is required.',400));$key=PLDR_Core::uuid();$wpdb->insert(PLDR_Core::table('shelves'),array('shelf_key'=>$key,'user_id'=>$uid,'name'=>$name,'shelf_type'=>'custom','sort_order'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));return array('id'=>(int)$wpdb->insert_id,'shelf_key'=>$key,'name'=>$name); }
-    public static function add(int $shelf_id,int $edition_id) { global $wpdb;$uid=get_current_user_id();if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);$shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);$edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return $edition;$wpdb->replace(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added_at'=>PLDR_Core::now()));return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added'=>true); }
-    public static function rename(int $shelf_id,string $name) { global $wpdb;$uid=get_current_user_id();if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);$shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be renamed.',409);$name=trim(sanitize_text_field($name));if(''===$name)return PLDR_Core::machine_error('pldr_shelf_name','Shelf name is required.',400);$wpdb->update(PLDR_Core::table('shelves'),array('name'=>$name,'version'=>(int)$shelf['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$shelf_id,'user_id'=>$uid));return array('id'=>$shelf_id,'name'=>$name,'version'=>(int)$shelf['version']+1); }
-    public static function remove(int $shelf_id) { global $wpdb;$uid=get_current_user_id();if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);$shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be deleted.',409);$wpdb->query('START TRANSACTION');$wpdb->delete(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id));$deleted=$wpdb->delete(PLDR_Core::table('shelves'),array('id'=>$shelf_id,'user_id'=>$uid));if(false===$deleted){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_delete','Shelf could not be deleted.',500);}$wpdb->query('COMMIT');return array('id'=>$shelf_id,'deleted'=>true); }
-    public static function remove_item(int $shelf_id,int $edition_id) { global $wpdb;$uid=get_current_user_id();if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);$shelf=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);$wpdb->delete(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id));return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'removed'=>true); }
+    public static function ensure_defaults(int $uid):void {
+        global $wpdb;
+        foreach(array('reading'=>'Reading now','later'=>'Read later','complete'=>'Completed','reference'=>'Important reference') as $type=>$name){
+            $exists=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d AND shelf_type=%s LIMIT 1',$uid,$type));
+            if($exists)continue;
+            $key=self::default_key($uid,$type);
+            $inserted=$wpdb->insert(PLDR_Core::table('shelves'),array('shelf_key'=>$key,'user_id'=>$uid,'name'=>$name,'shelf_type'=>$type,'sort_order'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+            if(false===$inserted){
+                $race=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d AND shelf_type=%s LIMIT 1',$uid,$type));
+                if(!$race)PLDR_Core::audit('user',$uid,'future_shelf_default_failed',array('shelf_type'=>$type,'db_error'=>(string)$wpdb->last_error));
+            }
+        }
+    }
+
+    public static function list():array {
+        global $wpdb;
+        $uid=get_current_user_id();
+        if(!$uid)return array();
+        self::ensure_defaults($uid);
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE user_id=%d ORDER BY sort_order ASC,id ASC',$uid),ARRAY_A)?:array();
+        foreach($rows as &$row){$row['id']=(int)$row['id'];$row['count']=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d',$row['id']));}
+        return $rows;
+    }
+
+    public static function create(string $name):array {
+        global $wpdb;
+        $uid=get_current_user_id();
+        if(!$uid)return array('error'=>PLDR_Core::machine_error('pldr_shelf_login','Log in to create a private shelf.',401));
+        $name=self::name($name);
+        if(''===$name)return array('error'=>PLDR_Core::machine_error('pldr_shelf_name','Shelf name is required.',400));
+        $key=PLDR_Core::uuid();
+        $inserted=$wpdb->insert(PLDR_Core::table('shelves'),array('shelf_key'=>$key,'user_id'=>$uid,'name'=>$name,'shelf_type'=>'custom','sort_order'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+        if(false===$inserted||!(int)$wpdb->insert_id)return array('error'=>PLDR_Core::machine_error('pldr_shelf_store','Private shelf could not be stored.',500));
+        return array('id'=>(int)$wpdb->insert_id,'shelf_key'=>$key,'name'=>$name);
+    }
+
+    public static function add(int $shelf_id,int $edition_id) {
+        global $wpdb;
+        $uid=get_current_user_id();
+        if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
+        $shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
+        $edition=PLDR_Future_Data::require_edition($edition_id);
+        if(is_wp_error($edition))return $edition;
+        $stored=$wpdb->replace(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added_at'=>PLDR_Core::now()));
+        if(false===$stored)return PLDR_Core::machine_error('pldr_shelf_item_store','Shelf item could not be stored.',500);
+        return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added'=>true);
+    }
+
+    public static function rename(int $shelf_id,string $name) {
+        global $wpdb;
+        $uid=get_current_user_id();
+        if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
+        $shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
+        if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be renamed.',409);
+        $name=self::name($name);
+        if(''===$name)return PLDR_Core::machine_error('pldr_shelf_name','Shelf name is required.',400);
+        $updated=$wpdb->update(PLDR_Core::table('shelves'),array('name'=>$name,'version'=>(int)$shelf['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$shelf_id,'user_id'=>$uid));
+        if(false===$updated)return PLDR_Core::machine_error('pldr_shelf_rename','Shelf could not be renamed.',500);
+        return array('id'=>$shelf_id,'name'=>$name,'version'=>(int)$shelf['version']+1);
+    }
+
+    public static function remove(int $shelf_id) {
+        global $wpdb;
+        $uid=get_current_user_id();
+        if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
+        $shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
+        if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be deleted.',409);
+        $wpdb->query('START TRANSACTION');
+        $items=$wpdb->delete(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id));
+        if(false===$items){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_delete','Shelf items could not be removed.',500);}
+        $deleted=$wpdb->delete(PLDR_Core::table('shelves'),array('id'=>$shelf_id,'user_id'=>$uid));
+        if(1!==$deleted){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_delete','Shelf could not be deleted.',500);}
+        $wpdb->query('COMMIT');
+        return array('id'=>$shelf_id,'deleted'=>true);
+    }
+
+    public static function remove_item(int $shelf_id,int $edition_id) {
+        global $wpdb;
+        $uid=get_current_user_id();
+        if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
+        $shelf=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
+        $deleted=$wpdb->delete(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id));
+        if(false===$deleted)return PLDR_Core::machine_error('pldr_shelf_item_delete','Shelf item could not be removed.',500);
+        return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'removed'=>true);
+    }
+
+    private static function name(string $name):string {
+        $name=trim(sanitize_text_field($name));
+        return function_exists('mb_substr')?mb_substr($name,0,120,'UTF-8'):substr($name,0,120);
+    }
+
+    private static function default_key(int $uid,string $type):string {
+        $hex=hash('sha256','pldr-smart-shelf|'.$uid.'|'.$type);
+        return substr($hex,0,8).'-'.substr($hex,8,4).'-5'.substr($hex,13,3).'-a'.substr($hex,17,3).'-'.substr($hex,20,12);
+    }
 }

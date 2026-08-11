@@ -74,7 +74,7 @@ final class PLDR_Reading {
     public static function state(int $edition_id, int $user_id = 0): array {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
-        if (!$user_id) return array('page' => 1, 'percent' => 0);
+        if (!$user_id || !PLDR_Access::can_access_edition($edition_id, 'read', $user_id)) return array('page' => 1, 'percent' => 0);
         $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . PLDR_Core::table('reading_state') . ' WHERE user_id=%d AND edition_id=%d', $user_id, $edition_id), ARRAY_A);
         return $row ? array('page' => (int) $row['last_page'], 'percent' => (float) $row['percent'], 'updated_at' => $row['updated_at']) : array('page' => 1, 'percent' => 0);
     }
@@ -99,7 +99,7 @@ final class PLDR_Reading {
     public static function items(int $edition_id, int $user_id = 0): array {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
-        if (!$user_id) return array();
+        if (!$user_id || !PLDR_Access::can_access_edition($edition_id, 'read', $user_id)) return array();
         $rows = $wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM ' . PLDR_Core::table('reading_items') . ' WHERE user_id=%d AND edition_id=%d ORDER BY page_number ASC,id ASC', $user_id, $edition_id), ARRAY_A);
         foreach ($rows as &$row) { $row['id']=(int)$row['id']; $row['page_number']=(int)$row['page_number']; $row['version']=(int)$row['version']; $row['tags']=json_decode((string)$row['tags_json'],true)?:array(); unset($row['tags_json']); }
         return $rows ?: array();
@@ -204,7 +204,9 @@ final class PLDR_Reader {
     public static function reading_dashboard_html(): string {
         if (!is_user_logged_in()) return '<div class="pldr-state">' . esc_html__('Log in to view private reading progress.','pdf-library-digital-reading') . '</div>';
         global $wpdb;
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT s.*,e.document_id,d.public_id,d.title,d.slug FROM '.PLDR_Core::table('reading_state').' s JOIN '.PLDR_Core::table('editions').' e ON e.id=s.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE s.user_id=%d ORDER BY s.updated_at DESC LIMIT 100',get_current_user_id()),ARRAY_A);
+        $uid=get_current_user_id();
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT s.*,e.document_id,d.public_id,d.title,d.slug FROM '.PLDR_Core::table('reading_state').' s JOIN '.PLDR_Core::table('editions').' e ON e.id=s.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE s.user_id=%d ORDER BY s.updated_at DESC LIMIT 100',$uid),ARRAY_A)?:array();
+        $rows=array_values(array_filter($rows,static fn(array $row):bool=>PLDR_Access::can_access_edition((int)$row['edition_id'],'read',$uid)));
         ob_start();?><main class="pldr-shell"><h1><?php esc_html_e('Reading Workspace','pdf-library-digital-reading');?></h1><div class="pldr-grid"><?php foreach($rows as $row):?><article class="pldr-card"><div class="pldr-card-body"><h2><a href="<?php echo esc_url(PLDR_Core::route_url('read',array('id'=>$row['public_id'])));?>"><?php echo esc_html($row['title']);?></a></h2><p><?php echo esc_html(sprintf(__('Page %1$d · %2$s%% complete','pdf-library-digital-reading'),(int)$row['last_page'],(string)$row['percent']));?></p></div></article><?php endforeach;?></div></main><?php return (string)ob_get_clean();
     }
 

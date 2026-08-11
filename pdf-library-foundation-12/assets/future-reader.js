@@ -46,6 +46,18 @@
   };
   F.escape = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
   F.idempotency = (scope = 'future') => `${scope}-${F.editionId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  F.storageGet = (key, fallback = {}) => {
+    try {
+      const raw = window.localStorage?.getItem(key);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+    } catch (_) { return fallback; }
+  };
+  F.storageSet = (key, value) => {
+    try { window.localStorage?.setItem(key, JSON.stringify(value)); return true; }
+    catch (_) { return false; }
+  };
   F.api = async (path, options = {}) => {
     const headers = Object.assign({'X-WP-Nonce': future.nonce || cfg.nonce || ''}, options.headers || {});
     if (options.body && typeof options.body !== 'string') {
@@ -92,7 +104,7 @@
     if (!text) { F.say('No lawful reflow text is available for read aloud.'); return; }
     const utter = new SpeechSynthesisUtterance(text.slice(0, 32000));
     utter.lang = article.lang || cfg.language || document.documentElement.lang || 'en-US';
-    const saved = JSON.parse(localStorage.getItem('pldr-f24-prefs') || '{}');
+    const saved = F.storageGet('pldr-f24-prefs', {});
     utter.rate = Math.max(.5, Math.min(2, Number(saved.tts_rate || 1)));
     utter.onend = () => { F.speaking = false; F.say('Read aloud finished.'); };
     utter.onerror = () => { F.speaking = false; F.say('Read aloud stopped because the browser speech engine reported an error.'); };
@@ -110,7 +122,7 @@
         contrast: root.querySelector('[data-f24-contrast]')?.value || 'default',
         data_saver: !!root.querySelector('[data-f24-data-saver]')?.checked,
       };
-      localStorage.setItem('pldr-f24-prefs', JSON.stringify(value));
+      F.storageSet('pldr-f24-prefs', value);
       clearTimeout(timer);
       if (future.loggedIn) timer = setTimeout(async () => {
         try {
@@ -140,7 +152,7 @@
   };
 
   const loadPrefs = async () => {
-    const local = JSON.parse(localStorage.getItem('pldr-f24-prefs') || '{}'); applyPrefs(local);
+    const local = F.storageGet('pldr-f24-prefs', {}); applyPrefs(local);
     if (!future.loggedIn) return;
     try { const result = await F.api('preferences?key=reader'); F.prefVersion = Number(result.version || 0); applyPrefs(result.value || local); } catch (_) {}
   };
