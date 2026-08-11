@@ -3,6 +3,9 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Schema {
+    private const MIGRATION_LOCK_OPTION = 'pldr_migration_lock';
+    private const MIGRATION_LOCK_TTL = 300;
+
     public static function activate(): void {
         self::install_caps();
         self::upgrade();
@@ -34,15 +37,48 @@ final class PLDR_Schema {
         }
     }
 
+    private static function acquire_migration_lock(): ?string {
+        global $wpdb;
+        $token = self::uuid_lock_token();
+        $payload = wp_json_encode(array('token'=>$token,'acquired_at'=>time()));
+        if (!is_string($payload) || '' === $payload) return null;
+        if (add_option(self::MIGRATION_LOCK_OPTION, $payload, '', false)) return $payload;
+
+        $row = $wpdb->get_var($wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name=%s LIMIT 1",
+            self::MIGRATION_LOCK_OPTION
+        ));
+        if (!is_string($row) || '' === $row) return null;
+        $decoded = json_decode($row, true);
+        $acquired_at = is_array($decoded) ? absint($decoded['acquired_at'] ?? 0) : absint($row);
+        if ($acquired_at && (time() - $acquired_at) < self::MIGRATION_LOCK_TTL) return null;
+
+        $updated = $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->options} SET option_value=%s WHERE option_name=%s AND option_value=%s",
+            $payload, self::MIGRATION_LOCK_OPTION, $row
+        ));
+        if (1 !== $updated) return null;
+        wp_cache_delete(self::MIGRATION_LOCK_OPTION, 'options');
+        return $payload;
+    }
+
+    private static function release_migration_lock(string $payload): void {
+        global $wpdb;
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$wpdb->options} WHERE option_name=%s AND option_value=%s",
+            self::MIGRATION_LOCK_OPTION, $payload
+        ));
+        wp_cache_delete(self::MIGRATION_LOCK_OPTION, 'options');
+    }
+
+    private static function uuid_lock_token(): string {
+        return function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : PLDR_Core::uuid();
+    }
+
     public static function upgrade(): bool {
         global $wpdb;
-        if (!add_option('pldr_migration_lock', (string) time(), '', false)) {
-            $lock = absint(get_option('pldr_migration_lock', 0));
-            if ($lock && (time() - $lock) < 300) {
-                return false;
-            }
-            update_option('pldr_migration_lock', (string) time(), false);
-        }
+        $lock_payload = self::acquire_migration_lock();
+        if (null === $lock_payload) return false;
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         $charset = $wpdb->get_charset_collate();
@@ -317,12 +353,12 @@ final class PLDR_Schema {
         $required_tables=array('documents','editions','objects','access_policies','reading_state','reading_items','rights_cases','derivatives','ocr_text','access_tokens','outbox','audit','book_packs','idempotency');
         $missing=array();
         foreach($required_tables as $suffix){$table=PLDR_Core::table($suffix);if($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table))!==$table)$missing[]=$suffix;}
-        if($missing){update_option('pldr_schema_error',array('missing'=>$missing,'last_error'=>(string)$wpdb->last_error,'at'=>PLDR_Core::now()),false);delete_option('pldr_migration_lock');return false;}
+        if($missing){update_option('pldr_schema_error',array('missing'=>$missing,'last_error'=>(string)$wpdb->last_error,'at'=>PLDR_Core::now()),false);self::release_migration_lock($lock_payload);return false;}
         delete_option('pldr_schema_error');
 
         update_option('pldr_db_version', PLDR_DB_VERSION, false);
         update_option('pldr_contract_version', PLDR_CONTRACT_VERSION, false);
-        delete_option('pldr_migration_lock');
+        self::release_migration_lock($lock_payload);
 
         if (self::legacy_present()) {
             update_option('pldr_legacy_migration_state', array('status' => 'pending', 'offset' => 0, 'started_at' => PLDR_Core::now()), false);
