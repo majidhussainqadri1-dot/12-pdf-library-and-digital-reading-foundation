@@ -63,8 +63,14 @@ final class PLDR_Future_Annotations {
     private static function annotation_id(int $uid,int $edition_id,int $item_id):string {return 'urn:pldr:annotation:'.hash('sha256','pldr-annotation-v1|'.$uid.'|'.$edition_id.'|'.$item_id);}
     private static function selector(array $selector):array {$type=sanitize_text_field((string)($selector['type']??''));$out=array('type'=>$type);foreach(array('exact'=>260,'prefix'=>80,'suffix'=>80,'value'=>300) as $key=>$limit){if(isset($selector[$key]))$out[$key]=self::limit(wp_strip_all_tags((string)$selector[$key]),$limit);}if(isset($selector['refinedBy'])&&is_array($selector['refinedBy'])){$ref=(array)$selector['refinedBy'];$ref_type=sanitize_text_field((string)($ref['type']??''));if('FragmentSelector'===$ref_type){$value=self::limit(wp_strip_all_tags((string)($ref['value']??'')),300);if(''!==$value)$out['refinedBy']=array('type'=>'FragmentSelector','conformsTo'=>'https://www.w3.org/TR/media-frags/','value'=>$value);}}return $out;}
     private static function quote_belongs(int $edition_id,int $page,string $exact,array $edition) {
+        global $wpdb;
         $needle=PLDR_Core::normalize_search($exact);if(''===$needle)return false;
+        $wpdb->last_error='';
         $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'annotation_source_read_failed',array('page'=>$page));
+            return PLDR_Core::machine_error('pldr_annotation_source_read','Annotation source text could not be read reliably; external source validation was not attempted.',503,array('degraded'=>true));
+        }
         if($rows){$haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));if(''!==$haystack&&false!==strpos($haystack,$needle))return true;}
         try{
             return (bool)apply_filters('pldr_annotation_import_source_allowed',false,$edition_id,$page,$exact,$edition);
