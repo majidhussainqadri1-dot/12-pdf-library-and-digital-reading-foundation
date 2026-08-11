@@ -64,7 +64,10 @@ $must($rest, 'offline_vault_ttl_policy_provider_failed', 'Offline-vault TTL poli
 $must($rest, 'pldr_offline_ttl_policy', 'Offline-vault explicit degraded policy error is missing.');
 $must($rest, 'policy_checked_before_grant', 'Offline pre-grant policy-order evidence is missing.');
 $ttl_pos = strpos($rest, "apply_filters('pldr_offline_vault_ttl'");
-$grant_pos = strpos($rest, "PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline'");
+$grant_marker = <<<'MARKER'
+PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline'
+MARKER;
+$grant_pos = strpos($rest, $grant_marker);
 if (false === $ttl_pos || false === $grant_pos || $ttl_pos >= $grant_pos) { fwrite(STDERR, "Eleventh ten-round regression: Offline token is issued before TTL/right policy is resolved.\n"); exit(1); }
 
 // Round 10 — heatmap policy containment and abuse budget.
