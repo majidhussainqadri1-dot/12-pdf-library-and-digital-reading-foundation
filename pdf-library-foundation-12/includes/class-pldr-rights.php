@@ -68,8 +68,9 @@ final class PLDR_Rights {
         $document_id=(int)$parent['document_id'];
         if((int)$parent['reporter_id']!==$actor_id && !PLDR_Core::authorize('rights',$document_id,$actor_id) && !PLDR_Core::authorize('manage',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_appeal_forbidden','You cannot appeal this rights case.',403);
         $key=PLDR_Core::uuid();
-        $wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$key,'document_id'=>$document_id,'reporter_id'=>$actor_id,'parent_case_id'=>$case_id,'state'=>'appealed','reason'=>'appeal','evidence_json'=>wp_json_encode(array('reason'=>sanitize_textarea_field($reason),'evidence'=>$evidence)),'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
+        $inserted=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$key,'document_id'=>$document_id,'reporter_id'=>$actor_id,'parent_case_id'=>$case_id,'state'=>'appealed','reason'=>'appeal','evidence_json'=>wp_json_encode(array('reason'=>sanitize_textarea_field($reason),'evidence'=>$evidence)),'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
         $new_id=(int)$wpdb->insert_id;
+        if(false===$inserted||$new_id<1)return PLDR_Core::machine_error('pldr_appeal_store','The rights appeal could not be persisted; no appeal event was emitted.',500);
         PLDR_Core::emit('PDFRightsCaseAppealed.v1','rights_case',$new_id,array('case_id'=>$new_id,'parent_case_id'=>$case_id,'document_id'=>$document_id));
         return array('case_id'=>$new_id,'case_key'=>$key,'state'=>'appealed');
     }
@@ -162,8 +163,10 @@ final class PLDR_Book_Packs {
         );
         if('founder-owned'===$rights && empty($canonical['provenance']))return PLDR_Core::machine_error('pldr_pack_provenance','Founder-owned Book Content Packs require explicit provenance and edition history.',400);
         $manifest_hash=hash('sha256',wp_json_encode($canonical,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
-        $wpdb->replace(PLDR_Core::table('book_packs'),array('pack_key'=>$canonical['pack_key'],'pack_version'=>$canonical['version'],'title'=>$canonical['title'],'author'=>$canonical['author'],'translator'=>$canonical['translator'],'rights_basis'=>$rights,'manifest_sha256'=>$manifest_hash,'metadata_json'=>wp_json_encode($canonical),'status'=>'registered','created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+        $stored=$wpdb->replace(PLDR_Core::table('book_packs'),array('pack_key'=>$canonical['pack_key'],'pack_version'=>$canonical['version'],'title'=>$canonical['title'],'author'=>$canonical['author'],'translator'=>$canonical['translator'],'rights_basis'=>$rights,'manifest_sha256'=>$manifest_hash,'metadata_json'=>wp_json_encode($canonical),'status'=>'registered','created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+        if(false===$stored)return PLDR_Core::machine_error('pldr_pack_store','Book Content Pack metadata could not be persisted; no registration event was emitted.',500);
         $id=(int)$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('book_packs').' WHERE pack_key=%s AND pack_version=%s',$canonical['pack_key'],$canonical['version']));
+        if($id<1)return PLDR_Core::machine_error('pldr_pack_store','Book Content Pack persistence could not be confirmed; no registration event was emitted.',500);
         PLDR_Core::audit('book_pack',$id,'registered',array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash),$actor_id);
         PLDR_Core::emit('PDFBookPackRegistered.v1','book_pack',$id,array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'document_public_id'=>$canonical['document_public_id']));
         return array('id'=>$id,'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>'registered');
