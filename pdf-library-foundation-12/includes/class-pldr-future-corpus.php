@@ -4,6 +4,7 @@ defined('ABSPATH') || exit;
 
 final class PLDR_Future_Corpus {
     public static function manifest(int $edition_id,int $offset=0,int $limit=250):array {
+        global $wpdb;
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return array('error'=>$edition);
         $doc=PLDR_Core::document((int)$edition['document_id']);if(!$doc)return array('error'=>PLDR_Core::machine_error('pldr_corpus_document','Document not found.',404));
         try{
@@ -18,7 +19,12 @@ final class PLDR_Future_Corpus {
         if(!$allowed)return array('error'=>PLDR_Core::machine_error('pldr_corpus_not_allowed','This edition is not allowlisted for AI corpus use.',403));
         if(!$consumer_allowed)return array('error'=>PLDR_Core::machine_error('pldr_corpus_consumer_forbidden','AI corpus manifests are available only through the approved File 16 consumer contract.',403,array('owner'=>'File 12','consumer'=>'File 16')));
         $offset=max(0,min(100000,$offset));$limit=max(1,min(500,$limit));
+        $wpdb->last_error='';
         $rows=PLDR_Future_Data::ocr_pages($edition_id,0,$limit+1,$offset);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'ai_corpus_source_read_failed',array('offset'=>$offset,'limit'=>$limit));
+            return array('error'=>PLDR_Core::machine_error('pldr_corpus_source_read','AI corpus source text could not be read reliably; no partial manifest was returned.',503,array('degraded'=>true)));
+        }
         $has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
         $chunks=array();
         foreach($rows as $row){$text=trim((string)$row['text_content']);if(''===$text)continue;$chunks[]=array('chunk_id'=>'f12:'.$edition['public_id'].':e'.$edition_id.':p'.(int)$row['page_number'],'page'=>(int)$row['page_number'],'citation_anchor'=>PLDR_Reader::citation($edition,(int)$row['page_number'],'sabri'),'rights'=>(string)$edition['rights_basis'],'quality'=>(float)$row['quality_score'],'text_sha256'=>hash('sha256',$text),'retrieval_url'=>rest_url('pldr/v1/future/reflow/'.$edition_id.'?page='.(int)$row['page_number']));}
