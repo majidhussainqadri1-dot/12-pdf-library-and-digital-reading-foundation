@@ -132,7 +132,12 @@ final class PLDR_Future_Data {
             $external_failure=true;$external_error='invalid-provider-response';
         }
         $items = array();
+        $wpdb->last_error='';
         $rows=self::ocr_pages($edition_id,0,1000,0);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'outline_source_read_failed',array('limit'=>1000));
+            return array('error'=>PLDR_Core::machine_error('pldr_outline_source_read','Outline OCR source state could not be read reliably; no empty heuristic outline was returned.',503,array('degraded'=>true,'provider_failure'=>$external_failure)));
+        }
         foreach ($rows as $row) {
             $lines = preg_split('/\R/u', (string) $row['text_content']) ?: array();
             foreach (array_slice($lines, 0, 80) as $line) {
