@@ -51,13 +51,25 @@ final class PLDR_Rights {
         $safe_evidence=self::sanitize_evidence($evidence);
         if(is_wp_error($safe_evidence))return $safe_evidence;
         $case_key = PLDR_Core::uuid();
+        $sensitive=in_array($reason,array('patient-privacy','unauthorized-scan'),true);
+        $transition=null;
+
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_case_transaction','Rights report transaction could not be started.',500);
         $ok=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$case_key,'document_id'=>$document_id,'reporter_id'=>$reporter_id,'parent_case_id'=>null,'state'=>'reported','reason'=>$reason,'evidence_json'=>$safe_evidence['json'],'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
-        if(false===$ok)return PLDR_Core::machine_error('pldr_case_store','The report could not be recorded.',500);
+        if(false===$ok){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_store','The report could not be recorded.',500);}
         $case_id=(int)$wpdb->insert_id;
-        if(in_array($reason,array('patient-privacy','unauthorized-scan'),true)) self::temporary_restrict($document_id,$reason);
-        PLDR_Core::audit('rights_case',$case_id,'reported',array('document_id'=>$document_id,'reason'=>$reason),$reporter_id);
+        if($case_id<1){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_store','The report persistence could not be confirmed.',500);}
+
+        if($sensitive&&!in_array((string)$doc['status'],array('restricted','removed'),true)){
+            $transition=self::transition_document_status_row($document_id,'restricted');
+            if(is_wp_error($transition)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_sensitive_restriction_failed','Sensitive rights report was not accepted because immediate restriction could not be committed safely.',503,array('cause'=>$transition->get_error_code()));}
+        }
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_commit','Rights report could not be committed atomically.',500);}
+
+        if(is_array($transition))self::after_document_status_change($transition['document'],'restricted','temporary-'.$reason);
+        PLDR_Core::audit('rights_case',$case_id,'reported',array('document_id'=>$document_id,'reason'=>$reason,'sensitive_restriction_committed'=>(bool)$transition),$reporter_id);
         PLDR_Core::emit('RightsReportFiled.v1','rights_case',$case_id,array('case_key'=>$case_key,'document_id'=>$doc['public_id'],'reason'=>$reason));
-        return array('case_id'=>$case_id,'case_key'=>$case_key,'state'=>'reported');
+        return array('case_id'=>$case_id,'case_key'=>$case_key,'state'=>'reported','sensitive_restriction_committed'=>$sensitive ? ('restricted'===$doc['status']||'removed'===$doc['status']||(bool)$transition) : false);
     }
 
     public static function decide(int $case_id,string $decision,string $note,int $reviewer_id=0,$expected_version=0) {
@@ -146,7 +158,7 @@ final class PLDR_Rights {
         return array('document_id'=>$doc['public_id'],'status'=>'published','version'=>(int)$doc['version']+1);
     }
 
-    private static function temporary_restrict(int $document_id,string $reason):void { self::set_document_status($document_id,'restricted','temporary-'.$reason); }
+    private static function temporary_restrict(int $document_id,string $reason) { return self::set_document_status($document_id,'restricted','temporary-'.$reason); }
 
     private static function transition_document_status_row(int $document_id,string $status) {
         global $wpdb;
