@@ -128,15 +128,20 @@ final class PLDR_Rights {
         $edition = PLDR_Core::latest_edition($document_id); $object = $edition ? PLDR_Core::object((int)$edition['object_id']) : null;
         if(!$edition || !$object || 'available'!==$object['object_status'] || 'clean'!==$object['scan_status']) return PLDR_Core::machine_error('pldr_approve_scan','A clean available encrypted object is required before publication.',409);
         foreach(array('author_name','source_name','rights_basis','sha256') as $field) if(empty($edition[$field])) return PLDR_Core::machine_error('pldr_approve_metadata','Rights/source metadata is incomplete.',409,array('field'=>$field));
-        $wpdb->query('START TRANSACTION');
+
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_approve_transaction','Document publication transaction could not be started.',500);
         $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d','published',PLDR_Core::now(),$document_id,(int)$doc['version']));
         if(1!==$updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_document_conflict','Concurrent document update detected.',409);}
-        $wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,updated_at=%s WHERE document_id=%d AND id<>%d AND status=%s','superseded',PLDR_Core::now(),$document_id,(int)$edition['id'],'published'));
-        $edition_updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d','published',PLDR_Core::now(),(int)$edition['id']));
-        if(false===$edition_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_edition_publish_failed','Edition publication could not be committed.',500);}
-        $wpdb->query('COMMIT');
+
+        $superseded=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,updated_at=%s WHERE document_id=%d AND id<>%d AND status=%s','superseded',PLDR_Core::now(),$document_id,(int)$edition['id'],'published'));
+        if(false===$superseded){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_edition_supersede_failed','Existing published editions could not be superseded; publication was rolled back.',500);}
+
+        $edition_updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d','published',PLDR_Core::now(),(int)$edition['id'],(int)$edition['version']));
+        if(1!==$edition_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_edition_publish_conflict','The target edition changed concurrently; publication was rolled back.',409);}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_approve_commit','Document publication could not be committed atomically.',500);}
+
         PLDR_Access::revoke_document($document_id,'publication-state-change');
-        PLDR_Core::audit('document',$document_id,'approved',array('edition_id'=>(int)$edition['id']),$reviewer_id);
+        PLDR_Core::audit('document',$document_id,'approved',array('edition_id'=>(int)$edition['id'],'superseded_editions'=>(int)$superseded),$reviewer_id);
         PLDR_Core::emit('PDFDocumentPublished.v1','document',$document_id,array('document_id'=>$doc['public_id'],'edition_id'=>(int)$edition['id']));
         return array('document_id'=>$doc['public_id'],'status'=>'published','version'=>(int)$doc['version']+1);
     }
