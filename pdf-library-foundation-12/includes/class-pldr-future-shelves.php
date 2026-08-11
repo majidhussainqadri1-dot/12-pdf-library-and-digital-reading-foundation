@@ -28,12 +28,11 @@ final class PLDR_Future_Shelves {
         $shelves=PLDR_Core::table('shelves');$items=PLDR_Core::table('shelf_items');
         $rows=$wpdb->get_results($wpdb->prepare(
             "SELECT s.*,COUNT(i.id) item_count FROM {$shelves} s LEFT JOIN {$items} i ON i.shelf_id=s.id WHERE s.user_id=%d GROUP BY s.id ORDER BY s.sort_order ASC,s.id ASC LIMIT %d",
-            $uid,self::LIST_LIMIT+1
+            $uid,self::LIST_LIMIT
         ),ARRAY_A)?:array();
-        $truncated=count($rows)>self::LIST_LIMIT;if($truncated)$rows=array_slice($rows,0,self::LIST_LIMIT);
         foreach($rows as &$row){$row['id']=(int)$row['id'];$row['version']=(int)$row['version'];$row['count']=(int)($row['item_count']??0);unset($row['item_count']);}
         unset($row);
-        return array('items'=>$rows,'limit'=>self::LIST_LIMIT,'returned'=>count($rows),'truncated'=>$truncated);
+        return $rows;
     }
 
     public static function create(string $name):array {
