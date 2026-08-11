@@ -44,7 +44,8 @@ final class PLDR_Access {
         global $wpdb; $actor_id=$actor_id?:get_current_user_id();
         if(!PLDR_Core::authorize('manage',$document_id,$actor_id)&&!PLDR_Core::authorize('rights',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_policy_forbidden','Document access-policy authority is required.',403);
         $doc=PLDR_Core::document($document_id);$current=PLDR_Core::policy($document_id);if(!$doc||!$current)return PLDR_Core::machine_error('pldr_policy_missing','Document access policy was not found.',404);
-        if($expected_version&&(int)$current['version']!==$expected_version)return PLDR_Core::machine_error('pldr_policy_conflict','Access policy changed; refresh before updating.',409,array('current_version'=>(int)$current['version']));
+        if($expected_version<1)return PLDR_Core::machine_error('pldr_policy_precondition','Access-policy updates require the exact expected policy version.',428,array('current_version'=>(int)$current['version']));
+        if((int)$current['version']!==$expected_version)return PLDR_Core::machine_error('pldr_policy_conflict','Access policy changed; refresh before updating.',409,array('current_version'=>(int)$current['version']));
 
         $audience=sanitize_key((string)($changes['audience']??$current['audience']));
         if(!in_array($audience,array('public','account','education-entitled','assigned'),true))return PLDR_Core::machine_error('pldr_policy_audience','Invalid access audience.',400);
