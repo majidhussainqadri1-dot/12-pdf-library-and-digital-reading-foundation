@@ -7,10 +7,16 @@ final class PLDR_Future_OCR_Lab {
         global $wpdb;
         $edition = PLDR_Future_Data::require_edition($edition_id);
         if (is_wp_error($edition)) return array('error' => $edition);
+        $document_id = (int) $edition['document_id'];
+        $can_review = PLDR_Core::authorize('manage', $document_id) || PLDR_Core::authorize('rights', $document_id);
         $row = $wpdb->get_row($wpdb->prepare('SELECT COUNT(*) pages,AVG(quality_score) avg_quality,MIN(quality_score) min_quality,MAX(quality_score) max_quality FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d', $edition_id), ARRAY_A) ?: array();
-        $corrections = $wpdb->get_results($wpdb->prepare('SELECT id,page_number,status,original_text,corrected_text,review_note,submitted_by,reviewed_by,updated_at FROM ' . PLDR_Core::table('ocr_corrections') . ' WHERE edition_id=%d ORDER BY page_number ASC,id ASC LIMIT 500', $edition_id), ARRAY_A) ?: array();
+        if ($can_review) {
+            $corrections = $wpdb->get_results($wpdb->prepare('SELECT id,page_number,status,original_text,corrected_text,review_note,submitted_by,reviewed_by,version,updated_at FROM ' . PLDR_Core::table('ocr_corrections') . ' WHERE edition_id=%d ORDER BY page_number ASC,id ASC LIMIT 500', $edition_id), ARRAY_A) ?: array();
+        } else {
+            $corrections = $wpdb->get_results($wpdb->prepare('SELECT id,page_number,status,original_text,corrected_text,updated_at FROM ' . PLDR_Core::table('ocr_corrections') . ' WHERE edition_id=%d ORDER BY page_number ASC,id ASC LIMIT 500', $edition_id), ARRAY_A) ?: array();
+        }
         $heat = $wpdb->get_results($wpdb->prepare('SELECT page_number,quality_score FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d ORDER BY page_number ASC', $edition_id), ARRAY_A) ?: array();
-        return array('edition_id'=>$edition_id,'pages'=>(int)($row['pages']??0),'average_quality'=>round((float)($row['avg_quality']??0),2),'minimum_quality'=>(float)($row['min_quality']??0),'maximum_quality'=>(float)($row['max_quality']??0),'heatmap'=>$heat,'corrections'=>$corrections,'original_scan_immutable'=>true);
+        return array('edition_id'=>$edition_id,'pages'=>(int)($row['pages']??0),'average_quality'=>round((float)($row['avg_quality']??0),2),'minimum_quality'=>(float)($row['min_quality']??0),'maximum_quality'=>(float)($row['max_quality']??0),'heatmap'=>$heat,'corrections'=>$corrections,'review_metadata_visible'=>$can_review,'original_scan_immutable'=>true);
     }
 
     public static function submit(int $edition_id, int $page, string $original, string $corrected) {
@@ -30,13 +36,19 @@ final class PLDR_Future_OCR_Lab {
 
     public static function review(int $correction_id, string $decision, string $note) {
         global $wpdb;
-        if (!PLDR_Core::authorize('manage') && !PLDR_Core::authorize('rights')) return PLDR_Core::machine_error('pldr_ocr_review_forbidden', 'OCR correction review authority is required.', 403);
-        if (!in_array($decision,array('approved','rejected'),true) || ''===trim($note)) return PLDR_Core::machine_error('pldr_ocr_review_input','A decision and review note are required.',400);
-        $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('ocr_corrections').' WHERE id=%d',$correction_id),ARRAY_A); if(!$row)return PLDR_Core::machine_error('pldr_ocr_correction_missing','OCR correction not found.',404);
+        if (!in_array($decision,array('approved','rejected'),true)) return PLDR_Core::machine_error('pldr_ocr_review_input','A valid review decision is required.',400);
+        $note=self::limit(sanitize_textarea_field($note),2000);
+        if (''===trim($note)) return PLDR_Core::machine_error('pldr_ocr_review_input','A decision and review note are required.',400);
+        $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('ocr_corrections').' WHERE id=%d',$correction_id),ARRAY_A);
+        if(!$row)return PLDR_Core::machine_error('pldr_ocr_correction_missing','OCR correction not found.',404);
+        $edition=PLDR_Core::edition((int)$row['edition_id']);
+        if(!$edition)return PLDR_Core::machine_error('pldr_ocr_review_edition','OCR correction edition is unavailable.',404);
+        $document_id=(int)$edition['document_id'];
+        if (!PLDR_Core::authorize('manage',$document_id) && !PLDR_Core::authorize('rights',$document_id)) return PLDR_Core::machine_error('pldr_ocr_review_forbidden', 'OCR correction review authority is required for this document.', 403);
         if('approved'===$decision){$source=(string)$wpdb->get_var($wpdb->prepare('SELECT text_content FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d AND page_number=%d',(int)$row['edition_id'],(int)$row['page_number']));if(''===$source||false===strpos($source,(string)$row['original_text']))return PLDR_Core::machine_error('pldr_ocr_review_stale','The base OCR source changed or no longer contains the submitted excerpt; re-submit the correction against current OCR.',409);}
-        $updated=$wpdb->update(PLDR_Core::table('ocr_corrections'),array('status'=>$decision,'reviewed_by'=>get_current_user_id(),'review_note'=>sanitize_textarea_field($note),'version'=>(int)$row['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$correction_id,'version'=>(int)$row['version']));
+        $updated=$wpdb->update(PLDR_Core::table('ocr_corrections'),array('status'=>$decision,'reviewed_by'=>get_current_user_id(),'review_note'=>$note,'version'=>(int)$row['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$correction_id,'version'=>(int)$row['version']));
         if(1!==$updated)return PLDR_Core::machine_error('pldr_ocr_review_conflict','OCR correction changed concurrently; refresh before reviewing.',409);
-        PLDR_Core::audit('ocr_correction',$correction_id,'reviewed',array('decision'=>$decision));
+        PLDR_Core::audit('ocr_correction',$correction_id,'reviewed',array('decision'=>$decision,'document_id'=>$document_id));
         return array('id'=>$correction_id,'status'=>$decision,'original_scan_immutable'=>true,'base_ocr_immutable'=>true,'derived_correction_layer'=>true);
     }
     private static function limit(string $value,int $length):string { return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length); }
