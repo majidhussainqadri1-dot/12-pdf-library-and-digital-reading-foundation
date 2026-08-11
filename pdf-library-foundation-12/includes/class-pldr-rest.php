@@ -4,6 +4,7 @@ defined('ABSPATH') || exit;
 
 final class PLDR_REST {
     private const READER_THUMB_LIMIT = 300;
+    private const READER_PREVIEW_GRANT_LIMIT = 50;
 
     public static function register(): void {
         register_rest_route('pldr/v1','/library',array('methods'=>'GET','callback'=>array(__CLASS__,'library'),'permission_callback'=>'__return_true','args'=>array('q'=>array('sanitize_callback'=>'sanitize_text_field'),'type'=>array('sanitize_callback'=>'sanitize_key'),'category'=>array('sanitize_callback'=>'sanitize_key'),'language'=>array('sanitize_callback'=>'sanitize_text_field'),'page'=>array('sanitize_callback'=>'absint'),'per_page'=>array('sanitize_callback'=>'absint'))));
@@ -76,10 +77,12 @@ final class PLDR_REST {
         $thumb_table=PLDR_Core::table('derivatives');
         $thumb_total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.$thumb_table.' WHERE edition_id=%d AND derivative_type=%s AND status=%s',$edition_id,'thumbnail','available'));
         $thumb_rows=$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.$thumb_table.' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT %d',$edition_id,'thumbnail','available',self::READER_THUMB_LIMIT),ARRAY_A)?:array();
-        $thumbs=array();
+        $thumbs=array();$preview_grants_issued=0;$preview_grants_failed=0;$preview_grants_deferred=0;
         foreach($thumb_rows as $row){
+            if($preview_grants_issued>=self::READER_PREVIEW_GRANT_LIMIT){$preview_grants_deferred++;continue;}
             $g=PLDR_Access::issue_token($edition_id,(int)$row['object_id'],'preview',get_current_user_id(),900);
-            if(is_array($g))$thumbs[(int)$row['page_number']]=$g['url'];
+            if(is_array($g)){$thumbs[(int)$row['page_number']]=$g['url'];$preview_grants_issued++;}
+            else $preview_grants_failed++;
         }
         $policy=PLDR_Core::policy((int)$edition['document_id']);
         return rest_ensure_response(array(
@@ -90,7 +93,7 @@ final class PLDR_REST {
             'version'=>(int)$edition['version'],
             'delivery'=>$grant,
             'thumbnails'=>$thumbs,
-            'thumbnails_meta'=>array('limit'=>self::READER_THUMB_LIMIT,'returned'=>count($thumbs),'total'=>$thumb_total,'truncated'=>$thumb_total>self::READER_THUMB_LIMIT),
+            'thumbnails_meta'=>array('limit'=>self::READER_THUMB_LIMIT,'returned'=>count($thumbs),'total'=>$thumb_total,'truncated'=>$thumb_total>self::READER_THUMB_LIMIT,'preview_grant_limit'=>self::READER_PREVIEW_GRANT_LIMIT,'preview_grants_issued'=>$preview_grants_issued,'preview_grants_failed'=>$preview_grants_failed,'preview_grants_deferred'=>$preview_grants_deferred+max(0,count($thumb_rows)-$preview_grants_issued-$preview_grants_failed-$preview_grants_deferred)),
             'reading'=>PLDR_Reading::state($edition_id),
             'permissions'=>array('download'=>!empty($policy['download_allowed']),'print'=>!empty($policy['print_allowed']),'offline'=>!empty($policy['offline_allowed'])),
             'accessibility'=>self::accessibility_metadata($edition_id,$edition),
