@@ -10,15 +10,26 @@ final class PLDR_Future_Authority {
         if (!PLDR_Core::authorize('manage') && !PLDR_Core::authorize('publish')) return PLDR_Core::machine_error('pldr_authority_forbidden', 'Bibliographic enrichment requires publishing authority.', 403);
         if (!$force) {
             $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . PLDR_Core::table('authority_cache') . ' WHERE identifier_type=%s AND identifier_value=%s AND expires_at>%s ORDER BY updated_at DESC LIMIT 1', $type, $value, PLDR_Core::now()), ARRAY_A);
-            if ($row) return array('status' => 'cached', 'provider' => $row['provider'], 'result' => json_decode((string) $row['result_json'], true) ?: array(), 'provenance' => json_decode((string) $row['provenance_json'], true) ?: array(), 'canonical_overwrite' => false);
+            if ($row) {
+                $data=json_decode((string)$row['result_json'],true);$provenance=json_decode((string)$row['provenance_json'],true);
+                if(is_array($data)&&is_array($provenance))return array('status' => 'cached', 'provider' => $row['provider'], 'result' => $data, 'provenance' => $provenance, 'canonical_overwrite' => false);
+                $wpdb->delete(PLDR_Core::table('authority_cache'),array('id'=>(int)$row['id']),array('%d'));
+                PLDR_Core::audit('authority',(int)$row['id'],'corrupt_cache_discarded',array('identifier_type'=>$type));
+            }
         }
-        $result = apply_filters('pldr_authority_lookup', null, $type, $value);
+        try{
+            $result = apply_filters('pldr_authority_lookup', null, $type, $value);
+        }catch(Throwable $e){
+            return PLDR_Core::machine_error('pldr_authority_provider', 'Bibliographic authority provider failed; canonical metadata was left unchanged.', 503, array('degraded' => true, 'provider_failure'=>true));
+        }
         if (!is_array($result) || empty($result['data'])) return PLDR_Core::machine_error('pldr_authority_provider', 'No bibliographic authority provider is configured for this identifier.', 503, array('degraded' => true));
         $provider = sanitize_text_field((string) ($result['provider'] ?? 'adapter')); $provider = function_exists('mb_substr') ? mb_substr($provider,0,80,'UTF-8') : substr($provider,0,80);
         $encoded = wp_json_encode($result['data']);
         if (!is_string($encoded) || strlen($encoded) > 524288) return PLDR_Core::machine_error('pldr_authority_payload', 'Bibliographic authority provider response exceeded the governed payload limit.', 502);
         $provenance = array('provider' => $provider, 'retrieved_at' => PLDR_Core::now(), 'identifier_type' => $type, 'identifier_value' => $value, 'external_enrichment' => true, 'canonical_overwrite' => false);
-        $stored=$wpdb->replace(PLDR_Core::table('authority_cache'), array('identifier_type'=>$type,'identifier_value'=>$value,'provider'=>$provider,'result_json'=>$encoded,'provenance_json'=>wp_json_encode($provenance),'expires_at'=>gmdate('Y-m-d H:i:s', time()+30*DAY_IN_SECONDS),'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+        $provenance_json=wp_json_encode($provenance);
+        if(!is_string($provenance_json))return PLDR_Core::machine_error('pldr_authority_payload','Bibliographic authority provenance could not be encoded safely.',502);
+        $stored=$wpdb->replace(PLDR_Core::table('authority_cache'), array('identifier_type'=>$type,'identifier_value'=>$value,'provider'=>$provider,'result_json'=>$encoded,'provenance_json'=>$provenance_json,'expires_at'=>gmdate('Y-m-d H:i:s', time()+30*DAY_IN_SECONDS),'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
         if(false===$stored)return PLDR_Core::machine_error('pldr_authority_cache_store','Bibliographic authority provenance could not be persisted.',500);
         PLDR_Core::audit('authority', 0, 'external_enrichment_cached', array('identifier_type'=>$type,'provider'=>$provider));
         return array('status' => 'fresh', 'provider' => $provider, 'result' => $result['data'], 'provenance' => $provenance, 'canonical_overwrite' => false);
