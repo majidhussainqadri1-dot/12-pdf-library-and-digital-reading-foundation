@@ -4,6 +4,8 @@ defined('ABSPATH') || exit;
 
 final class PLDR_Future_Insights {
     private const MAX_EVENTS_PER_HOUR = 1200;
+    private const REPORT_GROUP_LIMIT = 1000;
+    private const COMPLETION_SCAN_LIMIT = 2000;
 
     public static function event(int $edition_id,string $type,int $page,int $duration,array $context=array()) {
         global $wpdb;
@@ -26,11 +28,32 @@ final class PLDR_Future_Insights {
 
     public static function report(int $days=30):array {
         global $wpdb;$uid=get_current_user_id();if(!$uid)return array();$days=max(1,min(365,$days));$since=gmdate('Y-m-d H:i:s',time()-$days*DAY_IN_SECONDS);
-        $groups=$wpdb->get_results($wpdb->prepare('SELECT e.edition_id,SUM(e.duration_seconds) seconds,COUNT(DISTINCT e.page_number) distinct_pages,d.title FROM '.PLDR_Core::table('reading_events').' e JOIN '.PLDR_Core::table('editions').' ed ON ed.id=e.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=ed.document_id WHERE e.user_id=%d AND e.created_at>=%s GROUP BY e.edition_id,d.title ORDER BY seconds DESC LIMIT 1000',$uid,$since),ARRAY_A)?:array();
+        $groups=$wpdb->get_results($wpdb->prepare('SELECT e.edition_id,SUM(e.duration_seconds) seconds,COUNT(DISTINCT e.page_number) distinct_pages,d.title FROM '.PLDR_Core::table('reading_events').' e JOIN '.PLDR_Core::table('editions').' ed ON ed.id=e.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=ed.document_id WHERE e.user_id=%d AND e.created_at>=%s GROUP BY e.edition_id,d.title ORDER BY seconds DESC LIMIT %d',$uid,$since,self::REPORT_GROUP_LIMIT+1),ARRAY_A)?:array();
+        $group_scan_truncated=count($groups)>self::REPORT_GROUP_LIMIT;if($group_scan_truncated)$groups=array_slice($groups,0,self::REPORT_GROUP_LIMIT);
         $seconds=0;$pages=0;$editions=0;$recent=array();$hidden=0;
         foreach($groups as $row){$edition_id=(int)$row['edition_id'];if(!PLDR_Access::can_access_edition($edition_id,'read',$uid)){$hidden++;continue;}$editions++;$seconds+=(int)$row['seconds'];$pages+=(int)$row['distinct_pages'];if(count($recent)<10)$recent[]=array('edition_id'=>$edition_id,'seconds'=>(int)$row['seconds'],'title'=>(string)$row['title']);}
-        $completed=0;$completed_rows=$wpdb->get_col($wpdb->prepare('SELECT edition_id FROM '.PLDR_Core::table('reading_state').' WHERE user_id=%d AND percent>=%f AND updated_at>=%s ORDER BY updated_at DESC LIMIT 2000',$uid,99.5,$since))?:array();
+        $completed=0;$completed_rows=$wpdb->get_col($wpdb->prepare('SELECT edition_id FROM '.PLDR_Core::table('reading_state').' WHERE user_id=%d AND percent>=%f AND updated_at>=%s ORDER BY updated_at DESC LIMIT %d',$uid,99.5,$since,self::COMPLETION_SCAN_LIMIT+1))?:array();
+        $completion_scan_truncated=count($completed_rows)>self::COMPLETION_SCAN_LIMIT;if($completion_scan_truncated)$completed_rows=array_slice($completed_rows,0,self::COMPLETION_SCAN_LIMIT);
         foreach($completed_rows as $edition_id)if(PLDR_Access::can_access_edition((int)$edition_id,'read',$uid))$completed++;
-        return array('days'=>$days,'reading_seconds'=>$seconds,'documents'=>$editions,'distinct_pages'=>$pages,'completed_documents'=>$completed,'most_used'=>$recent,'inaccessible_editions_excluded'=>$hidden,'windowed_completion'=>true,'entitlement_rechecked'=>true,'private'=>true,'streaks'=>false,'leaderboards'=>false,'shame_mechanics'=>false);
+        return array(
+            'days'=>$days,
+            'reading_seconds'=>$seconds,
+            'documents'=>$editions,
+            'distinct_pages'=>$pages,
+            'completed_documents'=>$completed,
+            'most_used'=>$recent,
+            'inaccessible_editions_excluded'=>$hidden,
+            'group_scan_limit'=>self::REPORT_GROUP_LIMIT,
+            'group_scan_truncated'=>$group_scan_truncated,
+            'completion_scan_limit'=>self::COMPLETION_SCAN_LIMIT,
+            'completion_scan_truncated'=>$completion_scan_truncated,
+            'aggregate_truncated'=>$group_scan_truncated||$completion_scan_truncated,
+            'windowed_completion'=>true,
+            'entitlement_rechecked'=>true,
+            'private'=>true,
+            'streaks'=>false,
+            'leaderboards'=>false,
+            'shame_mechanics'=>false,
+        );
     }
 }
