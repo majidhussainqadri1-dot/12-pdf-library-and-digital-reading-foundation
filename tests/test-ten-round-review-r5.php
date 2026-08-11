@@ -62,7 +62,7 @@ $must($iiif, 'file12DownloadRenderingAllowed', 'IIIF download-rendering disclosu
 // Round 8 — handoff race handling and normalized DTO.
 $must($handoff, 'Reading-session handoff was created concurrently', 'Initial handoff insert race is not reported as a conflict.');
 $must($handoff, 'private static function dto', 'Handoff public response normalization is missing.');
-$must($handoff, "'anchor'=>json_decode", 'Handoff anchor is not decoded into the public DTO.');
+$must($handoff, "'anchor'=>is_array(\$anchor)?\$anchor:array()", 'Handoff anchor is not integrity-checked and decoded into the public DTO.');
 
 // Round 9 — bounded reading-event ingestion.
 $must($insights, 'MAX_EVENTS_PER_HOUR = 1200', 'Reading-event ingestion ceiling is missing.');
