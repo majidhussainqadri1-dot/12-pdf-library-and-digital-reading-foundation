@@ -30,8 +30,10 @@ jobs:
         run: php tests/test-plan-contract.php
       - name: Future Digital Reading Intelligence 24 contract scan
         run: php tests/test-future-24-contract.php
-      - name: Fresh ten-round corrective-review regressions
+      - name: First fresh ten-round corrective-review regressions
         run: php tests/test-ten-round-review.php
+      - name: Second fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r2.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
