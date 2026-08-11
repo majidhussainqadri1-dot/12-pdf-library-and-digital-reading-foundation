@@ -27,9 +27,10 @@ final class PLDR_Rights {
     public static function decide(int $case_id,string $decision,string $note,int $reviewer_id=0,$expected_version=0) {
         global $wpdb;
         $reviewer_id=$reviewer_id?:get_current_user_id();
-        if(!PLDR_Core::authorize('rights',0,$reviewer_id))return PLDR_Core::machine_error('pldr_rights_forbidden','Rights-review authority is required.',403);
         $case=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('rights_cases').' WHERE id=%d',$case_id),ARRAY_A);
         if(!$case)return PLDR_Core::machine_error('pldr_case_missing','Rights case not found.',404);
+        $document_id=(int)$case['document_id'];
+        if(!PLDR_Core::authorize('rights',$document_id,$reviewer_id) && !PLDR_Core::authorize('manage',$document_id,$reviewer_id))return PLDR_Core::machine_error('pldr_rights_forbidden','Rights-review authority for this document is required.',403);
         if($expected_version && (int)$case['version']!==$expected_version)return PLDR_Core::machine_error('pldr_case_conflict','Rights case changed; refresh before deciding.',409,array('current_version'=>(int)$case['version']));
         if('closed'===$case['state'])return PLDR_Core::machine_error('pldr_case_state','This rights case cannot transition from its current state.',409);
         $allowed=array('restrict','remove','restore','dismiss','request-evidence');
@@ -40,7 +41,6 @@ final class PLDR_Rights {
         if('request-evidence'===$decision)$new_state='reviewed';
         $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('rights_cases').' SET state=%s,decision_note=%s,assigned_to=%d,version=version+1,updated_at=%s,closed_at=%s WHERE id=%d AND version=%d',$new_state,sanitize_textarea_field($note),$reviewer_id,PLDR_Core::now(),$closed,$case_id,(int)$case['version']));
         if(1!==$updated)return PLDR_Core::machine_error('pldr_case_conflict','Concurrent rights-case update detected.',409);
-        $document_id=(int)$case['document_id'];
         if('restrict'===$decision) self::set_document_status($document_id,'restricted','rights-case-'.$case_id);
         if('remove'===$decision) self::set_document_status($document_id,'removed','rights-case-'.$case_id);
         if('restore'===$decision) self::set_document_status($document_id,'published','rights-case-'.$case_id);
@@ -56,11 +56,12 @@ final class PLDR_Rights {
         $parent=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('rights_cases').' WHERE id=%d',$case_id),ARRAY_A);
         if(!$parent)return PLDR_Core::machine_error('pldr_case_missing','Rights case not found.',404);
         if(!in_array($parent['state'],array('closed','reviewed'),true))return PLDR_Core::machine_error('pldr_appeal_state','This case is not eligible for appeal yet.',409);
-        if((int)$parent['reporter_id']!==$actor_id && !PLDR_Core::authorize('rights',0,$actor_id) && !PLDR_Core::authorize('manage',(int)$parent['document_id'],$actor_id))return PLDR_Core::machine_error('pldr_appeal_forbidden','You cannot appeal this rights case.',403);
+        $document_id=(int)$parent['document_id'];
+        if((int)$parent['reporter_id']!==$actor_id && !PLDR_Core::authorize('rights',$document_id,$actor_id) && !PLDR_Core::authorize('manage',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_appeal_forbidden','You cannot appeal this rights case.',403);
         $key=PLDR_Core::uuid();
-        $wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$key,'document_id'=>(int)$parent['document_id'],'reporter_id'=>$actor_id,'parent_case_id'=>$case_id,'state'=>'appealed','reason'=>'appeal','evidence_json'=>wp_json_encode(array('reason'=>sanitize_textarea_field($reason),'evidence'=>$evidence)),'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
+        $wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$key,'document_id'=>$document_id,'reporter_id'=>$actor_id,'parent_case_id'=>$case_id,'state'=>'appealed','reason'=>'appeal','evidence_json'=>wp_json_encode(array('reason'=>sanitize_textarea_field($reason),'evidence'=>$evidence)),'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
         $new_id=(int)$wpdb->insert_id;
-        PLDR_Core::emit('PDFRightsCaseAppealed.v1','rights_case',$new_id,array('case_id'=>$new_id,'parent_case_id'=>$case_id,'document_id'=>(int)$parent['document_id']));
+        PLDR_Core::emit('PDFRightsCaseAppealed.v1','rights_case',$new_id,array('case_id'=>$new_id,'parent_case_id'=>$case_id,'document_id'=>$document_id));
         return array('case_id'=>$new_id,'case_key'=>$key,'state'=>'appealed');
     }
 
