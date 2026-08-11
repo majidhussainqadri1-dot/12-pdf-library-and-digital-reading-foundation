@@ -38,6 +38,8 @@ jobs:
         run: php tests/test-ten-round-review-r3.php
       - name: Fourth fresh ten-round corrective-review regressions
         run: php tests/test-ten-round-review-r4.php
+      - name: Fifth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r5.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
