@@ -6,9 +6,16 @@ final class PLDR_Future_Corpus {
     public static function manifest(int $edition_id,int $offset=0,int $limit=250):array {
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return array('error'=>$edition);
         $doc=PLDR_Core::document((int)$edition['document_id']);if(!$doc)return array('error'=>PLDR_Core::machine_error('pldr_corpus_document','Document not found.',404));
-        if('patient-cases'===$doc['category']&&!apply_filters('pldr_ai_patient_case_allowed',false,$edition_id,$doc))return array('error'=>PLDR_Core::machine_error('pldr_corpus_patient_case','Patient-case documents are excluded from AI corpus manifests unless separately approved.',403));
-        $allowed=apply_filters('pldr_ai_corpus_allowed',false,$edition_id,$edition,$doc);if(!$allowed)return array('error'=>PLDR_Core::machine_error('pldr_corpus_not_allowed','This edition is not allowlisted for AI corpus use.',403));
-        $consumer_allowed=(bool)apply_filters('pldr_ai_corpus_consumer_allowed',false,get_current_user_id(),$edition_id,$edition,$doc);
+        try{
+            $patient_case_allowed='patient-cases'!==$doc['category']||(bool)apply_filters('pldr_ai_patient_case_allowed',false,$edition_id,$doc);
+            $allowed=(bool)apply_filters('pldr_ai_corpus_allowed',false,$edition_id,$edition,$doc);
+            $consumer_allowed=(bool)apply_filters('pldr_ai_corpus_consumer_allowed',false,get_current_user_id(),$edition_id,$edition,$doc);
+        }catch(Throwable $e){
+            PLDR_Core::audit('edition',$edition_id,'ai_corpus_policy_provider_failed',array('document_id'=>(int)$edition['document_id'],'provider_failure'=>true));
+            return array('error'=>PLDR_Core::machine_error('pldr_corpus_policy_provider','AI corpus policy/consumer authorization could not be verified; corpus access was denied.',503,array('degraded'=>true,'provider_failure'=>true)));
+        }
+        if(!$patient_case_allowed)return array('error'=>PLDR_Core::machine_error('pldr_corpus_patient_case','Patient-case documents are excluded from AI corpus manifests unless separately approved.',403));
+        if(!$allowed)return array('error'=>PLDR_Core::machine_error('pldr_corpus_not_allowed','This edition is not allowlisted for AI corpus use.',403));
         if(!$consumer_allowed)return array('error'=>PLDR_Core::machine_error('pldr_corpus_consumer_forbidden','AI corpus manifests are available only through the approved File 16 consumer contract.',403,array('owner'=>'File 12','consumer'=>'File 16')));
         $offset=max(0,min(100000,$offset));$limit=max(1,min(500,$limit));
         $rows=PLDR_Future_Data::ocr_pages($edition_id,0,$limit+1,$offset);
