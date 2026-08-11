@@ -10,7 +10,7 @@ final class PLDR_Future_Handoff {
         $edition=PLDR_Future_Data::require_edition($edition_id);
         if(is_wp_error($edition))return $edition;
         $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('session_handoffs').' WHERE user_id=%d AND edition_id=%d',$uid,$edition_id),ARRAY_A);
-        return $row?:array();
+        return $row?self::dto($row):array();
     }
 
     public static function save(int $edition_id,array $context,int $expected=0) {
@@ -31,12 +31,30 @@ final class PLDR_Future_Handoff {
         $row=array('user_id'=>$uid,'edition_id'=>$edition_id,'page_number'=>$page,'zoom'=>$zoom,'layout_mode'=>$layout,'anchor_json'=>$anchor_json,'device_hint'=>self::limit(sanitize_text_field((string)($context['device']??'')),80),'version'=>$version,'updated_at'=>PLDR_Core::now());
         if($current){
             $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('session_handoffs').' SET page_number=%d,zoom=%s,layout_mode=%s,anchor_json=%s,device_hint=%s,version=%d,updated_at=%s WHERE user_id=%d AND edition_id=%d AND version=%d',$row['page_number'],$row['zoom'],$row['layout_mode'],$row['anchor_json'],$row['device_hint'],$version,$row['updated_at'],$uid,$edition_id,(int)$current['version']));
+            if(false===$updated)return PLDR_Core::machine_error('pldr_handoff_store','Reading-session handoff could not be stored.',500);
             if(1!==$updated)return PLDR_Core::machine_error('pldr_handoff_conflict','Concurrent reading-session handoff update detected.',409,array('current'=>self::get($edition_id)));
         }else{
             $inserted=$wpdb->insert(PLDR_Core::table('session_handoffs'),$row);
-            if(false===$inserted)return PLDR_Core::machine_error('pldr_handoff_store','Reading-session handoff could not be stored.',500);
+            if(false===$inserted){
+                $race=self::get($edition_id);
+                if(is_array($race)&&$race)return PLDR_Core::machine_error('pldr_handoff_conflict','Reading-session handoff was created concurrently on another request.',409,array('current'=>$race));
+                return PLDR_Core::machine_error('pldr_handoff_store','Reading-session handoff could not be stored.',500);
+            }
         }
-        return $row;
+        return self::dto($row);
+    }
+
+    private static function dto(array $row):array {
+        return array(
+            'edition_id'=>(int)($row['edition_id']??0),
+            'page'=>(int)($row['page_number']??1),
+            'zoom'=>(string)($row['zoom']??'page-width'),
+            'layout'=>(string)($row['layout_mode']??'single'),
+            'anchor'=>json_decode((string)($row['anchor_json']??''),true)?:array(),
+            'device'=>(string)($row['device_hint']??''),
+            'version'=>(int)($row['version']??0),
+            'updated_at'=>$row['updated_at']??null,
+        );
     }
 
     private static function anchor(array $anchor):array {
