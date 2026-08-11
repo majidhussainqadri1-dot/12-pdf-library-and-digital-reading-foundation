@@ -10,7 +10,13 @@ final class PLDR_Future_Annotations {
         global $wpdb;
         $edition = PLDR_Future_Data::require_edition($edition_id);if (is_wp_error($edition)) return array('error' => $edition);
         $uid=get_current_user_id();if (!$uid) return array('error' => PLDR_Core::machine_error('pldr_annotations_login','Log in to export private annotations.',401));
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM '.PLDR_Core::table('reading_items').' WHERE user_id=%d AND edition_id=%d ORDER BY page_number ASC,id ASC LIMIT %d',$uid,$edition_id,self::EXPORT_LIMIT+1),ARRAY_A)?:array();
+        $wpdb->last_error='';
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM '.PLDR_Core::table('reading_items').' WHERE user_id=%d AND edition_id=%d ORDER BY page_number ASC,id ASC LIMIT %d',$uid,$edition_id,self::EXPORT_LIMIT+1),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'annotation_export_read_failed',array('user_id'=>$uid));
+            return array('error'=>PLDR_Core::machine_error('pldr_annotation_export_read','Private annotations could not be read reliably; no empty export page was returned.',503,array('degraded'=>true)));
+        }
+        $rows=is_array($rows)?$rows:array();
         $truncated=count($rows)>self::EXPORT_LIMIT;if($truncated)$rows=array_slice($rows,0,self::EXPORT_LIMIT);
         $source=self::canonical_source($edition,$edition_id);$annotations = array();
         foreach ($rows as $item) {
