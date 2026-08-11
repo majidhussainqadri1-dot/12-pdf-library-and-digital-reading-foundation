@@ -29,7 +29,10 @@ final class PLDR_Future_Citations {
             $page_line=$page?"\nSP  - {$page}":'';
             return array('format' => 'ris', 'content' => "TY  - BOOK\nTI  - {$title}\nAU  - {$author}\nPY  - " . ($year ?: '') . "\nPB  - {$publisher}\nSN  - {$isbn}\nUR  - {$url}".$page_line."\nER  -", 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
         }
-        if (in_array($format, array('apa','mla','sabri'), true)) return array('format' => $format, 'content' => PLDR_Reader::citation($edition, $page, $format), 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
+        if (in_array($format, array('apa','mla','sabri','plain'), true)) {
+            $reader_format='plain'===$format?'sabri':$format;
+            return array('format' => $format, 'content' => PLDR_Reader::citation($edition, $page, $reader_format), 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
+        }
         if ('chicago' === $format) return array('format' => 'chicago', 'content' => trim($author . '. ' . $title . '. ' . ($edition_label ? $edition_label . '. ' : '') . ($publisher ? $publisher . ', ' : '') . ($year ?: 'n.d.') . '. ' . $url . ($page ? ', ' . $page : '') . '.'), 'document_id'=>$edition['public_id'], 'edition_id'=>$edition_id, 'page'=>$page ?: null,'locator_bound'=>(bool)$page);
         return array('error' => PLDR_Core::machine_error('pldr_citation_format', 'Unsupported citation export format.', 400));
     }
