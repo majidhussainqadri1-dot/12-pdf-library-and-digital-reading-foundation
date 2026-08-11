@@ -9,7 +9,12 @@ final class PLDR_Future_Handoff {
         if(!$uid)return PLDR_Core::machine_error('pldr_handoff_login','Log in to synchronize reading sessions.',401);
         $edition=PLDR_Future_Data::require_edition($edition_id);
         if(is_wp_error($edition))return $edition;
+        $wpdb->last_error='';
         $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('session_handoffs').' WHERE user_id=%d AND edition_id=%d',$uid,$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('edition',$edition_id,'handoff_read_failed',array('user_id'=>$uid));
+            return PLDR_Core::machine_error('pldr_handoff_read','Cross-device reading-session state could not be read reliably.',503,array('degraded'=>true));
+        }
         return $row?self::dto($row):array();
     }
 
