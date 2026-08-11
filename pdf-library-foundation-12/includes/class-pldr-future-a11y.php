@@ -3,6 +3,8 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Future_A11y {
+    private const PROVIDER_FINDINGS_LIMIT = 50;
+
     public static function inspect(int $edition_id,bool $refresh=false):array {
         global $wpdb;
         $edition=PLDR_Future_Data::require_edition($edition_id);
@@ -20,13 +22,33 @@ final class PLDR_Future_A11y {
         if($ocr_pages>0)$score+=min(25,$ocr_avg/4);else$findings[]='No lawful OCR text is available for accessible text fallback.';
         $thumbs=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s',$edition_id,'thumbnail','available'));
         if($thumbs>0)$score+=5;else$findings[]='Page preview derivatives are unavailable.';
-        $external=apply_filters('pldr_accessibility_inspect',null,$edition_id,$edition);$provider='heuristic';
-        if(is_array($external)){$provider=self::limit(sanitize_text_field((string)($external['provider']??'adapter')),80);$score=max(0,min(100,(float)($external['score']??$score)));foreach((array)($external['findings']??array()) as $finding){$finding=self::limit(sanitize_text_field((string)$finding),500);if(''!==$finding)$findings[]=$finding;}}
-        $findings=array_values(array_unique($findings));
+        $provider='heuristic';$provider_failure=false;$provider_input_total=0;
+        try {
+            $external=apply_filters('pldr_accessibility_inspect',null,$edition_id,$edition);
+        } catch (Throwable $e) {
+            $external=null;$provider_failure=true;
+            $findings[]='External accessibility inspection provider failed; local heuristic assessment remains available.';
+            PLDR_Core::audit('edition',$edition_id,'accessibility_provider_failed',array('document_id'=>$document_id,'error'=>self::limit($e->getMessage(),500)));
+        }
+        if(is_array($external)){
+            $provider_name=self::limit(sanitize_text_field((string)($external['provider']??'')),80);
+            if(''===$provider_name){
+                $provider_failure=true;
+                $findings[]='External accessibility findings were ignored because provider provenance was missing.';
+            }else{
+                $provider=$provider_name;
+                $score=max(0,min(100,(float)($external['score']??$score)));
+                $provider_findings=(array)($external['findings']??array());$provider_input_total=count($provider_findings);
+                foreach(array_slice($provider_findings,0,self::PROVIDER_FINDINGS_LIMIT) as $finding){$finding=self::limit(sanitize_text_field((string)$finding),500);if(''!==$finding)$findings[]=$finding;}
+            }
+        }
+        $findings=array_values(array_unique(array_slice($findings,0,self::PROVIDER_FINDINGS_LIMIT+10)));
         $status=$score>=90?'excellent':($score>=75?'good':($score>=50?'partial':'needs-remediation'));
-        $stored=$wpdb->replace(PLDR_Core::table('a11y_audits'),array('edition_id'=>$edition_id,'score'=>$score,'status'=>$status,'findings_json'=>wp_json_encode($findings),'provider'=>$provider,'verified_by'=>0,'verified_at'=>null,'updated_at'=>PLDR_Core::now()));
+        $finding_json=wp_json_encode($findings);
+        if(!is_string($finding_json))return array('error'=>PLDR_Core::machine_error('pldr_a11y_encode','Accessibility assessment could not be encoded.',500));
+        $stored=$wpdb->replace(PLDR_Core::table('a11y_audits'),array('edition_id'=>$edition_id,'score'=>$score,'status'=>$status,'findings_json'=>$finding_json,'provider'=>$provider,'verified_by'=>0,'verified_at'=>null,'updated_at'=>PLDR_Core::now()));
         if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_a11y_store','Accessibility assessment could not be stored.',500));
-        return array('edition_id'=>$edition_id,'score'=>round($score,2),'status'=>$status,'findings'=>$findings,'provider'=>$provider,'verified'=>false,'verified_at'=>null,'public_badge_allowed'=>false,'ocr_pages_assessed'=>$ocr_pages,'ocr_average_quality'=>round($ocr_avg,2));
+        return array('edition_id'=>$edition_id,'score'=>round($score,2),'status'=>$status,'findings'=>$findings,'provider'=>$provider,'provider_failure'=>$provider_failure,'provider_findings_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT,'verified'=>false,'verified_at'=>null,'public_badge_allowed'=>false,'ocr_pages_assessed'=>$ocr_pages,'ocr_average_quality'=>round($ocr_avg,2));
     }
 
     public static function verify(int $edition_id,string $note='') {
