@@ -25,10 +25,12 @@ final class PLDR_Access {
         if (!$user_id) return false;
         if ('account' === $audience) return true;
 
-        $allowed = apply_filters('pldr_user_entitled', null, $user_id, $edition_id, (string) $policy['entitlement_key'], $audience);
+        $entitlement_key = trim((string)($policy['entitlement_key'] ?? ''));
+        if ('' === $entitlement_key) return false;
+        $allowed = apply_filters('pldr_user_entitled', null, $user_id, $edition_id, $entitlement_key, $audience);
         if (is_bool($allowed)) return $allowed;
         if (function_exists('smc_has_entitlement')) {
-            return (bool) smc_has_entitlement($user_id, (string) $policy['entitlement_key']);
+            return (bool) smc_has_entitlement($user_id, $entitlement_key);
         }
         return PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id);
     }
@@ -38,8 +40,30 @@ final class PLDR_Access {
         if(!PLDR_Core::authorize('manage',$document_id,$actor_id)&&!PLDR_Core::authorize('rights',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_policy_forbidden','Document access-policy authority is required.',403);
         $doc=PLDR_Core::document($document_id);$current=PLDR_Core::policy($document_id);if(!$doc||!$current)return PLDR_Core::machine_error('pldr_policy_missing','Document access policy was not found.',404);
         if($expected_version&&(int)$current['version']!==$expected_version)return PLDR_Core::machine_error('pldr_policy_conflict','Access policy changed; refresh before updating.',409,array('current_version'=>(int)$current['version']));
-        $audience=sanitize_key((string)($changes['audience']??$current['audience']));if(!in_array($audience,array('public','account','education-entitled','assigned'),true))return PLDR_Core::machine_error('pldr_policy_audience','Invalid access audience.',400);
-        $row=array('document_id'=>$document_id,'audience'=>$audience,'entitlement_key'=>sanitize_text_field((string)($changes['entitlement_key']??$current['entitlement_key'])),'download_allowed'=>array_key_exists('download_allowed',$changes)?(empty($changes['download_allowed'])?0:1):(int)$current['download_allowed'],'print_allowed'=>array_key_exists('print_allowed',$changes)?(empty($changes['print_allowed'])?0:1):(int)$current['print_allowed'],'offline_allowed'=>array_key_exists('offline_allowed',$changes)?(empty($changes['offline_allowed'])?0:1):(int)$current['offline_allowed'],'embargo_until'=>array_key_exists('embargo_until',$changes)?self::date_or_null($changes['embargo_until']):$current['embargo_until'],'version'=>(int)$current['version']+1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now());
+
+        $audience=sanitize_key((string)($changes['audience']??$current['audience']));
+        if(!in_array($audience,array('public','account','education-entitled','assigned'),true))return PLDR_Core::machine_error('pldr_policy_audience','Invalid access audience.',400);
+        $entitlement_key=sanitize_text_field((string)($changes['entitlement_key']??$current['entitlement_key']));
+        if(in_array($audience,array('education-entitled','assigned'),true)&&''===trim($entitlement_key))return PLDR_Core::machine_error('pldr_policy_entitlement','This access audience requires a non-empty entitlement key.',400);
+
+        $embargo=$current['embargo_until'];
+        if(array_key_exists('embargo_until',$changes)){
+            $embargo=self::parse_embargo($changes['embargo_until']);
+            if(is_wp_error($embargo))return $embargo;
+        }
+
+        $row=array(
+            'document_id'=>$document_id,
+            'audience'=>$audience,
+            'entitlement_key'=>$entitlement_key,
+            'download_allowed'=>array_key_exists('download_allowed',$changes)?(empty($changes['download_allowed'])?0:1):(int)$current['download_allowed'],
+            'print_allowed'=>array_key_exists('print_allowed',$changes)?(empty($changes['print_allowed'])?0:1):(int)$current['print_allowed'],
+            'offline_allowed'=>array_key_exists('offline_allowed',$changes)?(empty($changes['offline_allowed'])?0:1):(int)$current['offline_allowed'],
+            'embargo_until'=>$embargo,
+            'version'=>(int)$current['version']+1,
+            'created_at'=>PLDR_Core::now(),
+            'updated_at'=>PLDR_Core::now(),
+        );
 
         $wpdb->query('START TRANSACTION');
         $ok=$wpdb->insert(PLDR_Core::table('access_policies'),$row);
@@ -54,7 +78,14 @@ final class PLDR_Access {
         return array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience);
     }
 
-    private static function date_or_null($value): ?string { if(!$value)return null;$ts=strtotime((string)$value);return $ts?gmdate('Y-m-d H:i:s',$ts):null; }
+    private static function parse_embargo($value) {
+        if(null===$value||''===trim((string)$value))return null;
+        $raw=trim((string)$value);
+        if(!preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?(?:Z|[+\-]\d{2}:\d{2})?)?$/',$raw))return PLDR_Core::machine_error('pldr_policy_embargo','Embargo date must be an explicit ISO-style date/time, not a relative or malformed value.',400);
+        $ts=strtotime($raw);
+        if(false===$ts)return PLDR_Core::machine_error('pldr_policy_embargo','Embargo date could not be parsed safely.',400);
+        return gmdate('Y-m-d H:i:s',$ts);
+    }
 
     public static function issue_token(int $edition_id, int $object_id, string $operation, int $user_id = 0, int $ttl = 600) {
         global $wpdb;
