@@ -45,6 +45,6 @@ final class PLDR_Future_Citations {
     }
 
     private static function bibtex_escape(string $text): string {
-        return str_replace(array('\\','{','}','%','#','&','_'),array('\\textbackslash{}','\\{','\\}','\\%','\\#','\\&','\\_'),$text);
+        return strtr($text,array('\\'=>'\\textbackslash{}','{'=>'\\{','}'=>'\\}','%'=>'\\%','#'=>'\\#','&'=>'\\&','_'=>'\\_'));
     }
 }
