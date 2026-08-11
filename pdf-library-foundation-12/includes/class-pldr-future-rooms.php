@@ -25,7 +25,7 @@ final class PLDR_Future_Rooms {
         $status=$provider_ref?'active':'pending-provider';
         if($provider_ref){
             $updated=$wpdb->update(PLDR_Core::table('room_contexts'),array('provider_ref'=>$provider_ref,'status'=>'active','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
-            if(false===$updated)return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; the local pending context remains for reconciliation.',500,array('room_key'=>$room_key));
+            if(1!==$updated)return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; the local pending context remains for reconciliation.',500,array('room_key'=>$room_key));
         }
         PLDR_Core::emit('PDFReadingRoomRequested.v1','edition',$edition_id,array('room_key'=>$room_key,'document_id'=>$edition['public_id'],'page'=>$page,'provider_ref'=>$provider_ref));
         return array('room_key'=>$room_key,'status'=>$status,'provider_ref'=>$provider_ref,'source_bound'=>true,'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
@@ -45,12 +45,13 @@ final class PLDR_Future_Rooms {
         foreach(array('exact','selection') as $key){if(!empty($anchor[$key]))$texts[]=PLDR_Core::normalize_search((string)$anchor[$key]);}
         $texts=array_values(array_filter($texts,static fn(string $value):bool=>''!==$value));
         if(!$texts)return true;
-        foreach(PLDR_Future_Data::ocr_pages($edition_id) as $row){
-            if((int)($row['page_number']??0)!==$page)continue;
-            $haystack=PLDR_Core::normalize_search((string)($row['text_content']??''));
-            if(''===$haystack)break;
-            foreach($texts as $needle){if(false===strpos($haystack,$needle))return (bool)apply_filters('pldr_reading_room_anchor_allowed',false,$edition_id,$page,$anchor,$edition);}
-            return true;
+        $rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if($rows){
+            $haystack=PLDR_Core::normalize_search((string)($rows[0]['text_content']??''));
+            if(''!==$haystack){
+                foreach($texts as $needle){if(false===strpos($haystack,$needle))return (bool)apply_filters('pldr_reading_room_anchor_allowed',false,$edition_id,$page,$anchor,$edition);}
+                return true;
+            }
         }
         return (bool)apply_filters('pldr_reading_room_anchor_allowed',false,$edition_id,$page,$anchor,$edition);
     }
