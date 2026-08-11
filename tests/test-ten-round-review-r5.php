@@ -26,7 +26,8 @@ $preservation = $read('includes/class-pldr-future-preservation.php');
 // Round 1 — bounded bulk OCR and reflow.
 $must($data, 'BULK_OCR_LIMIT = 1000', 'Bulk OCR ceiling is missing.');
 $must($data, 'REFLOW_WINDOW_LIMIT = 100', 'Reflow window ceiling is missing.');
-$must($data, "'truncated'=>\$page===0&&\$ocr_total>count(\$items)", 'Reflow truncation disclosure is missing.');
+$must($data, "'truncated'=>\$truncated", 'Reflow truncation disclosure is missing.');
+$must($data, 'provider_input_truncated', 'Provider-backed reflow truncation disclosure is missing.');
 
 // Round 2 — aggregate accessibility scoring.
 $must($a11y, 'COUNT(*) page_count,AVG(quality_score) avg_quality', 'Accessibility scoring still depends on hydrating OCR text.');
