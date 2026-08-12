@@ -42,9 +42,10 @@ $must($fingerprint, 'pldr_fingerprint_ocr_read', 'Fingerprint OCR DB failure is 
 // Round 7 — visual derivative DB failure blocks incomplete fingerprint family persistence.
 $must($fingerprint, 'pldr_fingerprint_visual_read', 'Fingerprint visual-evidence DB failure is not explicit.');
 
-// Round 8 — current fingerprint evidence read failure cannot trigger recompute/comparison.
+// Round 8 — current fingerprint evidence read failure cannot trigger hidden compute/comparison.
 $must($fingerprint, 'pldr_fingerprint_current_read', 'Current fingerprint evidence DB failure is not explicit.');
-$must($fingerprint, 'scan_fingerprint_current_reread_failed', 'Post-compute fingerprint evidence reread failure is not explicit.');
+$must($fingerprint, 'pldr_fingerprint_required', 'Missing fingerprint evidence does not stop read-only candidate comparison pending explicit compute.');
+$must($fingerprint, "'missing_types'=>", 'Missing fingerprint evidence does not disclose which explicit compute inputs are required.');
 
 // Round 9 — comparison candidate-pool DB failure cannot become empty success.
 $must($fingerprint, 'pldr_fingerprint_candidate_read', 'Fingerprint candidate-pool DB failure is not explicit.');
