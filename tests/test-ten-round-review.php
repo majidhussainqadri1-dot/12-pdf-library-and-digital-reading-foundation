@@ -35,7 +35,8 @@ $futureJs = $read('assets/future-reader.js');
 // Pass 1: every private reading-state read revalidates current edition access.
 $contains($handoff, 'PLDR_Future_Data::require_edition($edition_id)', 'Pass 1 regression: handoff read lost edition-access revalidation.');
 $contains($reader, 'PLDR_Access::can_access_edition($edition_id, \'read\', $user_id)', 'Pass 1 regression: private reader state/items lost access revalidation.');
-$contains($reader, 'array_filter($rows,static fn(array $row):bool=>PLDR_Access::can_access_edition', 'Pass 1 regression: reading dashboard can disclose revoked-edition history.');
+$contains($reader, '$allowed=PLDR_Access::can_access_edition((int)$row[\'edition_id\'],\'read\',$uid);', 'Pass 1 regression: reading dashboard can disclose revoked-edition history.');
+$contains($reader, 'if($allowed)$visible[]=$row;', 'Pass 1 regression: reading dashboard access-filter append guard is missing.');
 $contains($fingerprint, 'self::can_inspect($other)', 'Pass 1 regression: fingerprint candidate disclosure is no longer filtered by current access.');
 
 // Pass 2: approved OCR corrections remain a derived overlay; base OCR is immutable.
