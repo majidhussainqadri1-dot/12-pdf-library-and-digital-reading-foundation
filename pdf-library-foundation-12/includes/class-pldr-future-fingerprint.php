@@ -50,19 +50,20 @@ final class PLDR_Future_Fingerprint {
         }
         $current=array_column($rowsCurrent,null,'fingerprint_type'); if(!$current)return array();
         $wpdb->last_error='';
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT f.*,e.document_id,e.edition_label,d.public_id,d.title FROM '.PLDR_Core::table('scan_fingerprints').' f JOIN '.PLDR_Core::table('editions').' e ON e.id=f.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE f.edition_id<>%d ORDER BY f.updated_at DESC LIMIT 1000',$edition_id),ARRAY_A);
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT f.*,e.document_id,e.edition_label,d.public_id,d.title FROM '.PLDR_Core::table('scan_fingerprints').' f JOIN '.PLDR_Core::table('editions').' e ON e.id=f.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE f.edition_id<>%d ORDER BY f.updated_at DESC LIMIT 1001',$edition_id),ARRAY_A);
         if(''!==(string)$wpdb->last_error){
             PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_candidate_read_failed',array('limit'=>1000));
             return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_candidate_read','Scan-fingerprint comparison evidence could not be read reliably; no empty candidate result was returned.',503,array('degraded'=>true)));
         }
         $rows=is_array($rows)?$rows:array();
+        if(count($rows)>1000)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_scan_truncated','Scan-fingerprint candidate evidence exceeds the bounded 1000-row review window; no misleading partial candidate list was returned.',409,array('scan_limit'=>1000,'source_truncated'=>true)));
         $grouped=array(); foreach($rows as $row)$grouped[(int)$row['edition_id']][]=$row;
-        $out=array();
+        $out=array();$candidate_seen=0;
         foreach($grouped as $otherId=>$fingerprints){$wpdb->last_error='';$other=PLDR_Core::edition((int)$otherId);if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_candidate_edition_read','Candidate edition state could not be read reliably; comparison was stopped.',503,array('degraded'=>true)));if(!$other||!self::can_inspect($other))continue;$visualDistance=null;$ocrDistance=null;$meta=false;$info=$fingerprints[0];foreach($fingerprints as $row){$meta=$meta||hash_equals((string)($current['ocr-simhash64']['metadata_hash']??$current['visual-ahash']['metadata_hash']??''),(string)$row['metadata_hash']);if('visual-ahash'===$row['fingerprint_type']&&isset($current['visual-ahash']))$visualDistance=self::hamming((string)$current['visual-ahash']['fingerprint_value'],(string)$row['fingerprint_value']);if('ocr-simhash64'===$row['fingerprint_type']&&isset($current['ocr-simhash64']))$ocrDistance=self::hamming((string)$current['ocr-simhash64']['fingerprint_value'],(string)$row['fingerprint_value']);}
             $isCandidate=($visualDistance!==null&&$visualDistance<=18)||($ocrDistance!==null&&$ocrDistance<=10)||$meta; if(!$isCandidate)continue;
             $class=($visualDistance!==null&&$visualDistance<=8)?'probable-same-scan-family':(($visualDistance!==null&&$visualDistance<=18)||($ocrDistance!==null&&$ocrDistance<=10)?'possible-same-scan-family':'metadata-similar');
+            $candidate_seen++;if($candidate_seen>50)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_results_truncated','More than 50 scan-family candidates matched; no misleading partial candidate list was returned.',409,array('candidate_limit'=>50,'results_truncated'=>true)));
             $out[]=array('edition_id'=>$otherId,'document_id'=>$info['public_id'],'title'=>$info['title'],'edition_label'=>$info['edition_label'],'visual_distance'=>$visualDistance,'ocr_distance'=>$ocrDistance,'metadata_match'=>$meta,'classification'=>$class,'automatic_merge'=>false);
-            if(count($out)>=50)break;
         }
         return $out;
     }
