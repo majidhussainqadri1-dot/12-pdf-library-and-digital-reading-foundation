@@ -6,7 +6,9 @@ final class PLDR_Future_Corpus {
     public static function manifest(int $edition_id,int $offset=0,int $limit=250):array {
         global $wpdb;
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return array('error'=>$edition);
-        $doc=PLDR_Core::document((int)$edition['document_id']);if(!$doc)return array('error'=>PLDR_Core::machine_error('pldr_corpus_document','Document not found.',404));
+        $doc=PLDR_Core::document((int)$edition['document_id']);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_corpus_document_read','AI corpus document classification could not be read reliably; corpus access was denied.',503,array('degraded'=>true)));
+        if(!$doc)return array('error'=>PLDR_Core::machine_error('pldr_corpus_document','Document not found.',404));
         try{
             $patient_case_allowed='patient-cases'!==$doc['category']||(bool)apply_filters('pldr_ai_patient_case_allowed',false,$edition_id,$doc);
             $allowed=(bool)apply_filters('pldr_ai_corpus_allowed',false,$edition_id,$edition,$doc);

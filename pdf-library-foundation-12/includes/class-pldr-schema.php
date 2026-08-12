@@ -44,10 +44,12 @@ final class PLDR_Schema {
         if (!is_string($payload) || '' === $payload) return null;
         if (add_option(self::MIGRATION_LOCK_OPTION, $payload, '', false)) return $payload;
 
+        $wpdb->last_error='';
         $row = $wpdb->get_var($wpdb->prepare(
             "SELECT option_value FROM {$wpdb->options} WHERE option_name=%s LIMIT 1",
             self::MIGRATION_LOCK_OPTION
         ));
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'migration_lock_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return null;}
         if (!is_string($row) || '' === $row) return null;
         $decoded = json_decode($row, true);
         $acquired_at = is_array($decoded) ? absint($decoded['acquired_at'] ?? 0) : absint($row);
@@ -57,17 +59,18 @@ final class PLDR_Schema {
             "UPDATE {$wpdb->options} SET option_value=%s WHERE option_name=%s AND option_value=%s",
             $payload, self::MIGRATION_LOCK_OPTION, $row
         ));
-        if (1 !== $updated) return null;
+        if (1 !== $updated) { if(false===$updated||''!==(string)$wpdb->last_error)PLDR_Core::audit('system',0,'migration_lock_takeover_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500))); return null; }
         wp_cache_delete(self::MIGRATION_LOCK_OPTION, 'options');
         return $payload;
     }
 
     private static function release_migration_lock(string $payload): void {
         global $wpdb;
-        $wpdb->query($wpdb->prepare(
+        $released=$wpdb->query($wpdb->prepare(
             "DELETE FROM {$wpdb->options} WHERE option_name=%s AND option_value=%s",
             self::MIGRATION_LOCK_OPTION, $payload
         ));
+        if(false===$released)PLDR_Core::audit('system',0,'migration_lock_release_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
         wp_cache_delete(self::MIGRATION_LOCK_OPTION, 'options');
     }
 

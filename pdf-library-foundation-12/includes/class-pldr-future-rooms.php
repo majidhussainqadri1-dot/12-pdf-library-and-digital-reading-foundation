@@ -52,7 +52,8 @@ final class PLDR_Future_Rooms {
             catch(Throwable $e){$compensation_failed=true;PLDR_Core::audit('room_context',$context_id,'provider_compensation_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_ref'=>$provider_ref),$uid);}
             return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; provider compensation was requested and the local context requires reconciliation.',500,array('room_key'=>$room_key,'compensation_failed'=>$compensation_failed));
         }
-        PLDR_Core::emit('PDFReadingRoomRequested.v1','edition',$edition_id,array('room_key'=>$room_key,'document_id'=>$edition['public_id'],'page'=>$page,'provider_ref'=>$provider_ref));
+        $event=PLDR_Core::emit('PDFReadingRoomRequested.v1','edition',$edition_id,array('room_key'=>$room_key,'document_id'=>$edition['public_id'],'page'=>$page,'provider_ref'=>$provider_ref));
+        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_room_event_reconcile','Reading-room provider context is active but its reliable integration event could not be persisted; reconciliation is required.',503,array('committed'=>true,'room_key'=>$room_key,'provider_ref'=>$provider_ref));
         return array('room_key'=>$room_key,'status'=>'active','provider_ref'=>$provider_ref,'source_bound'=>true,'selector_value_preserved'=>isset($anchor['value']),'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
     }
 

@@ -7,10 +7,14 @@ final class PLDR_Future_Data {
     private const REFLOW_WINDOW_LIMIT = 100;
 
     public static function require_edition(int $edition_id, string $operation = 'read') {
+        global $wpdb;
         $edition = PLDR_Core::edition($edition_id);
-        if (!$edition || !PLDR_Access::can_access_edition($edition_id, $operation, get_current_user_id())) {
-            return PLDR_Core::machine_error('pldr_future_forbidden', 'This document edition is unavailable for the requested advanced reading operation.', 403);
-        }
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_future_edition_read','Advanced-reader edition state could not be read reliably.',503,array('degraded'=>true));
+        if (!$edition) return PLDR_Core::machine_error('pldr_future_missing','This document edition was not found.',404);
+        $wpdb->last_error='';
+        $allowed=PLDR_Access::can_access_edition($edition_id,$operation,get_current_user_id());
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_future_access_read','Advanced-reader authorization state could not be verified reliably.',503,array('degraded'=>true));
+        if(!$allowed)return PLDR_Core::machine_error('pldr_future_forbidden','This document edition is unavailable for the requested advanced reading operation.',403);
         return $edition;
     }
 

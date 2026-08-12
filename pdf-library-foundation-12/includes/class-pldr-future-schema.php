@@ -32,6 +32,7 @@ final class PLDR_Future_Schema {
         $current = (string) get_option(self::LOCK_OPTION, '');
         $parts = explode(':', $current, 2); $locked_at = absint($parts[0] ?? 0);
         if ($locked_at && (time() - $locked_at) < 300) return null;
+        $wpdb->last_error='';
         $updated = $wpdb->query($wpdb->prepare(
             "UPDATE {$wpdb->options} SET option_value=%s WHERE option_name=%s AND option_value=%s",
             $token,
@@ -39,12 +40,14 @@ final class PLDR_Future_Schema {
             $current
         ));
         wp_cache_delete(self::LOCK_OPTION, 'options');
+        if(false===$updated||''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'future_migration_lock_takeover_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return null;}
         return 1 === $updated ? $token : null;
     }
 
     private static function release_lock(string $token): void {
         global $wpdb;
-        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name=%s AND option_value=%s", self::LOCK_OPTION, $token));
+        $released=$wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name=%s AND option_value=%s", self::LOCK_OPTION, $token));
+        if(false===$released)PLDR_Core::audit('system',0,'future_migration_lock_release_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
         wp_cache_delete(self::LOCK_OPTION, 'options');
     }
 

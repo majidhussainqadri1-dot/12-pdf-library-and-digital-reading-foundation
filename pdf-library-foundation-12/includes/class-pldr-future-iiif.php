@@ -7,8 +7,8 @@ final class PLDR_Future_IIIF {
 
     public static function manifest(string $public_id) {
         global $wpdb;
-        $doc=PLDR_Core::document_by_public_id($public_id);if(!$doc)return PLDR_Core::machine_error('pldr_iiif_missing','Document not found.',404);
-        $edition=PLDR_Core::current_edition((int)$doc['id']);if(!$edition||!PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id()))return PLDR_Core::machine_error('pldr_iiif_forbidden','IIIF manifest is unavailable for this document.',404);
+        $doc=PLDR_Core::document_by_public_id($public_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_iiif_document_read','IIIF document state could not be read reliably.',503,array('degraded'=>true));if(!$doc)return PLDR_Core::machine_error('pldr_iiif_missing','Document not found.',404);
+        $edition=PLDR_Core::current_edition((int)$doc['id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_iiif_edition_read','IIIF edition state could not be read reliably.',503,array('degraded'=>true));if(!$edition||!PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id()))return PLDR_Core::machine_error('pldr_iiif_forbidden','IIIF manifest is unavailable for this document.',404);
         try {
             $canvas_limit=(int)apply_filters('pldr_iiif_canvas_limit',500,(int)$edition['id']);
             $preview_grant_limit=(int)apply_filters('pldr_iiif_preview_grant_limit',self::PREVIEW_GRANT_LIMIT,(int)$edition['id']);

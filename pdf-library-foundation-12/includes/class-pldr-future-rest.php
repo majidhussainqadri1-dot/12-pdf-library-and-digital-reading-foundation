@@ -81,9 +81,7 @@ final class PLDR_Future_REST {
     private static function idempotent(WP_REST_Request $request, string $route, callable $callback) {
         $key = substr(sanitize_text_field((string) $request->get_header('Idempotency-Key')), 0, 200);
         if ('' === $key) {
-            try{$result=$callback();}catch(Throwable $e){PLDR_Core::audit('rest',0,'future_mutation_callback_failed',array('route'=>$route));return PLDR_Core::machine_error('pldr_future_mutation_failed','The requested mutation failed before completion.',500);}
-            if(is_array($result)&&isset($result['error'])&&is_wp_error($result['error']))$result=$result['error'];
-            return is_wp_error($result)?$result:rest_ensure_response($result);
+            return PLDR_Core::machine_error('pldr_future_idempotency_required','This Future-24 mutation requires an Idempotency-Key.',428);
         }
         $actor = get_current_user_id();
         $route = 'future-' . $route;
@@ -147,7 +145,7 @@ final class PLDR_Future_REST {
     }
     public static function preferences_get(WP_REST_Request $r) { return self::response(PLDR_Future_Preferences::get((string)($r['key']?:'reader'))); }
     public static function preferences_save(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'preferences-save',static fn()=>PLDR_Future_Preferences::save((string)($b['key']??'reader'),(array)($b['value']??array()),absint($b['expected_version']??0))); }
-    public static function shelves() { return self::response(array('items'=>PLDR_Future_Shelves::list(),'private'=>true)); }
+    public static function shelves() { $items=PLDR_Future_Shelves::list();if(isset($items['error'])&&is_wp_error($items['error']))return $items['error'];return self::response(array('items'=>$items,'private'=>true)); }
     public static function shelf_create(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-create',static fn()=>PLDR_Future_Shelves::create((string)($b['name']??''))); }
     public static function shelf_add(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-add',static fn()=>PLDR_Future_Shelves::add(absint($r['id']),absint($b['edition_id']??0))); }
     public static function shelf_rename(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-rename',static fn()=>PLDR_Future_Shelves::rename(absint($r['id']),(string)($b['name']??''))); }
@@ -164,6 +162,6 @@ final class PLDR_Future_REST {
     public static function corpus(WP_REST_Request $r) { $limit=absint($r['limit']);if(!$limit)$limit=250;return self::response(PLDR_Future_Corpus::manifest(absint($r['edition']),absint($r['offset']),$limit)); }
     public static function derive_text(WP_REST_Request $r) { $b=self::body($r);return self::response(PLDR_Future_Derived_Text::derive(absint($b['edition_id']??0),absint($b['page']??0),(string)($b['text']??''),(string)($b['mode']??''),(string)($b['target']??''))); }
     public static function preservation(WP_REST_Request $r) { return self::response(PLDR_Future_Preservation::assess(absint($r['edition']),!empty($r['verify']))); }
-    public static function duplicates(WP_REST_Request $r) { return self::response(array('items'=>PLDR_Future_Fingerprint::candidates(absint($r['edition'])),'automatic_merge'=>false)); }
+    public static function duplicates(WP_REST_Request $r) { $items=PLDR_Future_Fingerprint::candidates(absint($r['edition']));if(isset($items['error'])&&is_wp_error($items['error']))return $items['error'];return self::response(array('items'=>$items,'automatic_merge'=>false)); }
     public static function fingerprint(WP_REST_Request $r) { return self::idempotent($r,'fingerprint',static fn()=>PLDR_Future_Fingerprint::compute_and_store(absint($r['edition']))); }
 }

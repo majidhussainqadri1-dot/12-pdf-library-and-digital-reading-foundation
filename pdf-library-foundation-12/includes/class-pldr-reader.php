@@ -128,7 +128,8 @@ final class PLDR_Reading {
         $percent = round(($page / $pages) * 100, 2);
         $ok = $wpdb->replace(PLDR_Core::table('reading_state'), array('user_id' => $user_id, 'edition_id' => $edition_id, 'last_page' => $page, 'percent' => $percent, 'edition_version' => (int) $edition['version'], 'updated_at' => PLDR_Core::now()), array('%d','%d','%d','%f','%d','%s'));
         if (false === $ok) return PLDR_Core::machine_error('pldr_progress_store', 'Reading progress could not be saved.', 500);
-        PLDR_Core::emit('ReadingProgressUpdated.v1', 'edition', $edition_id, array('user_id' => $user_id, 'edition_id' => $edition_id, 'page' => $page, 'percent' => $percent));
+        $event=PLDR_Core::emit('ReadingProgressUpdated.v1', 'edition', $edition_id, array('user_id' => $user_id, 'edition_id' => $edition_id, 'page' => $page, 'percent' => $percent));
+        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_progress_event_reconcile','Reading progress was saved but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'edition_id'=>$edition_id,'page'=>$page));
         return array('page' => $page, 'percent' => $percent, 'updated_at' => PLDR_Core::now());
     }
 

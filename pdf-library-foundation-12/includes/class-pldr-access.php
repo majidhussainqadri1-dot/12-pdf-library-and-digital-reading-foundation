@@ -84,7 +84,8 @@ final class PLDR_Access {
         $revoked=PLDR_Access::revoke_document($document_id,'access-policy-change');
         if($revoked<0)return PLDR_Core::machine_error('pldr_policy_revoke_reconcile','Access policy was committed but prior delivery grants could not be revoked; reconciliation is required before retry.',503,array('committed'=>true,'policy_version'=>$row['version']));
         PLDR_Core::audit('document',$document_id,'access_policy_updated',array('version'=>$row['version'],'audience'=>$audience),$actor_id);
-        PLDR_Core::emit('PDFDocumentAccessChanged.v1','document',$document_id,array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience));
+        $event=PLDR_Core::emit('PDFDocumentAccessChanged.v1','document',$document_id,array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience));
+        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_policy_event_reconcile','Access policy was committed but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'policy_version'=>$row['version']));
         return array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience);
     }
 

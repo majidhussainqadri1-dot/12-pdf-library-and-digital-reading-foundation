@@ -129,39 +129,54 @@ final class PLDR_Core {
         return trim((string) preg_replace('/\s+/u', ' ', $text));
     }
 
-    public static function audit(string $object_type, int $object_id, string $action, array $context = array(), int $actor_id = 0): void {
+    public static function audit(string $object_type, int $object_id, string $action, array $context = array(), int $actor_id = 0): bool {
         global $wpdb;
         $actor_id = $actor_id ?: get_current_user_id();
         $safe = array();
         foreach ($context as $key => $value) {
             if (preg_match('/secret|token|password|key|patient|note_text/i', (string) $key)) continue;
-            $safe[sanitize_key((string) $key)] = is_scalar($value) ? (string) $value : wp_json_encode($value);
+            $safe_key=sanitize_key((string)$key);if(''===$safe_key)continue;
+            if(is_scalar($value)||null===$value)$safe[$safe_key]=(string)$value;
+            else{$encoded=wp_json_encode($value);$safe[$safe_key]=is_string($encoded)?$encoded:'[unencodable-context]';}
         }
-        $wpdb->insert(self::table('audit'), array(
+        $context_json=wp_json_encode($safe);
+        if(!is_string($context_json)){error_log('[PLDR]['.self::trace_id().'] audit-context-encode-failed '.sanitize_key($action));return false;}
+        $ok=$wpdb->insert(self::table('audit'), array(
             'trace_id' => self::trace_id(),
             'object_type' => sanitize_key($object_type),
             'object_id' => $object_id,
             'action' => sanitize_key($action),
             'actor_id' => $actor_id,
-            'context_json' => wp_json_encode($safe),
+            'context_json' => $context_json,
             'created_at' => self::now(),
         ), array('%s', '%s', '%d', '%s', '%d', '%s', '%s'));
+        if(false===$ok){error_log('[PLDR]['.self::trace_id().'] audit-store-failed '.sanitize_key($action));return false;}
+        return true;
     }
 
-    public static function emit(string $event_name, string $aggregate_type, int $aggregate_id, array $payload): string {
+    public static function emit(string $event_name, string $aggregate_type, int $aggregate_id, array $payload) {
         global $wpdb;
         $event_id = self::uuid();
-        $wpdb->insert(self::table('outbox'), array(
+        $payload_json = wp_json_encode($payload);
+        if (!is_string($payload_json)) {
+            error_log('[PLDR][' . self::trace_id() . '] outbox-payload-encode-failed ' . sanitize_text_field($event_name));
+            return self::machine_error('pldr_outbox_encode','Reliable event payload could not be encoded; reconciliation is required.',500,array('event_name'=>sanitize_text_field($event_name)));
+        }
+        $ok=$wpdb->insert(self::table('outbox'), array(
             'event_id' => $event_id,
             'event_name' => sanitize_text_field($event_name),
             'aggregate_type' => sanitize_key($aggregate_type),
             'aggregate_id' => $aggregate_id,
-            'payload_json' => wp_json_encode($payload),
+            'payload_json' => $payload_json,
             'status' => 'pending',
             'attempts' => 0,
             'available_at' => self::now(),
             'created_at' => self::now(),
         ), array('%s', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s'));
+        if(false===$ok){
+            error_log('[PLDR][' . self::trace_id() . '] outbox-store-failed ' . sanitize_text_field($event_name));
+            return self::machine_error('pldr_outbox_store','Reliable event could not be persisted; reconciliation is required.',503,array('event_name'=>sanitize_text_field($event_name)));
+        }
         return $event_id;
     }
 

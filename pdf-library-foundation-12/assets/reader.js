@@ -41,7 +41,7 @@
   };
   const saveProgress = async () => {
     try {
-      await api('reading/progress', {method: 'POST', body: {edition_id: cfg.editionId, page}, headers: {'Idempotency-Key': `progress-${cfg.editionId}-${page}`}});
+      await api('reading/progress', {method: 'POST', body: {edition_id: cfg.editionId, page}, headers: {'Idempotency-Key': crypto.randomUUID?.() || `progress-${cfg.editionId}-${page}-${Date.now()}-${Math.random()}`}});
       say(cfg.strings?.saved || 'Saved privately.');
     } catch (error) { say(error.message); }
   };
@@ -60,7 +60,7 @@
     if (action === 'fit') { zoom = 'page-width'; updateFrame(); }
     if (action === 'fullscreen') { try { await root.requestFullscreen(); } catch (e) { say(e.message); } }
     if (action === 'bookmark') {
-      try { await api('reading/items', {method:'POST',body:{edition_id:cfg.editionId,type:'bookmark',page},headers:{'Idempotency-Key':`bookmark-${cfg.editionId}-${page}`}}); say('Bookmark saved privately.'); loadPrivateItems(); } catch(e){ say(e.message); }
+      try { await api('reading/items', {method:'POST',body:{edition_id:cfg.editionId,type:'bookmark',page},headers:{'Idempotency-Key':crypto.randomUUID?.()||`bookmark-${cfg.editionId}-${page}-${Date.now()}-${Math.random()}`}}); say('Bookmark saved privately.'); loadPrivateItems(); } catch(e){ say(e.message); }
     }
     if (action === 'note') {
       const note = window.prompt('Private note for this page:');
@@ -119,7 +119,7 @@
       if (!result.items?.length) { privateItems.innerHTML=''; return; }
       const section=document.createElement('section'); section.innerHTML='<h2>Private bookmarks and notes</h2>';
       const ul=document.createElement('ul');
-      result.items.forEach((item)=>{const li=document.createElement('li');const jump=document.createElement('button');jump.type='button';jump.textContent=`${item.item_type} · page ${item.page_number}`;jump.addEventListener('click',()=>setPage(item.page_number));li.appendChild(jump);if(item.note_text){const span=document.createElement('span');span.textContent=` — ${item.note_text}`;li.appendChild(span);}const del=document.createElement('button');del.type='button';del.textContent='Delete';del.addEventListener('click',async()=>{await api(`reading/items/${item.id}`,{method:'DELETE'});loadPrivateItems();});li.appendChild(del);ul.appendChild(li);});section.appendChild(ul);privateItems.replaceChildren(section);
+      result.items.forEach((item)=>{const li=document.createElement('li');const jump=document.createElement('button');jump.type='button';jump.textContent=`${item.item_type} · page ${item.page_number}`;jump.addEventListener('click',()=>setPage(item.page_number));li.appendChild(jump);if(item.note_text){const span=document.createElement('span');span.textContent=` — ${item.note_text}`;li.appendChild(span);}const del=document.createElement('button');del.type='button';del.textContent='Delete';del.addEventListener('click',async()=>{await api(`reading/items/${item.id}`,{method:'DELETE',headers:{'Idempotency-Key':crypto.randomUUID?.()||`delete-${item.id}-${Date.now()}-${Math.random()}`}});loadPrivateItems();});li.appendChild(del);ul.appendChild(li);});section.appendChild(ul);privateItems.replaceChildren(section);
     } catch(e){ /* private overlays degrade without blocking reading */ }
   };
 
