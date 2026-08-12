@@ -278,6 +278,33 @@ final class PLDR_Core {
         return new WP_Error($code, $message, array_merge(array('status' => $status, 'trace_id' => self::trace_id()), $extra));
     }
 
+    public static function consume_mutation_rate(string $route,int $actor_id=0,int $default_limit=600) {
+        global $wpdb;
+        $route=substr(sanitize_key(str_replace('/','-',$route)),0,120);
+        if(''===$route)$route='mutation';
+        $actor_id=$actor_id?:get_current_user_id();
+        if($actor_id>0)$identity='u:'.$actor_id;
+        else{
+            $ip=sanitize_text_field((string)($_SERVER['REMOTE_ADDR']??'unknown'));
+            $ua=substr(sanitize_text_field((string)($_SERVER['HTTP_USER_AGENT']??'unknown')),0,300);
+            $identity='a:'.hash_hmac('sha256',$ip.'|'.$ua,wp_salt('auth'));
+        }
+        $scope=hash('sha256',$identity.'|'.$route);
+        $bucket='pldr_mut_rate_'.substr(hash('sha256',$scope.'|'.gmdate('YmdH')),0,32);
+        $lock='pldr_mut_rate_'.substr($scope,0,32);
+        $wpdb->last_error='';$locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,1)',$lock));
+        if(''!==(string)$wpdb->last_error||1!==$locked)return self::machine_error('pldr_mutation_rate_lock','Mutation abuse-protection state is temporarily unavailable; no mutation was executed.',503,array('retry_after'=>2));
+        try{
+            $count=(int)get_transient($bucket);
+            try{$limit=(int)apply_filters('pldr_mutation_hourly_limit',$default_limit,$route,$actor_id);}
+            catch(Throwable $e){self::audit('mutation',0,'mutation_rate_policy_provider_failed',array('route'=>$route,'provider_failure'=>true),$actor_id);return self::machine_error('pldr_mutation_rate_policy','Mutation rate policy could not be verified; no mutation was executed.',503,array('degraded'=>true,'provider_failure'=>true));}
+            $limit=max(60,min(5000,$limit));
+            if($count>=$limit)return self::machine_error('pldr_mutation_rate_limit','This mutation is temporarily rate limited.',429,array('retry_after'=>60,'hourly_limit'=>$limit));
+            if(!set_transient($bucket,$count+1,HOUR_IN_SECONDS+120))return self::machine_error('pldr_mutation_rate_store','Mutation rate state could not be stored; no mutation was executed.',503);
+            return array('allowed'=>true,'hourly_limit'=>$limit,'remaining'=>max(0,$limit-$count-1));
+        }finally{$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
+    }
+
     public static function request_fingerprint(WP_REST_Request $request): string {
         $files=array();
         foreach((array)$request->get_file_params() as $name=>$file){

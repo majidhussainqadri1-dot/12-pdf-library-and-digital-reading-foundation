@@ -47,6 +47,8 @@ final class PLDR_REST {
         if('conflict'===($claim['state']??''))return PLDR_Core::machine_error('pldr_idempotency_conflict','This Idempotency-Key was already used for a different request payload.',409);
         if('pending'===($claim['state']??''))return PLDR_Core::machine_error('pldr_idempotency_in_progress','A request with this Idempotency-Key is already in progress.',409,array('retry_after'=>2));
         if('reserved'!==($claim['state']??''))return PLDR_Core::machine_error('pldr_idempotency_unavailable','Idempotency protection could not be reserved; the mutation was not executed.',503);
+        $rate=PLDR_Core::consume_mutation_rate('core-'.$route,$actor,600);
+        if(is_wp_error($rate)){if(!PLDR_Core::idempotency_abort($route,$key,$actor))PLDR_Core::audit('mutation',0,'idempotency_abort_after_rate_failure',array('route'=>$route),$actor);return $rate;}
         try {
             $result=$callback();
         } catch (Throwable $e) {
