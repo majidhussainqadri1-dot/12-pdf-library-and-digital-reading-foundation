@@ -48,31 +48,23 @@ final class PLDR_Health {
     }
 
     public static function integrity_sample(int $limit = 3): array {
-        global $wpdb;
-        $wpdb->last_error='';
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT * FROM " . PLDR_Core::table('objects') . " WHERE object_status='available' ORDER BY COALESCE(verified_at,'1970-01-01') ASC,id ASC LIMIT %d",
-                max(1, min(20, $limit))
-            ),
-            ARRAY_A
-        );
-        if(''!==(string)$wpdb->last_error)return array('operation'=>'integrity-sample','results'=>array(),'error'=>'Integrity-sample object state could not be read reliably.');
-        $rows=is_array($rows)?$rows:array();
-        $results = array();
-        foreach ($rows as $object) {
-            $path = PLDR_Storage::path((string) $object['storage_name'], (string) $object['storage_scope']);
-            $error = '';
-            $ok = !is_wp_error($path) && PLDR_Crypto::verify_file((string) $path, (string) $object['sha256'], $error);
-            $results[] = array('object_id' => (int) $object['id'], 'ok' => $ok, 'error' => $ok ? '' : $error);
-            if ($ok) {
-                $wpdb->update(PLDR_Core::table('objects'), array('verified_at' => PLDR_Core::now()), array('id' => (int) $object['id']));
-            } else {
-                $wpdb->update(PLDR_Core::table('objects'), array('object_status' => 'quarantined'), array('id' => (int) $object['id']));
-                PLDR_Core::audit('object', (int) $object['id'], 'integrity_quarantined', array('reason' => $error));
+        global $wpdb;$wpdb->last_error='';
+        $rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM ".PLDR_Core::table('objects')." WHERE object_status='available' ORDER BY COALESCE(verified_at,'1970-01-01') ASC,id ASC LIMIT %d",max(1,min(20,$limit))),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('operation'=>'integrity-sample','results'=>array(),'error'=>'Integrity-sample object state could not be read reliably.');$rows=is_array($rows)?$rows:array();$results=array();
+        foreach($rows as $object){
+            $object_id=(int)$object['id'];$path=PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);$error='';$ok=!is_wp_error($path)&&PLDR_Crypto::verify_file((string)$path,(string)$object['sha256'],$error);
+            if($ok){
+                $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET verified_at=%s WHERE id=%d AND object_status=%s AND storage_name=%s AND key_id=%s AND encrypted_sha256=%s',PLDR_Core::now(),$object_id,'available',(string)$object['storage_name'],(string)$object['key_id'],(string)$object['encrypted_sha256']));
+                if(1!==$updated){PLDR_Core::audit('object',$object_id,'integrity_verify_reconcile_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Object state changed while integrity verification was being persisted; retry required.','verification_persisted'=>false);continue;}
+                $results[]=array('object_id'=>$object_id,'ok'=>true,'error'=>'','verification_persisted'=>true);continue;
             }
+            $changed=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s AND storage_name=%s AND key_id=%s AND encrypted_sha256=%s','quarantined',PLDR_Core::now(),$object_id,'available',(string)$object['storage_name'],(string)$object['key_id'],(string)$object['encrypted_sha256']));
+            if(1===$changed){PLDR_Core::audit('object',$object_id,'integrity_quarantined',array('reason'=>$error));$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>$error,'quarantine_persisted'=>true);continue;}
+            $wpdb->last_error='';$current=PLDR_Core::object($object_id);if(''!==(string)$wpdb->last_error){PLDR_Core::audit('object',$object_id,'integrity_quarantine_reconcile_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Integrity failed and quarantine persistence could not be reconciled.','quarantine_persisted'=>false);continue;}
+            if($current&&'quarantined'===(string)$current['object_status']){$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>$error,'quarantine_persisted'=>true,'concurrent_quarantine'=>true);continue;}
+            PLDR_Core::audit('object',$object_id,'integrity_quarantine_reconcile_failed',array('state_changed'=>true));$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Integrity failed but object state changed concurrently; quarantine was not falsely claimed.','quarantine_persisted'=>false);
         }
-        return array('operation' => 'integrity-sample', 'results' => $results);
+        return array('operation'=>'integrity-sample','results'=>$results,'cas_persistence'=>true);
     }
 }
 
