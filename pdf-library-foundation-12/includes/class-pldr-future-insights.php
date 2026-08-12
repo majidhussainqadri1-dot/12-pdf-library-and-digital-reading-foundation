@@ -62,7 +62,7 @@ final class PLDR_Future_Insights {
         }
         $completed_rows=is_array($completed_rows)?$completed_rows:array();
         $completed=0;$completion_scan_truncated=count($completed_rows)>self::COMPLETION_SCAN_LIMIT;if($completion_scan_truncated)$completed_rows=array_slice($completed_rows,0,self::COMPLETION_SCAN_LIMIT);
-        foreach($completed_rows as $edition_id)if(PLDR_Access::can_access_edition((int)$edition_id,'read',$uid))$completed++;
+        foreach($completed_rows as $edition_id){$wpdb->last_error='';$allowed=PLDR_Access::can_access_edition((int)$edition_id,'read',$uid);if(''!==(string)$wpdb->last_error){PLDR_Core::audit('user',$uid,'reading_insights_completion_access_failed',array('edition_id'=>(int)$edition_id,'days'=>$days),$uid);return array('error'=>PLDR_Core::machine_error('pldr_insight_completion_access','Private reading-completion authorization could not be verified reliably; no partial completion count was returned.',503,array('degraded'=>true)));}if($allowed)$completed++;}
         return array(
             'days'=>$days,
             'reading_seconds'=>$seconds,
