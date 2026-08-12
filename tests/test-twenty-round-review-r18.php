@@ -18,7 +18,7 @@ $privacy=$read('includes/class-pldr-privacy.php');
 
 // Round 1.
 $must($rights,'pldr_case_precondition','rights decision expected_version precondition missing.');
-$must($rights,"$expected_version<1",'rights decision missing-version guard missing.');
+$must($rights,'if($expected_version<1)','rights decision missing-version guard missing.');
 // Round 2.
 $must($rights,'pldr_approve_precondition','publication approval expected_version precondition missing.');
 $must($rights,'pldr_approve_document_read','publication document read failure is not explicit.');
@@ -28,12 +28,12 @@ $must($rights,'pldr_approve_object_read','publication object read failure is not
 $must($access,'rights_expiry_invalid','malformed rights-expiry fail-closed marker missing.');
 $must($access,'$rights_ts<=time()&&!$curator','request-time rights-expiry enforcement missing.');
 // Round 4.
-$must($rest,"self::idempotent($request,'reader-access'",'reader-access durable grant is not idempotent.');
+$must($rest,'self::idempotent($request,\'reader-access\'','reader-access durable grant is not idempotent.');
 // Round 5.
-$must($rest,"self::idempotent($request,'download-session'",'download-session durable grant is not idempotent.');
+$must($rest,'self::idempotent($request,\'download-session\'','download-session durable grant is not idempotent.');
 // Round 6.
 $must($core,'public static function consume_mutation_rate','shared mutation rate limiter missing.');
-$must($rest,"consume_mutation_rate('core-'.$route",'core mutation wrapper does not enforce the shared rate limiter.');
+$must($rest,'consume_mutation_rate(\'core-\'.$route','core mutation wrapper does not enforce the shared rate limiter.');
 $must($core,'pldr_mutation_rate_limit','core mutation 429 path missing.');
 // Round 7.
 $must($frest,'$rate=PLDR_Core::consume_mutation_rate($route,$actor,600)','Future-24 mutation wrapper lacks shared abuse ceiling.');
@@ -46,7 +46,7 @@ $must($insights,'no partial aggregate was returned','reading-insight partial-res
 $must($insights,'pldr_insight_completion_access','completion authorization DB failure can still undercount silently.');
 // Round 11.
 $must($shelves,'Shelf rename requires the exact expected shelf version.','shelf rename client precondition missing.');
-$must($frest,"absint($b['expected_version']??0)",'Future shelf mutations do not accept expected_version.');
+$must($frest,'absint($b[\'expected_version\']??0)','Future shelf mutations do not accept expected_version.');
 // Round 12.
 $must($shelves,'Shelf deletion requires the exact expected shelf version.','shelf deletion client precondition missing.');
 // Round 13.
@@ -58,14 +58,14 @@ $must($shelves,'public static function remove_item(int $shelf_id,int $edition_id
 $must($reader,'encode_catalog_cursor','signed catalog cursor encoder missing.');
 $must($reader,'decode_catalog_cursor','signed catalog cursor decoder missing.');
 $must($reader,'pldr_catalog_cursor_required','deep legacy traversal is not forced onto the cursor path.');
-$must($reader,"ORDER BY d.updated_at DESC,d.id DESC LIMIT %d",'catalog keyset ordering/bound missing.');
-$must($rest,"'cursor'=>array('sanitize_callback'=>'sanitize_text_field')",'catalog REST cursor argument missing.');
+$must($reader,'ORDER BY d.updated_at DESC,d.id DESC LIMIT %d','catalog keyset ordering/bound missing.');
+$must($rest,'\'cursor\'=>array(\'sanitize_callback\'=>\'sanitize_text_field\')','catalog REST cursor argument missing.');
 $must($reader,'pldr_catalog_query_long','catalog normalized query length bound missing.');
 // Round 15.
-$must($data,"consume_provider_rate('reflow'",'reflow provider rate limit missing.');
+$must($data,'consume_provider_rate(\'reflow\'','reflow provider rate limit missing.');
 $must($data,'pldr_provider_rate_limit','Future provider 429 path missing.');
 // Round 16.
-$must($data,"consume_provider_rate('outline'",'outline provider rate limit missing.');
+$must($data,'consume_provider_rate(\'outline\'','outline provider rate limit missing.');
 // Round 17.
 $must($fingerprint,'pldr_fingerprint_scan_truncated','fingerprint source truncation is not fail-visible.');
 $must($fingerprint,'pldr_fingerprint_results_truncated','fingerprint candidate-result truncation is not fail-visible.');
@@ -73,15 +73,15 @@ $must($fingerprint,'LIMIT 1001','fingerprint truncation probe is missing.');
 // Round 18.
 $must($access,'$batch=500','token/idempotency cleanup is not bounded.');
 $must($rights,'ORDER BY e.rights_expires_at ASC LIMIT 100','rights-expiry job is not bounded.');
-$must($admin,"$limit=100",'search-index repair batch bound missing.');
+$must($admin,'$limit=100','search-index repair batch bound missing.');
 $must($admin,'pldr_search_repair_state','search-index repair is not resumable.');
 $must($rights,'outbox_payload_corrupt','corrupt outbox payloads are not quarantined/dead-lettered.');
-$must($rights,"'invalid-payload-json'",'corrupt outbox payload dead-letter marker missing.');
+$must($rights,'\'invalid-payload-json\'','corrupt outbox payload dead-letter marker missing.');
 // Round 19.
 $must($admin,'cas_persistence','integrity sampling CAS persistence disclosure missing.');
 $must($admin,'integrity_verify_reconcile_failed','integrity verification stale-state reconciliation missing.');
 $must($admin,'integrity_quarantine_reconcile_failed','integrity quarantine stale-state reconciliation missing.');
-$must($admin,"AND object_status=%s AND storage_name=%s AND key_id=%s AND encrypted_sha256=%s",'integrity persistence is not bound to sampled object state.');
+$must($admin,'AND object_status=%s AND storage_name=%s AND key_id=%s AND encrypted_sha256=%s','integrity persistence is not bound to sampled object state.');
 // Round 20.
 $must($privacy,'pldr-future-shelf-items','Smart Shelf membership is missing from privacy export.');
 $must($privacy,'subject_ref','erasure completion audit still records raw subject ID.');
