@@ -15,6 +15,12 @@ final class PLDR_Access {
         if ('restricted' === $edition['document_status'] && !PLDR_Core::authorize('read_private', (int) $edition['document_id'], $user_id)) return false;
         $policy = PLDR_Core::policy((int) $edition['document_id']);
         if (!$policy) return false;
+        if(!empty($edition['rights_expires_at'])){
+            $rights_raw=(string)$edition['rights_expires_at'];$rights_ts=strtotime($rights_raw);
+            $curator=PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id)||PLDR_Core::authorize('rights',(int)$edition['document_id'],$user_id);
+            if(false===$rights_ts){PLDR_Core::audit('edition',$edition_id,'rights_expiry_invalid',array('document_id'=>(int)$edition['document_id']),$user_id);if(!$curator)return false;}
+            elseif($rights_ts<=time()&&!$curator)return false;
+        }
         if (!empty($policy['embargo_until']) && strtotime((string) $policy['embargo_until']) > time() && !PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id)) return false;
         if ('download' === $operation && empty($policy['download_allowed'])) return false;
         if ('print' === $operation && empty($policy['print_allowed'])) return false;
