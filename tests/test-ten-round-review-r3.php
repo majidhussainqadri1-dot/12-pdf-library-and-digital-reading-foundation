@@ -55,10 +55,11 @@ $must($fingerprint, 'ocr_pages_sampled', 'Fingerprint sample-size disclosure mis
 $must($annotations, 'source_required', 'Annotation import does not disclose mandatory source binding.');
 $must($annotations, "''===\$source||untrailingslashit", 'Missing annotation source is not rejected.');
 
-// Round 9 — logical pagination must happen after entitlement filtering.
-$must($reader, '$logical_offset = ($page - 1) * $per_page;', 'Logical access-filtered pagination offset missing.');
+// Round 9 — logical pagination still happens after entitlement filtering; R18 adds signed cursor/keyset continuation.
+$must($reader, '$logical_offset=$cursor_token?0:(($page-1)*$per_page);', 'Logical access-filtered pagination offset/cursor compatibility missing.');
 $must($reader, 'access_filtered_pagination', 'Access-filtered pagination disclosure missing.');
 $must($reader, 'scan_truncated', 'Bounded search scan does not disclose truncation.');
+$must($reader, 'cursor_supported', 'Signed cursor pagination capability missing.');
 $mustNot($reader, '$params[] = $per_page * 3;', 'Legacy pre-entitlement raw pagination returned.');
 
 // Round 10 — persistence must succeed before appeal/book-pack events are emitted.
