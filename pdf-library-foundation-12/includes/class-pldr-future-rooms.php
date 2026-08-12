@@ -45,15 +45,33 @@ final class PLDR_Future_Rooms {
             if(false===$pending)return PLDR_Core::machine_error('pldr_room_pending_store','Reading-room provider state could not be persisted; reconciliation is required.',500,array('room_key'=>$room_key));
             return PLDR_Core::machine_error('pldr_room_provider','No approved reading-room provider accepted the request; the local context remains pending.',503,array('room_key'=>$room_key,'degraded'=>true));
         }
+        if(false===$wpdb->query('START TRANSACTION')){
+            try{do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,'local-transaction-start-failed');}catch(Throwable $e){PLDR_Core::audit('room_context',$context_id,'provider_compensation_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_ref'=>$provider_ref),$uid);}
+            return PLDR_Core::machine_error('pldr_room_transaction','Reading-room finalization transaction could not be started; provider compensation was requested.',500,array('room_key'=>$room_key));
+        }
         $updated=$wpdb->update(PLDR_Core::table('room_contexts'),array('provider_ref'=>$provider_ref,'status'=>'active','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid,'status'=>'pending-provider'));
         if(1!==$updated){
+            $wpdb->query('ROLLBACK');
             $compensation_failed=false;
             try{do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,'local-provider-reference-persistence-failed');}
             catch(Throwable $e){$compensation_failed=true;PLDR_Core::audit('room_context',$context_id,'provider_compensation_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_ref'=>$provider_ref),$uid);}
             return PLDR_Core::machine_error('pldr_room_provider_store','Reading-room provider reference could not be persisted; provider compensation was requested and the local context requires reconciliation.',500,array('room_key'=>$room_key,'compensation_failed'=>$compensation_failed));
         }
         $event=PLDR_Core::emit('PDFReadingRoomRequested.v1','edition',$edition_id,array('room_key'=>$room_key,'document_id'=>$edition['public_id'],'page'=>$page,'provider_ref'=>$provider_ref));
-        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_room_event_reconcile','Reading-room provider context is active but its reliable integration event could not be persisted; reconciliation is required.',503,array('committed'=>true,'room_key'=>$room_key,'provider_ref'=>$provider_ref));
+        if(is_wp_error($event)){
+            $wpdb->query('ROLLBACK');
+            $compensation_failed=false;
+            try{do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,'atomic-event-persistence-failed');}
+            catch(Throwable $e){$compensation_failed=true;PLDR_Core::audit('room_context',$context_id,'provider_compensation_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_ref'=>$provider_ref),$uid);}
+            return PLDR_Core::machine_error('pldr_room_event_atomic','Reading-room activation was rolled back because its reliable event could not be persisted atomically; provider compensation was requested.',503,array('committed'=>false,'room_key'=>$room_key,'compensation_failed'=>$compensation_failed));
+        }
+        if(false===$wpdb->query('COMMIT')){
+            $wpdb->query('ROLLBACK');
+            $compensation_failed=false;
+            try{do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,'atomic-local-commit-failed');}
+            catch(Throwable $e){$compensation_failed=true;PLDR_Core::audit('room_context',$context_id,'provider_compensation_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_ref'=>$provider_ref),$uid);}
+            return PLDR_Core::machine_error('pldr_room_commit','Reading-room activation could not be committed atomically; provider compensation was requested.',500,array('room_key'=>$room_key,'compensation_failed'=>$compensation_failed));
+        }
         return array('room_key'=>$room_key,'status'=>'active','provider_ref'=>$provider_ref,'source_bound'=>true,'selector_value_preserved'=>isset($anchor['value']),'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
     }
 

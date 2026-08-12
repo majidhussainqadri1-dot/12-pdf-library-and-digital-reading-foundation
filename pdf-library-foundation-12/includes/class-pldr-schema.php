@@ -455,8 +455,17 @@ final class PLDR_Schema {
             $state['status'] = 'complete';
             $state['completed_at'] = PLDR_Core::now();
             unset($state['last_error']);
-            update_option('pldr_legacy_migration_state', $state, false);
-            PLDR_Core::emit('PDFLibraryLegacyMigrationCompleted.v1', 'migration', 0, array('source' => 'SPL-0.2.0'));
+            if(false===$wpdb->query('START TRANSACTION')){
+                PLDR_Core::audit('migration',0,'legacy_completion_transaction_failed',array());
+                return;
+            }
+            if(!update_option('pldr_legacy_migration_state', $state, false)){
+                $confirmed=(array)get_option('pldr_legacy_migration_state',array());
+                if(($confirmed['status']??'')!=='complete'){$wpdb->query('ROLLBACK');wp_cache_delete('pldr_legacy_migration_state','options');PLDR_Core::audit('migration',0,'legacy_completion_state_failed',array());return;}
+            }
+            $event=PLDR_Core::emit('PDFLibraryLegacyMigrationCompleted.v1', 'migration', 0, array('source' => 'SPL-0.2.0'));
+            if(is_wp_error($event)){$wpdb->query('ROLLBACK');wp_cache_delete('pldr_legacy_migration_state','options');PLDR_Core::audit('migration',0,'legacy_completion_event_atomic_rollback',array());return;}
+            if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');wp_cache_delete('pldr_legacy_migration_state','options');PLDR_Core::audit('migration',0,'legacy_completion_commit_failed',array());return;}
             return;
         }
 
@@ -583,8 +592,9 @@ final class PLDR_Schema {
             if(false===$policy_stored)throw new RuntimeException('Legacy access policy could not be stored.');
             if(!self::migrate_legacy_user_data($legacy_id,$edition_id))throw new RuntimeException('Legacy private reading data could not be reconciled.');
             if(!self::migrate_legacy_reports($legacy_id,$document_id))throw new RuntimeException('Legacy report data could not be reconciled.');
+            $migration_event=PLDR_Core::emit('PDFLegacyInteractionMigrationRequested.v1','document',$document_id,array('legacy_document_id'=>$legacy_id,'document_public_id'=>$public_id));
+            if(is_wp_error($migration_event))throw new RuntimeException('Legacy migration reliable event could not be persisted atomically.');
             if(false===$wpdb->query('COMMIT'))throw new RuntimeException('Legacy migration transaction could not be committed.');
-            PLDR_Core::emit('PDFLegacyInteractionMigrationRequested.v1','document',$document_id,array('legacy_document_id'=>$legacy_id,'document_public_id'=>$public_id));
             PLDR_Core::audit('document', $document_id, 'legacy_imported', array('legacy_id' => $legacy_id,'edition_id'=>$edition_id));
             return true;
         } catch (Throwable $e) {

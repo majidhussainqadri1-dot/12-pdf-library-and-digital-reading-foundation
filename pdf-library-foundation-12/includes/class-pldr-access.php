@@ -79,13 +79,13 @@ final class PLDR_Access {
         if(false===$ok){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_conflict','Access policy could not be versioned because the policy changed concurrently.',409,array('current_version'=>(int)(PLDR_Core::policy($document_id)['version']??$current['version'])));}
         $doc_updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET access_mode=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d',$audience,PLDR_Core::now(),$document_id,(int)$doc['version']));
         if(1!==$doc_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_document_conflict','Document changed concurrently; access-policy update was rolled back.',409,array('current_document_version'=>(int)(PLDR_Core::document($document_id)['version']??$doc['version'])));}
+        $event=PLDR_Core::emit('PDFDocumentAccessChanged.v1','document',$document_id,array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience));
+        if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_event_atomic','Access-policy update was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false,'policy_version'=>$row['version']));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_commit','Access-policy update could not be committed atomically.',500);}
 
         $revoked=PLDR_Access::revoke_document($document_id,'access-policy-change');
         if($revoked<0)return PLDR_Core::machine_error('pldr_policy_revoke_reconcile','Access policy was committed but prior delivery grants could not be revoked; reconciliation is required before retry.',503,array('committed'=>true,'policy_version'=>$row['version']));
         PLDR_Core::audit('document',$document_id,'access_policy_updated',array('version'=>$row['version'],'audience'=>$audience),$actor_id);
-        $event=PLDR_Core::emit('PDFDocumentAccessChanged.v1','document',$document_id,array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience));
-        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_policy_event_reconcile','Access policy was committed but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'policy_version'=>$row['version']));
         return array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience);
     }
 

@@ -63,13 +63,15 @@ final class PLDR_Rights {
         if($sensitive&&!in_array((string)$doc['status'],array('restricted','removed'),true)){
             $transition=self::transition_document_status_row($document_id,'restricted');
             if(is_wp_error($transition)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_sensitive_restriction_failed','Sensitive rights report was not accepted because immediate restriction could not be committed safely.',503,array('cause'=>$transition->get_error_code()));}
+            $status_event=self::queue_document_status_event($transition['document'],'restricted','temporary-'.$reason);
+            if(is_wp_error($status_event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_sensitive_event_atomic','Sensitive restriction was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false));}
         }
+        $event=PLDR_Core::emit('RightsReportFiled.v1','rights_case',$case_id,array('case_key'=>$case_key,'document_id'=>$doc['public_id'],'reason'=>$reason));
+        if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_event_atomic','Rights report was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_commit','Rights report could not be committed atomically.',500);}
 
         if(is_array($transition)){ $after=self::after_document_status_change($transition['document'],'restricted','temporary-'.$reason); if(is_wp_error($after))return $after; }
         PLDR_Core::audit('rights_case',$case_id,'reported',array('document_id'=>$document_id,'reason'=>$reason,'sensitive_restriction_committed'=>(bool)$transition),$reporter_id);
-        $event=PLDR_Core::emit('RightsReportFiled.v1','rights_case',$case_id,array('case_key'=>$case_key,'document_id'=>$doc['public_id'],'reason'=>$reason));
-        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_case_event_reconcile','Rights report was committed but its reliable event could not be persisted; reconcile before retry.',503,array('committed'=>true,'case_id'=>$case_id));
         return array('case_id'=>$case_id,'case_key'=>$case_key,'state'=>'reported','sensitive_restriction_committed'=>$sensitive ? ('restricted'===$doc['status']||'removed'===$doc['status']||(bool)$transition) : false);
     }
 
@@ -101,12 +103,14 @@ final class PLDR_Rights {
         if($status){
             $transition=self::transition_document_status_row($document_id,$status);
             if(is_wp_error($transition)){$wpdb->query('ROLLBACK');return $transition;}
+            $status_event=self::queue_document_status_event($transition['document'],$status,$reason);
+            if(is_wp_error($status_event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_status_event_atomic','Rights decision was rolled back because its document-status event could not be persisted atomically.',503,array('committed'=>false,'case_id'=>$case_id));}
         }
+        $event=PLDR_Core::emit('PDFRightsCaseDecided.v1','rights_case',$case_id,array('case_id'=>$case_id,'document_id'=>$document_id,'decision'=>$decision,'state'=>$new_state));
+        if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_decision_event_atomic','Rights decision was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false,'case_id'=>$case_id));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_commit','Rights decision could not be committed atomically.',500);}
         if(is_array($transition)){ $after=self::after_document_status_change($transition['document'],$status,$reason); if(is_wp_error($after))return $after; }
         PLDR_Core::audit('rights_case',$case_id,'decided',array('decision'=>$decision,'document_id'=>$document_id),$reviewer_id);
-        $event=PLDR_Core::emit('PDFRightsCaseDecided.v1','rights_case',$case_id,array('case_id'=>$case_id,'document_id'=>$document_id,'decision'=>$decision,'state'=>$new_state));
-        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_case_decision_event_reconcile','Rights decision was committed but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'case_id'=>$case_id));
         return array('case_id'=>$case_id,'state'=>$new_state,'decision'=>$decision,'version'=>(int)$case['version']+1);
     }
 
@@ -127,11 +131,13 @@ final class PLDR_Rights {
         $appeal_payload=wp_json_encode(array('reason'=>$appeal_reason,'evidence'=>$safe_evidence['data']),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         if(!is_string($appeal_payload)||strlen($appeal_payload)>self::EVIDENCE_JSON_MAX)return PLDR_Core::machine_error('pldr_case_evidence_size','Rights appeal evidence exceeds the bounded safe payload size.',413,array('max_bytes'=>self::EVIDENCE_JSON_MAX));
         $key=PLDR_Core::uuid();
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_appeal_transaction','Rights appeal transaction could not be started.',500);
         $inserted=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$key,'document_id'=>$document_id,'reporter_id'=>$actor_id,'parent_case_id'=>$case_id,'state'=>'appealed','reason'=>'appeal','evidence_json'=>$appeal_payload,'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
         $new_id=(int)$wpdb->insert_id;
-        if(false===$inserted||$new_id<1)return PLDR_Core::machine_error('pldr_appeal_store','The rights appeal could not be persisted; no appeal event was emitted.',500);
+        if(false===$inserted||$new_id<1){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_store','The rights appeal could not be persisted; no appeal event was emitted.',500);}
         $event=PLDR_Core::emit('PDFRightsCaseAppealed.v1','rights_case',$new_id,array('case_id'=>$new_id,'parent_case_id'=>$case_id,'document_id'=>$document_id));
-        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_appeal_event_reconcile','Rights appeal was stored but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'case_id'=>$new_id));
+        if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_event_atomic','Rights appeal was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false));}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_commit','Rights appeal could not be committed atomically.',500);}
         return array('case_id'=>$new_id,'case_key'=>$key,'state'=>'appealed');
     }
 
@@ -155,12 +161,12 @@ final class PLDR_Rights {
 
         $edition_updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d','published',PLDR_Core::now(),(int)$edition['id'],(int)$edition['version']));
         if(1!==$edition_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_edition_publish_conflict','The target edition changed concurrently; publication was rolled back.',409);}
+        $event=PLDR_Core::emit('PDFDocumentPublished.v1','document',$document_id,array('document_id'=>$doc['public_id'],'edition_id'=>(int)$edition['id']));
+        if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_publish_event_atomic','Publication was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false,'document_id'=>$doc['public_id']));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_approve_commit','Document publication could not be committed atomically.',500);}
 
         if(PLDR_Access::revoke_document($document_id,'publication-state-change')<0)return PLDR_Core::machine_error('pldr_publish_revoke_reconcile','Publication was committed but prior delivery grants could not be revoked; reconciliation is required.',503,array('committed'=>true));
         PLDR_Core::audit('document',$document_id,'approved',array('edition_id'=>(int)$edition['id'],'superseded_editions'=>(int)$superseded),$reviewer_id);
-        $event=PLDR_Core::emit('PDFDocumentPublished.v1','document',$document_id,array('document_id'=>$doc['public_id'],'edition_id'=>(int)$edition['id']));
-        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_publish_event_reconcile','Publication was committed but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'document_id'=>$doc['public_id']));
         return array('document_id'=>$doc['public_id'],'status'=>'published','version'=>(int)$doc['version']+1);
     }
 
@@ -185,13 +191,15 @@ final class PLDR_Rights {
         return array('document'=>$doc,'version'=>(int)$doc['version']+1);
     }
 
+    private static function queue_document_status_event(array $doc,string $status,string $reason) {
+        $event='published'===$status?'PDFDocumentPublished.v1':'PDFDocumentAccessChanged.v1';
+        return PLDR_Core::emit($event,'document',(int)$doc['id'],array('document_id'=>$doc['public_id'],'status'=>$status,'reason'=>$reason));
+    }
+
     private static function after_document_status_change(array $doc,string $status,string $reason) {
         $document_id=(int)$doc['id'];
         $revoked=PLDR_Access::revoke_document($document_id,$reason);
         if($revoked<0){PLDR_Core::audit('document',$document_id,'rights_status_revoke_reconciliation_required',array('status'=>$status,'reason'=>$reason));return PLDR_Core::machine_error('pldr_rights_revoke_reconcile','Rights state changed but prior grants could not be revoked; reconciliation is required.',503,array('committed'=>true));}
-        $event='published'===$status?'PDFDocumentPublished.v1':'PDFDocumentAccessChanged.v1';
-        $stored=PLDR_Core::emit($event,'document',$document_id,array('document_id'=>$doc['public_id'],'status'=>$status,'reason'=>$reason));
-        if(is_wp_error($stored))return PLDR_Core::machine_error('pldr_rights_event_reconcile','Rights state changed but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true));
         return true;
     }
 
@@ -200,6 +208,8 @@ final class PLDR_Rights {
         if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_document_status_transaction','Document rights-state transaction could not be started.',500);
         $transition=self::transition_document_status_row($document_id,$status);
         if(is_wp_error($transition)){$wpdb->query('ROLLBACK');return $transition;}
+        $status_event=self::queue_document_status_event($transition['document'],$status,$reason);
+        if(is_wp_error($status_event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_rights_event_atomic','Document rights state was rolled back because its reliable event could not be persisted in the same transaction.',503,array('committed'=>false));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_document_status_commit','Document rights-state transition could not be committed.',500);}
         $after=self::after_document_status_change($transition['document'],$status,$reason);
         if(is_wp_error($after))return $after;
@@ -247,18 +257,21 @@ final class PLDR_Book_Packs {
             if(hash_equals((string)$existing['manifest_sha256'],$manifest_hash))return array('id'=>(int)$existing['id'],'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>(string)$existing['status'],'already_registered'=>true,'immutable_version'=>true);
             return PLDR_Core::machine_error('pldr_pack_version_conflict','This Book Content Pack version is already registered with different immutable metadata; publish a new pack version instead of overwriting history.',409,array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version']));
         }
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_pack_transaction','Book Content Pack registration transaction could not be started.',500);
         $stored=$wpdb->insert($table,array('pack_key'=>$canonical['pack_key'],'pack_version'=>$canonical['version'],'title'=>$canonical['title'],'author'=>$canonical['author'],'translator'=>$canonical['translator'],'rights_basis'=>$rights,'manifest_sha256'=>$manifest_hash,'metadata_json'=>$manifest_json,'status'=>'registered','created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
         if(false===$stored){
+            $wpdb->query('ROLLBACK');
             $wpdb->last_error='';
             $race=$wpdb->get_row($wpdb->prepare('SELECT id,manifest_sha256,status FROM '.$table.' WHERE pack_key=%s AND pack_version=%s LIMIT 1',$canonical['pack_key'],$canonical['version']),ARRAY_A);
             if(''===(string)$wpdb->last_error&&$race&&hash_equals((string)$race['manifest_sha256'],$manifest_hash))return array('id'=>(int)$race['id'],'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>(string)$race['status'],'already_registered'=>true,'immutable_version'=>true,'concurrent_registration'=>true);
             return PLDR_Core::machine_error('pldr_pack_store','Book Content Pack metadata could not be persisted or reconciled; no registration event was emitted.',500);
         }
         $id=(int)$wpdb->insert_id;
-        if($id<1)return PLDR_Core::machine_error('pldr_pack_store','Book Content Pack persistence could not be confirmed; no registration event was emitted.',500);
-        PLDR_Core::audit('book_pack',$id,'registered',array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash),$actor_id);
+        if($id<1){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_pack_store','Book Content Pack persistence could not be confirmed; no registration event was emitted.',500);}
         $event=PLDR_Core::emit('PDFBookPackRegistered.v1','book_pack',$id,array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'document_public_id'=>$canonical['document_public_id']));
-        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_pack_event_reconcile','Book Content Pack was registered but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'id'=>$id));
+        if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_pack_event_atomic','Book Content Pack registration was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false));}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_pack_commit','Book Content Pack registration could not be committed atomically.',500);}
+        PLDR_Core::audit('book_pack',$id,'registered',array('pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash),$actor_id);
         return array('id'=>$id,'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>'registered','immutable_version'=>true);
     }
 

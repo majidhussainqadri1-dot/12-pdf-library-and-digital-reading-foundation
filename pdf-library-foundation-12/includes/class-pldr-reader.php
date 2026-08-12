@@ -57,8 +57,26 @@ final class PLDR_Search {
             $rows = is_array($rows) ? $rows : array();
             if (!$rows) break;
             foreach ($rows as $doc) {
+                $wpdb->last_error = '';
                 $edition = PLDR_Core::current_edition((int) $doc['id']);
-                if (!$edition || !PLDR_Access::can_access_edition((int) $edition['id'], 'read', $user_id)) continue;
+                if ('' !== (string) $wpdb->last_error) {
+                    return array(
+                        'items'=>array(),'page'=>$page,'per_page'=>$per_page,'has_more'=>false,
+                        'error'=>PLDR_Core::machine_error('pldr_catalog_edition_read','PDF Library edition state could not be read reliably during catalog filtering.',503,array('degraded'=>true)),
+                        'degraded'=>true,'scan_limit_provider_failed'=>$scan_limit_provider_failed,
+                    );
+                }
+                if (!$edition) continue;
+                $wpdb->last_error = '';
+                $allowed = PLDR_Access::can_access_edition((int) $edition['id'], 'read', $user_id);
+                if ('' !== (string) $wpdb->last_error) {
+                    return array(
+                        'items'=>array(),'page'=>$page,'per_page'=>$per_page,'has_more'=>false,
+                        'error'=>PLDR_Core::machine_error('pldr_catalog_access_read','PDF Library authorization state could not be verified reliably during catalog filtering.',503,array('degraded'=>true)),
+                        'degraded'=>true,'scan_limit_provider_failed'=>$scan_limit_provider_failed,
+                    );
+                }
+                if (!$allowed) continue;
                 $eligible[] = PLDR_Core::public_document_dto($doc, $edition);
                 if (count($eligible) >= $target) break;
             }
@@ -120,16 +138,24 @@ final class PLDR_Reading {
     public static function save_progress(int $edition_id, int $page, int $user_id = 0) {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
-        if (!$user_id || !PLDR_Access::can_access_edition($edition_id, 'read', $user_id)) return PLDR_Core::machine_error('pldr_progress_forbidden', 'Reading progress cannot be saved for this document.', 403);
+        if (!$user_id) return PLDR_Core::machine_error('pldr_progress_forbidden', 'Reading progress cannot be saved for this document.', 403);
+        $wpdb->last_error='';
+        $allowed=PLDR_Access::can_access_edition($edition_id, 'read', $user_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_progress_access_read','Reading-progress authorization state could not be verified reliably.',503,array('degraded'=>true));
+        if(!$allowed)return PLDR_Core::machine_error('pldr_progress_forbidden', 'Reading progress cannot be saved for this document.', 403);
+        $wpdb->last_error='';
         $edition = PLDR_Core::edition($edition_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_progress_edition_read','Reading-progress edition state could not be read reliably.',503,array('degraded'=>true));
         if (!$edition) return PLDR_Core::machine_error('pldr_edition_missing', 'Document edition not found.', 404);
         $pages = max(1, (int) $edition['pages']);
         if ($page < 1 || $page > $pages) return PLDR_Core::machine_error('pldr_page_range', 'Reading page is outside the document.', 400);
         $percent = round(($page / $pages) * 100, 2);
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_progress_transaction','Reading-progress transaction could not be started.',500);
         $ok = $wpdb->replace(PLDR_Core::table('reading_state'), array('user_id' => $user_id, 'edition_id' => $edition_id, 'last_page' => $page, 'percent' => $percent, 'edition_version' => (int) $edition['version'], 'updated_at' => PLDR_Core::now()), array('%d','%d','%d','%f','%d','%s'));
-        if (false === $ok) return PLDR_Core::machine_error('pldr_progress_store', 'Reading progress could not be saved.', 500);
+        if (false === $ok){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_store', 'Reading progress could not be saved.', 500);}
         $event=PLDR_Core::emit('ReadingProgressUpdated.v1', 'edition', $edition_id, array('user_id' => $user_id, 'edition_id' => $edition_id, 'page' => $page, 'percent' => $percent));
-        if(is_wp_error($event))return PLDR_Core::machine_error('pldr_progress_event_reconcile','Reading progress was saved but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'edition_id'=>$edition_id,'page'=>$page));
+        if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_event_atomic','Reading progress was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false,'edition_id'=>$edition_id,'page'=>$page));}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_commit','Reading progress could not be committed atomically.',500);}
         return array('page' => $page, 'percent' => $percent, 'updated_at' => PLDR_Core::now());
     }
 
@@ -146,8 +172,14 @@ final class PLDR_Reading {
     public static function add_item(int $edition_id, array $data, int $user_id = 0) {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
-        if (!$user_id || !PLDR_Access::can_access_edition($edition_id, 'read', $user_id)) return PLDR_Core::machine_error('pldr_item_forbidden', 'Private reading item cannot be saved.', 403);
+        if (!$user_id) return PLDR_Core::machine_error('pldr_item_forbidden', 'Private reading item cannot be saved.', 403);
+        $wpdb->last_error='';
+        $allowed=PLDR_Access::can_access_edition($edition_id, 'read', $user_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_item_access_read','Private reading-item authorization state could not be verified reliably.',503,array('degraded'=>true));
+        if(!$allowed)return PLDR_Core::machine_error('pldr_item_forbidden', 'Private reading item cannot be saved.', 403);
+        $wpdb->last_error='';
         $edition = PLDR_Core::edition($edition_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_item_edition_read','Private reading-item edition state could not be read reliably.',503,array('degraded'=>true));
         if (!$edition) return PLDR_Core::machine_error('pldr_edition_missing', 'Document edition not found.', 404);
         $type = sanitize_key((string) ($data['type'] ?? 'bookmark'));
         if (!in_array($type, array('bookmark','note','highlight'), true)) return PLDR_Core::machine_error('pldr_item_type', 'Unsupported private reading item type.', 400);
@@ -168,12 +200,28 @@ final class PLDR_Reading {
     public static function items(int $edition_id, int $user_id = 0): array {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
-        if (!$user_id || !PLDR_Access::can_access_edition($edition_id, 'read', $user_id)) return array();
+        if (!$user_id) return array();
+        $wpdb->last_error='';
+        $allowed=PLDR_Access::can_access_edition($edition_id, 'read', $user_id);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_items_access_read','Private reading-item authorization state could not be verified reliably.',503,array('degraded'=>true)));
+        if(!$allowed)return array();
         $wpdb->last_error='';
         $rows = $wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM ' . PLDR_Core::table('reading_items') . ' WHERE user_id=%d AND edition_id=%d ORDER BY page_number ASC,id ASC LIMIT 1000', $user_id, $edition_id), ARRAY_A);
         if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_items_read','Private reading items could not be read reliably.',503,array('degraded'=>true)));
         $rows=is_array($rows)?$rows:array();
-        foreach ($rows as &$row) { $row['id']=(int)$row['id']; $row['page_number']=(int)$row['page_number']; $row['version']=(int)$row['version']; $row['tags']=json_decode((string)$row['tags_json'],true)?:array(); unset($row['tags_json']); }
+        foreach ($rows as &$row) {
+            $row['id']=(int)$row['id'];
+            $row['page_number']=(int)$row['page_number'];
+            $row['version']=(int)$row['version'];
+            $tags=json_decode((string)$row['tags_json'],true);
+            if(!is_array($tags)){
+                PLDR_Core::audit('reading_item',(int)$row['id'],'reading_item_tags_corrupt',array('edition_id'=>$edition_id),$user_id);
+                return array('error'=>PLDR_Core::machine_error('pldr_items_corrupt','Stored private reading-item tags failed integrity validation; no partial item list was returned.',500,array('item_id'=>(int)$row['id'])));
+            }
+            $row['tags']=$tags;
+            unset($row['tags_json']);
+        }
+        unset($row);
         return $rows ?: array();
     }
 
@@ -196,6 +244,7 @@ final class PLDR_Reading {
 
 final class PLDR_Reader {
     private const THUMBNAIL_PREVIEW_LIMIT = 300;
+    private const THUMBNAIL_GRANT_LIMIT = 50;
 
     public static function library_html(array $args = array()): string {
         $result = PLDR_Search::search(array_merge($_GET, $args), get_current_user_id());
@@ -226,11 +275,22 @@ final class PLDR_Reader {
     }
 
     public static function document_html(string $public_id): string {
+        global $wpdb;
+        $wpdb->last_error='';
         $doc = PLDR_Core::document_by_public_id($public_id);
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
         if (!$doc) return self::state_html('not-found');
+        $wpdb->last_error='';
         $edition = PLDR_Core::current_edition((int)$doc['id']);
-        if (!$edition || !PLDR_Access::can_access_edition((int)$edition['id'], 'read', get_current_user_id())) return self::state_html('restricted');
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
+        if (!$edition) return self::state_html('restricted');
+        $wpdb->last_error='';
+        $allowed=PLDR_Access::can_access_edition((int)$edition['id'], 'read', get_current_user_id());
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
+        if(!$allowed)return self::state_html('restricted');
+        $wpdb->last_error='';
         $dto = PLDR_Core::public_document_dto($doc, $edition);
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
         $cover = self::cover_token((int)$edition['id']);
         try{$related_html=(string)apply_filters('pldr_related_content_html','',(int)$edition['id'],$dto);}
         catch(Throwable $e){$related_html='';PLDR_Core::audit('edition',(int)$edition['id'],'related_content_provider_failed',array('provider_failure'=>true));}
@@ -245,24 +305,46 @@ final class PLDR_Reader {
     }
 
     public static function reader_html(string $public_id): string {
+        global $wpdb;
+        $wpdb->last_error='';
         $doc = PLDR_Core::document_by_public_id($public_id);
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
         if (!$doc) return self::state_html('not-found');
+        $wpdb->last_error='';
         $edition = PLDR_Core::current_edition((int)$doc['id']);
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
         $requested_edition=absint($_GET['edition']??0);
-        if($requested_edition && (PLDR_Core::authorize('manage',(int)$doc['id'])||PLDR_Core::authorize('rights',(int)$doc['id']))){$candidate=PLDR_Core::edition($requested_edition);if($candidate&&(int)$candidate['document_id']===(int)$doc['id'])$edition=$candidate;}
-        if (!$edition || !PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id())) return self::state_html('restricted');
+        if($requested_edition && (PLDR_Core::authorize('manage',(int)$doc['id'])||PLDR_Core::authorize('rights',(int)$doc['id']))){
+            $wpdb->last_error='';
+            $candidate=PLDR_Core::edition($requested_edition);
+            if(''!==(string)$wpdb->last_error)return self::state_html('error');
+            if($candidate&&(int)$candidate['document_id']===(int)$doc['id'])$edition=$candidate;
+        }
+        if (!$edition) return self::state_html('restricted');
+        $wpdb->last_error='';
+        $allowed=PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id());
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
+        if(!$allowed)return self::state_html('restricted');
+        $wpdb->last_error='';
         $object = PLDR_Core::object((int)$edition['object_id']);
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
         if (!$object) return self::state_html('error');
         $grant = PLDR_Access::issue_token((int)$edition['id'],(int)$object['id'],'read',get_current_user_id(),900);
         if (is_wp_error($grant)) return self::state_html('error');
         $state = PLDR_Reading::state((int)$edition['id']);
         if(isset($state['error'])&&is_wp_error($state['error']))return self::state_html('error');
-        try{$interaction_html=(string)apply_filters('pldr_interaction_controls_html','',(int)$edition['id'],PLDR_Core::public_document_dto($doc,$edition));}
+        $wpdb->last_error='';
+        $interaction_dto=PLDR_Core::public_document_dto($doc,$edition);
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');
+        try{$interaction_html=(string)apply_filters('pldr_interaction_controls_html','',(int)$edition['id'],$interaction_dto);}
         catch(Throwable $e){$interaction_html='';PLDR_Core::audit('edition',(int)$edition['id'],'reader_interaction_provider_failed',array('provider_failure'=>true));}
         $thumbs = self::thumbnail_tokens((int)$edition['id']);
+        $wpdb->last_error='';
+        $policy=PLDR_Core::policy((int)$doc['id']);
+        if(''!==(string)$wpdb->last_error||!$policy)return self::state_html('error');
         $config = array(
             'editionId'=>(int)$edition['id'],'publicId'=>$public_id,'title'=>(string)$doc['title'],'pages'=>(int)$edition['pages'],'url'=>$grant['url'],'expiresAt'=>$grant['expires_at'],'startPage'=>max(1,(int)$state['page']),
-            'rest'=>esc_url_raw(rest_url('pldr/v1/')),'nonce'=>wp_create_nonce('wp_rest'),'thumbnails'=>$thumbs,'canDownload'=>!empty(PLDR_Core::policy((int)$doc['id'])['download_allowed']),'canPrint'=>!empty(PLDR_Core::policy((int)$doc['id'])['print_allowed']),'canOffline'=>!empty(PLDR_Core::policy((int)$doc['id'])['offline_allowed']),
+            'rest'=>esc_url_raw(rest_url('pldr/v1/')),'nonce'=>wp_create_nonce('wp_rest'),'thumbnails'=>$thumbs,'canDownload'=>!empty($policy['download_allowed']),'canPrint'=>!empty($policy['print_allowed']),'canOffline'=>!empty($policy['offline_allowed']),
             'strings'=>array('loading'=>__('Loading document…','pdf-library-digital-reading'),'error'=>__('The reader could not load this document. Retry or use the accessible fallback.','pdf-library-digital-reading'),'saved'=>__('Reading position saved privately.','pdf-library-digital-reading')),
         );
         wp_enqueue_style('pldr-reader'); wp_enqueue_script('pldr-reader');
@@ -293,7 +375,14 @@ final class PLDR_Reader {
         $rows=$wpdb->get_results($wpdb->prepare('SELECT s.*,e.document_id,d.public_id,d.title,d.slug FROM '.PLDR_Core::table('reading_state').' s JOIN '.PLDR_Core::table('editions').' e ON e.id=s.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE s.user_id=%d ORDER BY s.updated_at DESC LIMIT 100',$uid),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return self::state_html('error');
         $rows=is_array($rows)?$rows:array();
-        $rows=array_values(array_filter($rows,static fn(array $row):bool=>PLDR_Access::can_access_edition((int)$row['edition_id'],'read',$uid)));
+        $visible=array();
+        foreach($rows as $row){
+            $wpdb->last_error='';
+            $allowed=PLDR_Access::can_access_edition((int)$row['edition_id'],'read',$uid);
+            if(''!==(string)$wpdb->last_error)return self::state_html('error');
+            if($allowed)$visible[]=$row;
+        }
+        $rows=$visible;
         ob_start();?><main class="pldr-shell"><h1><?php esc_html_e('Reading Workspace','pdf-library-digital-reading');?></h1><div class="pldr-grid"><?php foreach($rows as $row):?><article class="pldr-card"><div class="pldr-card-body"><h2><a href="<?php echo esc_url(PLDR_Core::route_url('read',array('id'=>$row['public_id'])));?>"><?php echo esc_html($row['title']);?></a></h2><p><?php echo esc_html(sprintf(__('Page %1$d · %2$s%% complete','pdf-library-digital-reading'),(int)$row['last_page'],(string)$row['percent']));?></p></div></article><?php endforeach;?></div></main><?php return (string)ob_get_clean();
     }
 
@@ -310,6 +399,6 @@ final class PLDR_Reader {
     }
 
     private static function cover_token(int $edition_id): string { global $wpdb; $wpdb->last_error=''; $oid=(int)$wpdb->get_var($wpdb->prepare('SELECT object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s LIMIT 1',$edition_id,'cover','available')); if(''!==(string)$wpdb->last_error){PLDR_Core::audit('edition',$edition_id,'cover_derivative_read_failed',array());return'';} if(!$oid)return''; $grant=PLDR_Access::issue_token($edition_id,$oid,'preview',get_current_user_id(),900); return is_array($grant)?$grant['url']:''; }
-    private static function thumbnail_tokens(int $edition_id): array { global $wpdb; $wpdb->last_error=''; $rows=$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT %d',$edition_id,'thumbnail','available',self::THUMBNAIL_PREVIEW_LIMIT),ARRAY_A); if(''!==(string)$wpdb->last_error){PLDR_Core::audit('edition',$edition_id,'thumbnail_derivative_read_failed',array());return array();} $rows=is_array($rows)?$rows:array(); $out=array(); foreach($rows as $r){$g=PLDR_Access::issue_token($edition_id,(int)$r['object_id'],'preview',get_current_user_id(),900);if(is_array($g))$out[(int)$r['page_number']]=$g['url'];} return $out; }
+    private static function thumbnail_tokens(int $edition_id): array { global $wpdb; $wpdb->last_error=''; $rows=$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT %d',$edition_id,'thumbnail','available',self::THUMBNAIL_GRANT_LIMIT),ARRAY_A); if(''!==(string)$wpdb->last_error){PLDR_Core::audit('edition',$edition_id,'thumbnail_derivative_read_failed',array());return array();} $rows=is_array($rows)?$rows:array(); $out=array(); foreach($rows as $r){$g=PLDR_Access::issue_token($edition_id,(int)$r['object_id'],'preview',get_current_user_id(),900);if(is_array($g))$out[(int)$r['page_number']]=$g['url'];} return $out; }
     private static function state_html(string $state): string { $messages=array('not-found'=>__('Document not found.','pdf-library-digital-reading'),'restricted'=>__('This document is restricted, expired, embargoed, or not available to your account.','pdf-library-digital-reading'),'error'=>__('The document reader is temporarily unavailable.','pdf-library-digital-reading')); return '<main class="pldr-shell"><div class="pldr-state"><h1>'.esc_html($messages[$state]??$messages['error']).'</h1><a href="'.esc_url(PLDR_Core::route_url('library')).'">'.esc_html__('Return to PDF Library','pdf-library-digital-reading').'</a></div></main>'; }
 }

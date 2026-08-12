@@ -6,6 +6,36 @@ final class PLDR_Future_Preservation {
     private const PROVIDER_FINDINGS_LIMIT = 50;
     private const FINDING_LENGTH_LIMIT = 500;
 
+    public static function read(int $edition_id):array {
+        global $wpdb;
+        $wpdb->last_error='';
+        $edition=PLDR_Core::edition($edition_id);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_edition_read','Edition state could not be read reliably for preservation evidence.',503,array('degraded'=>true)));
+        if(!$edition)return array('error'=>PLDR_Core::machine_error('pldr_preservation_edition','Edition not found.',404));
+        $document_id=(int)$edition['document_id'];
+        if(!PLDR_Core::authorize('repair',$document_id)&&!PLDR_Core::authorize('manage',$document_id))return array('error'=>PLDR_Core::machine_error('pldr_preservation_forbidden','Preservation evidence requires repair or management authority for this document.',403));
+        $wpdb->last_error='';
+        $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('preservation_records').' WHERE edition_id=%d',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_record_read','Stored preservation evidence could not be read reliably.',503,array('degraded'=>true)));
+        if(!$row)return array('edition_id'=>$edition_id,'available'=>false,'read_only'=>true,'refresh_required'=>true);
+        $assessment=json_decode((string)$row['assessment_json'],true);
+        $derivatives=json_decode((string)$row['derivative_status_json'],true);
+        if(!is_array($assessment)||!is_array($derivatives))return array('error'=>PLDR_Core::machine_error('pldr_preservation_record_corrupt','Stored preservation evidence failed integrity validation.',500,array('edition_id'=>$edition_id)));
+        return array(
+            'edition_id'=>$edition_id,
+            'available'=>true,
+            'read_only'=>true,
+            'format_health'=>(string)$row['format_health'],
+            'checksum_generation'=>(int)$row['checksum_generation'],
+            'sha256'=>(string)$row['sha256'],
+            'encrypted_sha256'=>(string)$row['encrypted_sha256'],
+            'assessment'=>$assessment,
+            'derivatives'=>$derivatives,
+            'last_verified_at'=>$row['last_verified_at'],
+            'updated_at'=>$row['updated_at'],
+        );
+    }
+
     public static function assess(int $edition_id,bool $verify=false):array {
         global $wpdb;
         $system=function_exists('wp_doing_cron')&&wp_doing_cron()&&function_exists('doing_action')&&doing_action('pldr_future_preservation_scan');

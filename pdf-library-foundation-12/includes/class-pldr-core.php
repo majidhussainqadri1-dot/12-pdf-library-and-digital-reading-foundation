@@ -278,39 +278,95 @@ final class PLDR_Core {
         return new WP_Error($code, $message, array_merge(array('status' => $status, 'trace_id' => self::trace_id()), $extra));
     }
 
+    public static function request_fingerprint(WP_REST_Request $request): string {
+        $files=array();
+        foreach((array)$request->get_file_params() as $name=>$file){
+            if(!is_array($file))continue;
+            $entry=array(
+                'name'=>sanitize_file_name((string)($file['name']??'')),
+                'type'=>sanitize_mime_type((string)($file['type']??'')),
+                'size'=>absint($file['size']??0),
+                'error'=>absint($file['error']??0),
+            );
+            $tmp=(string)($file['tmp_name']??'');
+            if(''!==$tmp&&is_file($tmp)&&is_readable($tmp)){
+                $digest=hash_file('sha256',$tmp);
+                if(is_string($digest))$entry['sha256']=$digest;
+            }
+            $files[sanitize_key((string)$name)]=$entry;
+        }
+        ksort($files);
+        $payload=array(
+            'method'=>strtoupper((string)$request->get_method()),
+            'route'=>(string)$request->get_route(),
+            'params'=>self::canonicalize_idempotency_value($request->get_params()),
+            'body_sha256'=>hash('sha256',(string)$request->get_body()),
+            'files'=>$files,
+        );
+        $json=wp_json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        return is_string($json)?hash('sha256',$json):'';
+    }
+
+    private static function canonicalize_idempotency_value($value){
+        if(is_array($value)){
+            if(array_is_list($value))return array_map(array(__CLASS__,'canonicalize_idempotency_value'),$value);
+            ksort($value);
+            foreach($value as $key=>$item)$value[$key]=self::canonicalize_idempotency_value($item);
+            return $value;
+        }
+        if(is_object($value))return self::canonicalize_idempotency_value((array)$value);
+        if(is_bool($value)||is_int($value)||is_float($value)||null===$value)return $value;
+        return (string)$value;
+    }
+
+    public static function scope_anonymous_idempotency_key(string $key): string {
+        $ip=sanitize_text_field((string)($_SERVER['REMOTE_ADDR']??'unknown'));
+        $ua=substr(sanitize_text_field((string)($_SERVER['HTTP_USER_AGENT']??'unknown')),0,300);
+        $client=hash_hmac('sha256',$ip.'|'.$ua,wp_salt('auth'));
+        return hash('sha256',$client.'|'.substr($key,0,200));
+    }
+
     private static function idempotency_identity(string $route,string $key): array {
         $route=substr(sanitize_text_field($route),0,120);
         $key=substr(sanitize_text_field($key),0,200);
         return array($route,hash('sha256',$key));
     }
 
-    public static function idempotency_begin(string $route,string $key,int $actor_id): array {
+    public static function idempotency_begin(string $route,string $key,int $actor_id,string $request_hash=''): array {
         global $wpdb;
         if(''===$key)return array('state'=>'disabled');
         [$route,$hash]=self::idempotency_identity($route,$key);
+        $request_hash=preg_match('/^[a-f0-9]{64}$/',$request_hash)?$request_hash:'';
         $now=self::now();
         $wpdb->last_error='';
         $expired_cleanup=$wpdb->query($wpdb->prepare('DELETE FROM '.self::table('idempotency').' WHERE actor_id=%d AND route=%s AND key_hash=%s AND expires_at<=%s',$actor_id,$route,$hash,$now));
         if(false===$expired_cleanup)return array('state'=>'error','db_error'=>(string)$wpdb->last_error,'phase'=>'expired-cleanup');
         $expires=gmdate('Y-m-d H:i:s',time()+DAY_IN_SECONDS);
+        $pending_json=wp_json_encode(array('_request_hash'=>$request_hash));
+        if(!is_string($pending_json))return array('state'=>'error','db_error'=>'idempotency request fingerprint could not be encoded','phase'=>'fingerprint-encode');
         $wpdb->last_error='';
         $inserted=$wpdb->insert(self::table('idempotency'),array(
-            'actor_id'=>$actor_id,'route'=>$route,'key_hash'=>$hash,'response_json'=>'','status_code'=>0,'expires_at'=>$expires,'created_at'=>$now,
+            'actor_id'=>$actor_id,'route'=>$route,'key_hash'=>$hash,'response_json'=>$pending_json,'status_code'=>0,'expires_at'=>$expires,'created_at'=>$now,
         ),array('%d','%s','%s','%s','%d','%s','%s'));
-        if(1===$inserted)return array('state'=>'reserved');
+        if(1===$inserted)return array('state'=>'reserved','request_hash'=>$request_hash);
         $wpdb->last_error='';
         $row=$wpdb->get_row($wpdb->prepare('SELECT response_json,status_code,expires_at FROM '.self::table('idempotency').' WHERE actor_id=%d AND route=%s AND key_hash=%s AND expires_at>%s LIMIT 1',$actor_id,$route,$hash,$now),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return array('state'=>'error','db_error'=>(string)$wpdb->last_error,'phase'=>'existing-read');
         if(!$row)return array('state'=>'error','db_error'=>'idempotency reservation could not be confirmed','phase'=>'existing-read');
+        $stored=json_decode((string)$row['response_json'],true);
+        $stored_hash=is_array($stored)?(string)($stored['_request_hash']??''):'';
+        if(''!==$request_hash&&(''===$stored_hash||!hash_equals($stored_hash,$request_hash)))return array('state'=>'conflict','reason'=>'request-fingerprint-mismatch');
         if(0===(int)$row['status_code'])return array('state'=>'pending');
-        return array('state'=>'hit','body'=>json_decode((string)$row['response_json'],true),'status'=>(int)$row['status_code']);
+        $body=is_array($stored)&&array_key_exists('response',$stored)?$stored['response']:$stored;
+        return array('state'=>'hit','body'=>$body,'status'=>(int)$row['status_code']);
     }
 
-    public static function idempotency_complete(string $route,string $key,int $actor_id,$body,int $status=200): bool {
+    public static function idempotency_complete(string $route,string $key,int $actor_id,$body,int $status=200,string $request_hash=''): bool {
         global $wpdb;
         if(''===$key)return true;
         [$route,$hash]=self::idempotency_identity($route,$key);
-        $json=wp_json_encode($body);
+        $request_hash=preg_match('/^[a-f0-9]{64}$/',$request_hash)?$request_hash:'';
+        $json=wp_json_encode(array('_request_hash'=>$request_hash,'response'=>$body));
         if(false===$json)return false;
         $expires=gmdate('Y-m-d H:i:s',time()+DAY_IN_SECONDS);
         $updated=$wpdb->query($wpdb->prepare('UPDATE '.self::table('idempotency').' SET response_json=%s,status_code=%d,expires_at=%s WHERE actor_id=%d AND route=%s AND key_hash=%s AND status_code=0',$json,max(100,min(599,$status)),$expires,$actor_id,$route,$hash));
@@ -331,7 +387,9 @@ final class PLDR_Core {
         [$route,$hash]=self::idempotency_identity($route,$key);
         $row = $wpdb->get_row($wpdb->prepare('SELECT response_json,status_code FROM ' . self::table('idempotency') . ' WHERE actor_id=%d AND route=%s AND key_hash=%s AND expires_at>%s AND status_code>0 LIMIT 1',$actor_id,$route,$hash,self::now()), ARRAY_A);
         if (!$row) return null;
-        return array('body' => json_decode((string) $row['response_json'], true), 'status' => (int) $row['status_code']);
+        $stored=json_decode((string)$row['response_json'],true);
+        $body=is_array($stored)&&array_key_exists('response',$stored)?$stored['response']:$stored;
+        return array('body' => $body, 'status' => (int) $row['status_code']);
     }
 
     public static function idempotency_store(string $route, string $key, int $actor_id, $body, int $status = 200): bool {

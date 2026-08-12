@@ -42,18 +42,11 @@ final class PLDR_Future_Fingerprint {
         }
         $rowsCurrent=is_array($rowsCurrent)?$rowsCurrent:array();
         $current_types=array_column($rowsCurrent,null,'fingerprint_type');
-        $needs_ocr=!isset($current_types['ocr-simhash64']);
-        $needs_visual=class_exists('Imagick')&&!isset($current_types['visual-ahash']);
-        if((!$rowsCurrent||$needs_ocr||$needs_visual)&&self::can_compute($edition)){
-            $computed=self::compute_and_store($edition_id);
-            if(isset($computed['error']))return array('error'=>$computed['error']);
-            $wpdb->last_error='';
-            $rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A);
-            if(''!==(string)$wpdb->last_error){
-                PLDR_Core::audit('edition',$edition_id,'scan_fingerprint_current_reread_failed',array());
-                return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_current_read','Current scan-fingerprint evidence could not be re-read reliably after computation; comparison was not attempted.',503,array('degraded'=>true)));
-            }
-            $rowsCurrent=is_array($rowsCurrent)?$rowsCurrent:array();
+        $missing_types=array();
+        if(!isset($current_types['ocr-simhash64']))$missing_types[]='ocr-simhash64';
+        if(class_exists('Imagick')&&!isset($current_types['visual-ahash']))$missing_types[]='visual-ahash';
+        if(!$rowsCurrent||$missing_types){
+            return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_required','Scan-fingerprint review is read-only. Compute the missing fingerprint evidence with the idempotent fingerprint POST before requesting candidates.',409,array('missing_types'=>$missing_types?:array('any-supported-fingerprint'))));
         }
         $current=array_column($rowsCurrent,null,'fingerprint_type'); if(!$current)return array();
         $wpdb->last_error='';

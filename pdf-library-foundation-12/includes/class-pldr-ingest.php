@@ -230,6 +230,12 @@ final class PLDR_Ingest {
                 ));
                 if(false===$rights_saved)throw new RuntimeException('Restricted rights-evidence reference could not be recorded.');
             }
+            $ingested_event=PLDR_Core::emit('PDFDocumentIngested.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id, 'status' => $edition_status));
+            if(is_wp_error($ingested_event))throw new RuntimeException('Reliable ingest event could not be persisted atomically.');
+            if ('published' === $edition_status) {
+                $published_event=PLDR_Core::emit('PDFDocumentPublished.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id));
+                if(is_wp_error($published_event))throw new RuntimeException('Reliable publication event could not be persisted atomically.');
+            }
             if(false===$wpdb->query('COMMIT'))throw new RuntimeException('PDF ingest transaction could not be committed atomically.');
         } catch (Throwable $e) {
             $wpdb->query('ROLLBACK');
@@ -244,12 +250,6 @@ final class PLDR_Ingest {
         $scheduled=wp_schedule_single_event(time() + 5, 'pldr_generate_derivatives', array($edition_id, 0), true);
         if(is_wp_error($scheduled)||false===$scheduled)return PLDR_Core::machine_error('pldr_derivative_schedule_reconcile','PDF ingest was committed but derivative generation could not be scheduled; reconciliation is required.',503,array('committed'=>true,'edition_id'=>$edition_id));
         PLDR_Core::audit('document', $document_id, 'ingested', array('edition_id' => $edition_id, 'sha256' => $sha256, 'status' => $edition_status, 'document_family_existing'=>(bool)$existing_doc), $actor_id);
-        $ingested_event=PLDR_Core::emit('PDFDocumentIngested.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id, 'status' => $edition_status));
-        if(is_wp_error($ingested_event))return PLDR_Core::machine_error('pldr_ingest_event_reconcile','PDF ingest was committed but its reliable event could not be persisted; reconciliation is required.',503,array('committed'=>true,'edition_id'=>$edition_id));
-        if ('published' === $edition_status) {
-            $published_event=PLDR_Core::emit('PDFDocumentPublished.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id));
-            if(is_wp_error($published_event))return PLDR_Core::machine_error('pldr_ingest_publish_event_reconcile','Published ingest was committed but its publication event could not be persisted; reconciliation is required.',503,array('committed'=>true,'edition_id'=>$edition_id));
-        }
 
         return array('document_id' => $public_id, 'edition_id' => $edition_id, 'status' => $edition_status, 'sha256' => $sha256, 'similarity_reviewed' => (bool) $similar);
     }
@@ -547,12 +547,15 @@ final class PLDR_Ingest {
         }
         if($stored_pages<1){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_empty_after_validation',array('provider'=>$provider));return;}
         $status_value=$truncated?'partial-truncated':'available';
+        if(false===$wpdb->query('START TRANSACTION')){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_ready_transaction_failed',array('provider'=>$provider,'pages'=>$stored_pages));return;}
         $status=$wpdb->replace(PLDR_Core::table('derivatives'),array('edition_id'=>(int)$edition['id'],'derivative_type'=>'ocr-status','page_number'=>0,'object_id'=>0,'language'=>$language,'quality_score'=>$quality,'lawful_basis'=>'rights-policy','status'=>$status_value,'source_version'=>(int)$edition['version'],'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
-        if(false===$status){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_status_store_failed',array('status'=>$status_value,'provider'=>$provider));return;}
+        if(false===$status){$wpdb->query('ROLLBACK');PLDR_Core::audit('edition',(int)$edition['id'],'ocr_status_store_failed',array('status'=>$status_value,'provider'=>$provider));return;}
+        if(!$truncated){
+            $event=PLDR_Core::emit('PDFDocumentOCRReady.v1','edition',(int)$edition['id'],array('edition_id'=>(int)$edition['id'],'quality'=>$quality,'provider'=>$provider,'pages'=>$stored_pages));
+            if(is_wp_error($event)){$wpdb->query('ROLLBACK');PLDR_Core::audit('edition',(int)$edition['id'],'ocr_event_atomic_rollback',array('provider'=>$provider,'pages'=>$stored_pages));return;}
+        }
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');PLDR_Core::audit('edition',(int)$edition['id'],'ocr_ready_commit_failed',array('provider'=>$provider,'pages'=>$stored_pages));return;}
         PLDR_Core::audit('edition',(int)$edition['id'],'ocr_generated',array('provider'=>$provider,'pages'=>$stored_pages,'truncated'=>$truncated));
-        if($truncated)return;
-        $event=PLDR_Core::emit('PDFDocumentOCRReady.v1','edition',(int)$edition['id'],array('edition_id'=>(int)$edition['id'],'quality'=>$quality,'provider'=>$provider,'pages'=>$stored_pages));
-        if(is_wp_error($event))PLDR_Core::audit('edition',(int)$edition['id'],'ocr_event_reconciliation_required',array('provider'=>$provider,'pages'=>$stored_pages));
     }
 
 }

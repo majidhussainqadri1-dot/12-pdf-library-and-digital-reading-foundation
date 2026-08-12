@@ -51,11 +51,15 @@ final class PLDR_Future_REST {
             array('methods'=>'GET','callback'=>array(__CLASS__,'a11y'),'permission_callback'=>'__return_true'),
             array('methods'=>'POST','callback'=>array(__CLASS__,'a11y_verify'),'permission_callback'=>array(__CLASS__,'logged_in')),
         ));
+        register_rest_route('pldr/v1', '/future/accessibility/(?P<edition>\d+)/refresh', array('methods'=>'POST','callback'=>array(__CLASS__,'a11y_refresh'),'permission_callback'=>array(__CLASS__,'can_review')));
         register_rest_route('pldr/v1', '/future/reading-room', array('methods'=>'POST','callback'=>array(__CLASS__,'reading_room'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/context/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'context'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/corpus/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'corpus'),'permission_callback'=>'__return_true','args'=>array('offset'=>array('sanitize_callback'=>'absint'),'limit'=>array('sanitize_callback'=>'absint'))));
         register_rest_route('pldr/v1', '/future/derive-text', array('methods'=>'POST','callback'=>array(__CLASS__,'derive_text'),'permission_callback'=>'__return_true'));
-        register_rest_route('pldr/v1', '/future/preservation/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'preservation'),'permission_callback'=>array(__CLASS__,'logged_in')));
+        register_rest_route('pldr/v1', '/future/preservation/(?P<edition>\d+)', array(
+            array('methods'=>'GET','callback'=>array(__CLASS__,'preservation'),'permission_callback'=>array(__CLASS__,'logged_in')),
+            array('methods'=>'POST','callback'=>array(__CLASS__,'preservation_refresh'),'permission_callback'=>array(__CLASS__,'can_preservation')),
+        ));
         register_rest_route('pldr/v1', '/future/fingerprint/(?P<edition>\d+)', array(
             array('methods'=>'GET','callback'=>array(__CLASS__,'duplicates'),'permission_callback'=>array(__CLASS__,'logged_in')),
             array('methods'=>'POST','callback'=>array(__CLASS__,'fingerprint'),'permission_callback'=>array(__CLASS__,'logged_in')),
@@ -84,9 +88,13 @@ final class PLDR_Future_REST {
             return PLDR_Core::machine_error('pldr_future_idempotency_required','This Future-24 mutation requires an Idempotency-Key.',428);
         }
         $actor = get_current_user_id();
+        if(!$actor)$key=PLDR_Core::scope_anonymous_idempotency_key($key);
         $route = 'future-' . $route;
-        $claim = PLDR_Core::idempotency_begin($route, $key, $actor);
+        $request_hash=PLDR_Core::request_fingerprint($request);
+        if(''===$request_hash)return PLDR_Core::machine_error('pldr_future_idempotency_fingerprint','The Future-24 mutation request could not be fingerprinted safely; it was not executed.',503);
+        $claim = PLDR_Core::idempotency_begin($route, $key, $actor, $request_hash);
         if ('hit' === ($claim['state'] ?? '')) return new WP_REST_Response($claim['body'], $claim['status']);
+        if ('conflict' === ($claim['state'] ?? '')) return PLDR_Core::machine_error('pldr_future_idempotency_conflict','This Idempotency-Key was already used for a different Future-24 request payload.',409);
         if ('pending' === ($claim['state'] ?? '')) return PLDR_Core::machine_error('pldr_future_idempotency_in_progress','A request with this Idempotency-Key is already in progress.',409,array('retry_after'=>2));
         if ('reserved' !== ($claim['state'] ?? '')) return PLDR_Core::machine_error('pldr_future_idempotency_unavailable','Idempotency protection could not be reserved; the mutation was not executed.',503);
         try{$result=$callback();}
@@ -95,7 +103,7 @@ final class PLDR_Future_REST {
         $response = is_wp_error($result) ? rest_convert_error_to_response($result) : rest_ensure_response($result);
         $status = $response instanceof WP_REST_Response ? $response->get_status() : 200;
         $body = $response instanceof WP_REST_Response ? $response->get_data() : $result;
-        if (!PLDR_Core::idempotency_complete($route, $key, $actor, $body, $status)) return PLDR_Core::machine_error('pldr_future_idempotency_persist','The operation completed but its idempotency result could not be finalized; reconcile before retrying with a new key.',503,array('original_status'=>$status));
+        if (!PLDR_Core::idempotency_complete($route, $key, $actor, $body, $status, $request_hash)) return PLDR_Core::machine_error('pldr_future_idempotency_persist','The operation completed but its idempotency result could not be finalized; reconcile before retrying with a new key.',503,array('original_status'=>$status));
         return is_wp_error($result) ? $result : $response;
     }
 
@@ -105,7 +113,7 @@ final class PLDR_Future_REST {
     public static function compare(WP_REST_Request $r) { return self::response(PLDR_Future_Data::compare(absint($r['left']),absint($r['right']))); }
     public static function citation_export(WP_REST_Request $r) { return self::response(PLDR_Future_Citations::export(absint($r['edition']),sanitize_key((string)($r['format']?:'csl-json')),absint($r['page']))); }
     public static function anchor(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'anchor',static fn()=>PLDR_Future_Anchors::save(absint($b['edition_id']??0),absint($b['page']??0),(array)($b['selector']??array()),(string)($b['note']??''))); }
-    public static function authority(WP_REST_Request $r) { $b=self::body($r);return self::response(PLDR_Future_Authority::lookup((string)($b['type']??''),(string)($b['value']??''),!empty($b['force']))); }
+    public static function authority(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'authority',static fn()=>PLDR_Future_Authority::lookup((string)($b['type']??''),(string)($b['value']??''),!empty($b['force']))); }
     public static function ocr_quality(WP_REST_Request $r) { return self::response(PLDR_Future_OCR_Lab::report(absint($r['edition']))); }
     public static function ocr_correction(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'ocr-correction',static fn()=>PLDR_Future_OCR_Lab::submit(absint($r['edition']),absint($b['page']??0),(string)($b['original']??''),(string)($b['corrected']??''))); }
     public static function ocr_review(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'ocr-review',static fn()=>PLDR_Future_OCR_Lab::review(absint($r['id']),(string)($b['decision']??''),(string)($b['note']??''))); }
@@ -115,33 +123,35 @@ final class PLDR_Future_REST {
     public static function heatmap(WP_REST_Request $r) { return self::response(PLDR_Future_Search::heatmap(absint($r['edition']),(string)$r['q'])); }
     public static function offline_grant(WP_REST_Request $r) {
         $b=self::body($r);
-        global $wpdb;$wpdb->last_error='';
-        $edition=PLDR_Core::edition(absint($b['edition_id']??0));
-        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_offline_edition_read','Offline-grant edition state could not be read reliably.',503,array('degraded'=>true));
-        if(!$edition)return PLDR_Core::machine_error('pldr_offline_edition','Edition not found.',404);
-        $uid=get_current_user_id();
-        try {
-            $ttl=(int)apply_filters('pldr_offline_vault_ttl',7*DAY_IN_SECONDS,$edition,$uid);
-        } catch (Throwable $e) {
-            PLDR_Core::audit('edition',(int)$edition['id'],'offline_vault_ttl_policy_provider_failed',array('provider_failure'=>1),$uid);
-            return PLDR_Core::machine_error('pldr_offline_ttl_policy','Offline-vault lifetime policy is temporarily unavailable; no offline delivery grant was issued.',503,array('degraded'=>true,'provider_failure'=>true));
-        }
-        $ttl=max(HOUR_IN_SECONDS,min(30*DAY_IN_SECONDS,$ttl));
-        $valid=time()+$ttl;
-        if(!empty($edition['rights_expires_at'])){
-            $rights=strtotime((string)$edition['rights_expires_at']);
-            if(false===$rights)return PLDR_Core::machine_error('pldr_offline_rights_state','Offline rights expiry could not be interpreted safely; no grant was issued.',503,array('degraded'=>true));
-            $valid=min($valid,$rights);
-        }
-        if($valid<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);
-        $grant_ttl=max(60,min(900,$valid-time()));
-        $grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline',$uid,$grant_ttl);
-        if(is_wp_error($grant))return $grant;
-        $grant['offline_valid_until']=gmdate('c',$valid);
-        $grant['requires_logout_purge']=true;
-        $grant['policy_checked_before_grant']=true;
-        $grant['device_vault_policy']='non-extractable WebCrypto key; local expiry enforced; future refresh requires server reauthorization';
-        return self::response($grant);
+        return self::idempotent($r,'offline-grant',static function() use($b){
+            global $wpdb;$wpdb->last_error='';
+            $edition=PLDR_Core::edition(absint($b['edition_id']??0));
+            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_offline_edition_read','Offline-grant edition state could not be read reliably.',503,array('degraded'=>true));
+            if(!$edition)return PLDR_Core::machine_error('pldr_offline_edition','Edition not found.',404);
+            $uid=get_current_user_id();
+            try {
+                $ttl=(int)apply_filters('pldr_offline_vault_ttl',7*DAY_IN_SECONDS,$edition,$uid);
+            } catch (Throwable $e) {
+                PLDR_Core::audit('edition',(int)$edition['id'],'offline_vault_ttl_policy_provider_failed',array('provider_failure'=>1),$uid);
+                return PLDR_Core::machine_error('pldr_offline_ttl_policy','Offline-vault lifetime policy is temporarily unavailable; no offline delivery grant was issued.',503,array('degraded'=>true,'provider_failure'=>true));
+            }
+            $ttl=max(HOUR_IN_SECONDS,min(30*DAY_IN_SECONDS,$ttl));
+            $valid=time()+$ttl;
+            if(!empty($edition['rights_expires_at'])){
+                $rights=strtotime((string)$edition['rights_expires_at']);
+                if(false===$rights)return PLDR_Core::machine_error('pldr_offline_rights_state','Offline rights expiry could not be interpreted safely; no grant was issued.',503,array('degraded'=>true));
+                $valid=min($valid,$rights);
+            }
+            if($valid<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);
+            $grant_ttl=max(60,min(900,$valid-time()));
+            $grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline',$uid,$grant_ttl);
+            if(is_wp_error($grant))return $grant;
+            $grant['offline_valid_until']=gmdate('c',$valid);
+            $grant['requires_logout_purge']=true;
+            $grant['policy_checked_before_grant']=true;
+            $grant['device_vault_policy']='non-extractable WebCrypto key; local expiry enforced; future refresh requires server reauthorization';
+            return $grant;
+        });
     }
     public static function preferences_get(WP_REST_Request $r) { return self::response(PLDR_Future_Preferences::get((string)($r['key']?:'reader'))); }
     public static function preferences_save(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'preferences-save',static fn()=>PLDR_Future_Preferences::save((string)($b['key']??'reader'),(array)($b['value']??array()),absint($b['expected_version']??0))); }
@@ -155,13 +165,15 @@ final class PLDR_Future_REST {
     public static function insight_event(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'insight-event',static fn()=>PLDR_Future_Insights::event(absint($b['edition_id']??0),(string)($b['type']??''),absint($b['page']??1),absint($b['duration_seconds']??0),(array)($b['context']??array()))); }
     public static function handoff_get(WP_REST_Request $r) { return self::response(PLDR_Future_Handoff::get(absint($r['edition']))); }
     public static function handoff_save(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'handoff-save',static fn()=>PLDR_Future_Handoff::save(absint($r['edition']),(array)($b['context']??$b),absint($b['expected_version']??0))); }
-    public static function a11y(WP_REST_Request $r) { return self::response(PLDR_Future_A11y::inspect(absint($r['edition']),!empty($r['refresh']))); }
+    public static function a11y(WP_REST_Request $r) { return self::response(PLDR_Future_A11y::inspect(absint($r['edition']),false)); }
+    public static function a11y_refresh(WP_REST_Request $r) { return self::idempotent($r,'a11y-refresh',static fn()=>PLDR_Future_A11y::inspect(absint($r['edition']),true)); }
     public static function a11y_verify(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'a11y-verify',static fn()=>PLDR_Future_A11y::verify(absint($r['edition']),(string)($b['note']??''))); }
     public static function reading_room(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'reading-room',static fn()=>PLDR_Future_Rooms::create(absint($b['edition_id']??0),absint($b['page']??1),(array)($b['anchor']??array()))); }
     public static function context(WP_REST_Request $r) { return self::response(PLDR_Future_Context::lookup(absint($r['edition']),(string)$r['selection'],absint($r['page']))); }
     public static function corpus(WP_REST_Request $r) { $limit=absint($r['limit']);if(!$limit)$limit=250;return self::response(PLDR_Future_Corpus::manifest(absint($r['edition']),absint($r['offset']),$limit)); }
-    public static function derive_text(WP_REST_Request $r) { $b=self::body($r);return self::response(PLDR_Future_Derived_Text::derive(absint($b['edition_id']??0),absint($b['page']??0),(string)($b['text']??''),(string)($b['mode']??''),(string)($b['target']??''))); }
-    public static function preservation(WP_REST_Request $r) { return self::response(PLDR_Future_Preservation::assess(absint($r['edition']),!empty($r['verify']))); }
+    public static function derive_text(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'derive-text',static fn()=>PLDR_Future_Derived_Text::derive(absint($b['edition_id']??0),absint($b['page']??0),(string)($b['text']??''),(string)($b['mode']??''),(string)($b['target']??''))); }
+    public static function preservation(WP_REST_Request $r) { return self::response(PLDR_Future_Preservation::read(absint($r['edition']))); }
+    public static function preservation_refresh(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'preservation-refresh',static fn()=>PLDR_Future_Preservation::assess(absint($r['edition']),!empty($b['verify']))); }
     public static function duplicates(WP_REST_Request $r) { $items=PLDR_Future_Fingerprint::candidates(absint($r['edition']));if(isset($items['error'])&&is_wp_error($items['error']))return $items['error'];return self::response(array('items'=>$items,'automatic_merge'=>false)); }
     public static function fingerprint(WP_REST_Request $r) { return self::idempotent($r,'fingerprint',static fn()=>PLDR_Future_Fingerprint::compute_and_store(absint($r['edition']))); }
 }
