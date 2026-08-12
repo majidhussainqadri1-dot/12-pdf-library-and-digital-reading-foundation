@@ -160,7 +160,7 @@ final class PLDR_Future_REST {
     public static function shelves() { $items=PLDR_Future_Shelves::list();if(isset($items['error'])&&is_wp_error($items['error']))return $items['error'];return self::response(array('items'=>$items,'private'=>true)); }
     public static function shelf_create(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-create',static fn()=>PLDR_Future_Shelves::create((string)($b['name']??''))); }
     public static function shelf_add(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-add',static fn()=>PLDR_Future_Shelves::add(absint($r['id']),absint($b['edition_id']??0))); }
-    public static function shelf_rename(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-rename',static fn()=>PLDR_Future_Shelves::rename(absint($r['id']),(string)($b['name']??''))); }
+    public static function shelf_rename(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-rename',static fn()=>PLDR_Future_Shelves::rename(absint($r['id']),(string)($b['name']??''),absint($b['expected_version']??0))); }
     public static function shelf_delete(WP_REST_Request $r) { return self::idempotent($r,'shelf-delete',static fn()=>PLDR_Future_Shelves::remove(absint($r['id']))); }
     public static function shelf_remove_item(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-remove-item',static fn()=>PLDR_Future_Shelves::remove_item(absint($r['id']),absint($b['edition_id']??0))); }
     public static function insights(WP_REST_Request $r) { return self::response(PLDR_Future_Insights::report(absint($r['days']?:30))); }

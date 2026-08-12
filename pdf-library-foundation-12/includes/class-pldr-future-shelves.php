@@ -84,7 +84,7 @@ final class PLDR_Future_Shelves {
         return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added'=>1===$stored,'already_present'=>0===$stored);
     }
 
-    public static function rename(int $shelf_id,string $name) {
+    public static function rename(int $shelf_id,string $name,int $expected_version=0) {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
@@ -92,10 +92,12 @@ final class PLDR_Future_Shelves {
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true));
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
         if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be renamed.',409);
+        if($expected_version<1)return PLDR_Core::machine_error('pldr_shelf_precondition','Shelf rename requires the exact expected shelf version.',428,array('current_version'=>(int)$shelf['version']));
+        if((int)$shelf['version']!==$expected_version)return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed; refresh before renaming.',409,array('current_version'=>(int)$shelf['version']));
         $name=self::name($name);
         if(''===$name)return PLDR_Core::machine_error('pldr_shelf_name','Shelf name is required.',400);
-        $next=(int)$shelf['version']+1;
-        $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('shelves').' SET name=%s,version=%d,updated_at=%s WHERE id=%d AND user_id=%d AND version=%d',$name,$next,PLDR_Core::now(),$shelf_id,$uid,(int)$shelf['version']));
+        $next=$expected_version+1;
+        $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('shelves').' SET name=%s,version=%d,updated_at=%s WHERE id=%d AND user_id=%d AND version=%d',$name,$next,PLDR_Core::now(),$shelf_id,$uid,$expected_version));
         if(false===$updated)return PLDR_Core::machine_error('pldr_shelf_rename','Shelf could not be renamed.',500);
         if(1!==$updated)return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed concurrently; refresh before renaming.',409);
         return array('id'=>$shelf_id,'name'=>$name,'version'=>$next);
