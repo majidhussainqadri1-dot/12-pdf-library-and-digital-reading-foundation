@@ -45,7 +45,8 @@ $must($a11y, 'AND verified_by=0 AND score=%f AND status=%s AND findings_json=%s 
 // Round 6.
 $must($fingerprint, 'function can_compute', 'Fingerprint compute authority helper missing.');
 $must($fingerprint, 'pldr_fingerprint_compute_forbidden', 'Fingerprint heavy-compute authority failure missing.');
-$must($fingerprint, '&&self::can_compute($edition)', 'Candidate lookup can still trigger unrestricted compute.');
+$must($fingerprint, 'pldr_fingerprint_required', 'Candidate lookup is not read-only when fingerprint evidence is missing.');
+$must($fingerprint, 'Compute the missing fingerprint evidence with the idempotent fingerprint POST', 'Candidate lookup does not direct heavy computation to the governed idempotent POST path.');
 
 // Round 7.
 $must($context, 'MAX_PROVIDER_CALLS_PER_HOUR', 'Knowledge Context provider rate ceiling missing.');
