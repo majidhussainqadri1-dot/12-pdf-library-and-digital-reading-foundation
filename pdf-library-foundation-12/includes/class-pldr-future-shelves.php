@@ -70,18 +70,25 @@ final class PLDR_Future_Shelves {
         }finally{$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
     }
 
-    public static function add(int $shelf_id,int $edition_id) {
+    public static function add(int $shelf_id,int $edition_id,int $expected_version=0) {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
         $wpdb->last_error='';$shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true));
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
-        $edition=PLDR_Future_Data::require_edition($edition_id);
-        if(is_wp_error($edition))return $edition;
+        if($expected_version<1)return PLDR_Core::machine_error('pldr_shelf_precondition','Adding a shelf item requires the exact expected shelf version.',428,array('current_version'=>(int)$shelf['version']));
+        if((int)$shelf['version']!==$expected_version)return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed; refresh before adding an item.',409,array('current_version'=>(int)$shelf['version']));
+        $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return $edition;
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_shelf_item_transaction','Shelf membership transaction could not start.',500);
         $stored=$wpdb->query($wpdb->prepare('INSERT IGNORE INTO '.PLDR_Core::table('shelf_items').' (shelf_id,edition_id,added_at) VALUES (%d,%d,%s)',$shelf_id,$edition_id,PLDR_Core::now()));
-        if(false===$stored)return PLDR_Core::machine_error('pldr_shelf_item_store','Shelf item could not be stored.',500);
-        return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added'=>1===$stored,'already_present'=>0===$stored);
+        if(false===$stored){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_item_store','Shelf item could not be stored.',500);}
+        if(0===$stored){$wpdb->query('ROLLBACK');return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added'=>false,'already_present'=>true,'version'=>$expected_version);}
+        $next=$expected_version+1;
+        $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('shelves').' SET version=%d,updated_at=%s WHERE id=%d AND user_id=%d AND version=%d',$next,PLDR_Core::now(),$shelf_id,$uid,$expected_version));
+        if(1!==$updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed concurrently; membership insertion was rolled back.',409);}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_item_commit','Shelf membership could not be committed atomically.',500);}
+        return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added'=>true,'already_present'=>false,'version'=>$next);
     }
 
     public static function rename(int $shelf_id,string $name,int $expected_version=0) {
@@ -122,19 +129,26 @@ final class PLDR_Future_Shelves {
         return array('id'=>$shelf_id,'deleted'=>true,'items_removed'=>(int)$items);
     }
 
-    public static function remove_item(int $shelf_id,int $edition_id) {
+    public static function remove_item(int $shelf_id,int $edition_id,int $expected_version=0) {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
-        $wpdb->last_error='';$shelf=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        $wpdb->last_error='';$shelf=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true));
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
+        if($expected_version<1)return PLDR_Core::machine_error('pldr_shelf_precondition','Removing a shelf item requires the exact expected shelf version.',428,array('current_version'=>(int)$shelf['version']));
+        if((int)$shelf['version']!==$expected_version)return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed; refresh before removing an item.',409,array('current_version'=>(int)$shelf['version']));
         $wpdb->last_error='';$exists=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d AND edition_id=%d',$shelf_id,$edition_id));
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_item_read','Shelf membership state could not be read reliably.',503,array('degraded'=>true));
         if(!$exists)return PLDR_Core::machine_error('pldr_shelf_item_missing','Shelf item was not found.',404);
+        if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_shelf_item_transaction','Shelf membership transaction could not start.',500);
         $deleted=$wpdb->delete(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id));
-        if(1!==$deleted)return PLDR_Core::machine_error('pldr_shelf_item_delete','Shelf item could not be removed.',500);
-        return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'removed'=>true);
+        if(1!==$deleted){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_item_delete','Shelf item could not be removed.',500);}
+        $next=$expected_version+1;
+        $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('shelves').' SET version=%d,updated_at=%s WHERE id=%d AND user_id=%d AND version=%d',$next,PLDR_Core::now(),$shelf_id,$uid,$expected_version));
+        if(1!==$updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed concurrently; membership removal was rolled back.',409);}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_item_commit','Shelf membership removal could not be committed atomically.',500);}
+        return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'removed'=>true,'version'=>$next);
     }
 
     private static function name(string $name):string {
