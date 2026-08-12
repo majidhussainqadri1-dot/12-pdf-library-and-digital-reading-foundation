@@ -162,7 +162,10 @@ final class PLDR_Reading {
     public static function state(int $edition_id, int $user_id = 0): array {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
-        if (!$user_id || !PLDR_Access::can_access_edition($edition_id, 'read', $user_id)) return array('page' => 1, 'percent' => 0);
+        if (!$user_id) return array('page' => 1, 'percent' => 0);
+        $wpdb->last_error='';$allowed=PLDR_Access::can_access_edition($edition_id,'read',$user_id);
+        if(''!==(string)$wpdb->last_error)return array('page'=>1,'percent'=>0,'error'=>PLDR_Core::machine_error('pldr_progress_access_read','Private reading-progress authorization state could not be verified reliably.',503,array('degraded'=>true)));
+        if(!$allowed)return array('page'=>1,'percent'=>0);
         $wpdb->last_error='';
         $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . PLDR_Core::table('reading_state') . ' WHERE user_id=%d AND edition_id=%d', $user_id, $edition_id), ARRAY_A);
         if(''!==(string)$wpdb->last_error)return array('page'=>1,'percent'=>0,'error'=>PLDR_Core::machine_error('pldr_progress_read','Private reading progress could not be read reliably.',503,array('degraded'=>true)));
