@@ -146,10 +146,15 @@ final class PLDR_Rights {
         global $wpdb;
         $reviewer_id = $reviewer_id ?: get_current_user_id();
         if (!PLDR_Core::authorize('rights', $document_id, $reviewer_id) && !PLDR_Core::authorize('manage', $document_id, $reviewer_id)) return PLDR_Core::machine_error('pldr_approve_forbidden','Rights-review authority is required.',403);
-        $doc = PLDR_Core::document($document_id); if(!$doc) return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);
-        if ($expected_version && (int)$doc['version'] !== $expected_version) return PLDR_Core::machine_error('pldr_document_conflict','Document changed; refresh before approval.',409,array('current_version'=>(int)$doc['version']));
+        $wpdb->last_error='';$doc = PLDR_Core::document($document_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_approve_document_read','Document state could not be read reliably before publication approval.',503,array('degraded'=>true));
+        if(!$doc) return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);
+        if ($expected_version<1) return PLDR_Core::machine_error('pldr_approve_precondition','Document publication approval requires the exact expected document version.',428,array('current_version'=>(int)$doc['version']));
+        if ((int)$doc['version'] !== $expected_version) return PLDR_Core::machine_error('pldr_document_conflict','Document changed; refresh before approval.',409,array('current_version'=>(int)$doc['version']));
         if (!in_array($doc['status'],array('rights_review','scan','restricted'),true)) return PLDR_Core::machine_error('pldr_approve_state','Document is not in an approvable state.',409);
-        $edition = PLDR_Core::latest_edition($document_id); $object = $edition ? PLDR_Core::object((int)$edition['object_id']) : null;
+        $wpdb->last_error='';$edition = PLDR_Core::latest_edition($document_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_approve_edition_read','Latest edition state could not be read reliably before publication approval.',503,array('degraded'=>true));
+        $object=null;if($edition){$wpdb->last_error='';$object=PLDR_Core::object((int)$edition['object_id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_approve_object_read','Encrypted object state could not be read reliably before publication approval.',503,array('degraded'=>true));}
         if(!$edition || !$object || 'available'!==$object['object_status'] || 'clean'!==$object['scan_status']) return PLDR_Core::machine_error('pldr_approve_scan','A clean available encrypted object is required before publication.',409);
         foreach(array('author_name','source_name','rights_basis','sha256') as $field) if(empty($edition[$field])) return PLDR_Core::machine_error('pldr_approve_metadata','Rights/source metadata is incomplete.',409,array('field'=>$field));
 
