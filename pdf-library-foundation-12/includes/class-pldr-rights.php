@@ -83,7 +83,8 @@ final class PLDR_Rights {
         if(!$case)return PLDR_Core::machine_error('pldr_case_missing','Rights case not found.',404);
         $document_id=(int)$case['document_id'];
         if(!PLDR_Core::authorize('rights',$document_id,$reviewer_id) && !PLDR_Core::authorize('manage',$document_id,$reviewer_id))return PLDR_Core::machine_error('pldr_rights_forbidden','Rights-review authority for this document is required.',403);
-        if($expected_version && (int)$case['version']!==$expected_version)return PLDR_Core::machine_error('pldr_case_conflict','Rights case changed; refresh before deciding.',409,array('current_version'=>(int)$case['version']));
+        if($expected_version<1)return PLDR_Core::machine_error('pldr_case_precondition','Rights-case decisions require the exact expected case version.',428,array('current_version'=>(int)$case['version']));
+        if((int)$case['version']!==$expected_version)return PLDR_Core::machine_error('pldr_case_conflict','Rights case changed; refresh before deciding.',409,array('current_version'=>(int)$case['version']));
         if('closed'===$case['state'])return PLDR_Core::machine_error('pldr_case_state','This rights case cannot transition from its current state.',409);
         $allowed=array('restrict','remove','restore','dismiss','request-evidence');
         if(!in_array($decision,$allowed,true))return PLDR_Core::machine_error('pldr_case_decision','Invalid rights-case decision.',400);
