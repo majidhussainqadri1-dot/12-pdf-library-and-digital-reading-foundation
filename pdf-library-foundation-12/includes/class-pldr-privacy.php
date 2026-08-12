@@ -158,6 +158,17 @@ final class PLDR_Privacy {
             });
         }
 
+        $shelf_items_exists=self::table_exists('shelf_items');
+        if(self::table_check_failed())return self::export_failure($data,'shelf_items_table',$user_id);
+        $shelves_exists=self::table_exists('shelves');
+        if(self::table_check_failed())return self::export_failure($data,'shelves_table',$user_id);
+        if($shelf_items_exists&&$shelves_exists){
+            $items=PLDR_Core::table('shelf_items');$shelves=PLDR_Core::table('shelves');$editions=PLDR_Core::table('editions');$documents=PLDR_Core::table('documents');$wpdb->last_error='';
+            $shelf_rows=$wpdb->get_results($wpdb->prepare("SELECT i.id,i.edition_id,i.added_at,s.shelf_key,s.name shelf_name,d.public_id,d.title FROM {$items} i JOIN {$shelves} s ON s.id=i.shelf_id JOIN {$editions} e ON e.id=i.edition_id JOIN {$documents} d ON d.id=e.document_id WHERE s.user_id=%d ORDER BY i.id ASC LIMIT %d OFFSET %d",$user_id,$limit,$offset),ARRAY_A);
+            if(''!==(string)$wpdb->last_error)return self::export_failure($data,'shelf_items',$user_id);$shelf_rows=is_array($shelf_rows)?$shelf_rows:array();$counts[]=count($shelf_rows);
+            self::add_export_rows($data,$shelf_rows,'pldr-future-shelf-items',__('PDF Library private shelf membership','pdf-library-digital-reading'),'id',static function(array $row):array{return array(array('name'=>'Shelf key','value'=>(string)$row['shelf_key']),array('name'=>'Shelf name','value'=>(string)$row['shelf_name']),array('name'=>'Document','value'=>(string)$row['title'].' ('.(string)$row['public_id'].')'),array('name'=>'Edition','value'=>(int)$row['edition_id']),array('name'=>'Added','value'=>(string)$row['added_at']));});
+        }
+
         return array('data'=>$data, 'done'=>max($counts ?: array(0)) < $limit);
     }
 
@@ -321,7 +332,8 @@ final class PLDR_Privacy {
         }
         if($errors)return array('items_removed'=>$removed>0,'items_retained'=>true,'messages'=>array(__('File 12 privacy reconciliation could not confirm completion; retry is required.','pdf-library-digital-reading')),'done'=>false);
 
-        PLDR_Core::audit('privacy', 0, 'user_reading_erasure_batch', array('user_id'=>$user_id,'removed'=>$removed,'remaining'=>$remaining,'page'=>max(1,$page)));
+        $subject_ref=substr(hash_hmac('sha256',(string)$user_id,wp_salt('auth')),0,24);
+        PLDR_Core::audit('privacy', 0, 'user_reading_erasure_batch', array('subject_ref'=>$subject_ref,'removed'=>$removed,'remaining'=>$remaining,'page'=>max(1,$page)));
         return array(
             'items_removed'=>$removed > 0,
             'items_retained'=>$remaining > 0,
