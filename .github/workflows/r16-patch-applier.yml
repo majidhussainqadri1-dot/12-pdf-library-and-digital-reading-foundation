@@ -39,25 +39,15 @@ jobs:
           set -euo pipefail
           git apply --check /tmp/r16.patch
           git apply /tmp/r16.patch
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('.github/workflows/file-12-quality.yml')
-          s = p.read_text()
-          old = "      - name: Fifteenth fresh twenty-round corrective-review regressions\n        run: php tests/test-twenty-round-review-r15.php\n      - name: Secret scan"
-          new = "      - name: Fifteenth fresh twenty-round corrective-review regressions\n        run: php tests/test-twenty-round-review-r15.php\n      - name: Sixteenth fresh twenty-round corrective-review regressions\n        run: php tests/test-twenty-round-review-r16.php\n      - name: Secret scan"
-          if old not in s:
-              raise SystemExit('R16 quality-gate insertion marker missing')
-          p.write_text(s.replace(old, new, 1))
-          PY
           find pdf-library-foundation-12 -type f -name '*.php' -print0 | xargs -0 -n1 php -l
           find pdf-library-foundation-12/assets -type f -name '*.js' -print0 | xargs -0 -n1 node --check
           php tests/test-twenty-round-review-r16.php
-      - name: Commit exact reviewed R16 state and remove transfer harness
+      - name: Commit exact reviewed R16 source state
         run: |
           set -euo pipefail
-          git rm -r r16-review.patch.zlib.b64 r16-chunks .github/workflows/r16-patch-applier.yml
-          git add pdf-library-foundation-12 docs tests .github/workflows/file-12-quality.yml
+          git rm -r r16-review.patch.zlib.b64 r16-chunks
+          git add pdf-library-foundation-12 docs tests
           git config user.name 'Sabri File 12 R16 Corrective Review'
           git config user.email 'actions@users.noreply.github.com'
-          git commit -m 'Apply File 12 R16 twenty-round corrective review'
+          git commit -m 'Apply File 12 R16 twenty-round corrective review source'
           git push origin HEAD:feat/file-12-future-24-v1.1.0-rc1
