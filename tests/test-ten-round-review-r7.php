@@ -52,7 +52,8 @@ $must($prefs, "if(0===\$current_version && \$expected>0)", 'Missing-row preferen
 // Round 6 — atomic/retryable fingerprints.
 $must($fingerprint, "START TRANSACTION", 'Fingerprint persistence is not transactional.');
 $must($fingerprint, 'pldr_fingerprint_commit', 'Fingerprint COMMIT failure is not fail visible.');
-$must($fingerprint, '$needs_visual=', 'Missing visual fingerprints are not detected for retry.');
+$must($fingerprint, '$missing_types=array();', 'Missing fingerprint evidence is not detected for an explicit retry/compute step.');
+$must($fingerprint, 'pldr_fingerprint_required', 'Read-only fingerprint candidates do not expose the required compute-first retry state.');
 $must($fingerprint, "'atomic_persistence'=>true", 'Fingerprint atomic-persistence disclosure is missing.');
 
 // Round 7 — IIIF page identity independent of thumbnails.
