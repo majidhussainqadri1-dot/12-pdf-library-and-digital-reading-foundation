@@ -348,10 +348,11 @@ final class PLDR_Access {
     }
 
     public static function cleanup_tokens(): void {
-        global $wpdb;
-        $tokens=$wpdb->query($wpdb->prepare('DELETE FROM ' . PLDR_Core::table('access_tokens') . ' WHERE expires_at<%s OR (revoked_at IS NOT NULL AND revoked_at<%s)', gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS), gmdate('Y-m-d H:i:s', time() - 7 * DAY_IN_SECONDS)));
+        global $wpdb;$batch=500;
+        $tokens=$wpdb->query($wpdb->prepare("DELETE FROM ".PLDR_Core::table('access_tokens')." WHERE expires_at<%s OR (revoked_at IS NOT NULL AND revoked_at<%s) ORDER BY id ASC LIMIT {$batch}",gmdate('Y-m-d H:i:s',time()-DAY_IN_SECONDS),gmdate('Y-m-d H:i:s',time()-7*DAY_IN_SECONDS)));
         if(false===$tokens)PLDR_Core::audit('system',0,'access_token_cleanup_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
-        $idem=$wpdb->query($wpdb->prepare('DELETE FROM ' . PLDR_Core::table('idempotency') . ' WHERE expires_at<%s', PLDR_Core::now()));
+        $idem=$wpdb->query($wpdb->prepare("DELETE FROM ".PLDR_Core::table('idempotency')." WHERE expires_at<%s LIMIT {$batch}",PLDR_Core::now()));
         if(false===$idem)PLDR_Core::audit('system',0,'idempotency_cleanup_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
+        if($batch===$tokens||$batch===$idem){if(!wp_next_scheduled('pldr_cleanup_tokens'))wp_schedule_single_event(time()+60,'pldr_cleanup_tokens');}
     }
 }

@@ -226,14 +226,13 @@ final class PLDR_Rights {
         global $wpdb;
         $editions=PLDR_Core::table('editions');
         $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare(
-            "SELECT e.document_id FROM {$editions} e INNER JOIN (SELECT document_id,MAX(id) current_id FROM {$editions} WHERE status=%s GROUP BY document_id) current ON current.current_id=e.id WHERE e.rights_expires_at IS NOT NULL AND e.rights_expires_at<=%s",
+            "SELECT e.document_id FROM {$editions} e INNER JOIN (SELECT document_id,MAX(id) current_id FROM {$editions} WHERE status=%s GROUP BY document_id) current ON current.current_id=e.id WHERE e.rights_expires_at IS NOT NULL AND e.rights_expires_at<=%s ORDER BY e.rights_expires_at ASC LIMIT 100",
             'published',PLDR_Core::now()
         ),ARRAY_A);
         if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'rights_expiry_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return;}
-        foreach(is_array($rows)?$rows:array() as $r){
-            $doc=PLDR_Core::document((int)$r['document_id']);
-            if($doc && 'published'===$doc['status'])self::set_document_status((int)$doc['id'],'restricted','rights-expired');
-        }
+        $rows=is_array($rows)?$rows:array();
+        foreach($rows as $r){$wpdb->last_error='';$doc=PLDR_Core::document((int)$r['document_id']);if(''!==(string)$wpdb->last_error){PLDR_Core::audit('document',(int)$r['document_id'],'rights_expiry_document_read_failed',array());continue;}if($doc && 'published'===$doc['status'])self::set_document_status((int)$doc['id'],'restricted','rights-expired');}
+        if(100===count($rows))wp_schedule_single_event(time()+60,'pldr_rights_expiry');
     }
 }
 
@@ -310,7 +309,12 @@ final class PLDR_Integrations {
                 'processing',$lease_until,(int)$row['id'],'pending','retry','processing',$now
             ));
             if(1!==$claimed)continue;
-            $payload=json_decode((string)$row['payload_json'],true)?:array();
+            $payload=json_decode((string)$row['payload_json'],true);
+            if(!is_array($payload)||JSON_ERROR_NONE!==json_last_error()){
+                $dead=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>'dead-letter','attempts'=>max(8,(int)$row['attempts']+1),'last_error'=>'invalid-payload-json'),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
+                PLDR_Core::audit('outbox',(int)$row['id'],'outbox_payload_corrupt',array('event_id'=>(string)$row['event_id'],'dead_letter_persisted'=>1===$dead));
+                continue;
+            }
             try{
                 $accepted=apply_filters('pldr_dispatch_event',true,(string)$row['event_name'],$payload,(string)$row['event_id']);
                 if(false===$accepted)throw new RuntimeException('A consumer requested retry.');
