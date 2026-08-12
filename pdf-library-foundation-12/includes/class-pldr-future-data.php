@@ -5,6 +5,16 @@ defined('ABSPATH') || exit;
 final class PLDR_Future_Data {
     private const BULK_OCR_LIMIT = 1000;
     private const REFLOW_WINDOW_LIMIT = 100;
+    private const PROVIDER_CALLS_PER_HOUR = 120;
+
+    private static function consume_provider_rate(string $kind,int $edition_id) {
+        global $wpdb;$uid=get_current_user_id();
+        if($uid>0)$identity='u:'.$uid;else{$ip=sanitize_text_field((string)($_SERVER['REMOTE_ADDR']??'unknown'));$ua=substr(sanitize_text_field((string)($_SERVER['HTTP_USER_AGENT']??'unknown')),0,300);$identity='a:'.hash_hmac('sha256',$ip.'|'.$ua,wp_salt('auth'));}
+        $kind=sanitize_key($kind);$scope=hash('sha256',$identity.'|'.$kind.'|'.$edition_id);$bucket='pldr_provider_rate_'.substr(hash('sha256',$scope.'|'.gmdate('YmdH')),0,32);$lock='pldr_provider_rate_'.substr($scope,0,32);
+        $wpdb->last_error='';$locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,1)',$lock));if(''!==(string)$wpdb->last_error||1!==$locked)return PLDR_Core::machine_error('pldr_provider_rate_lock','Advanced reading provider capacity is temporarily unavailable.',503,array('retry_after'=>2));
+        try{$count=(int)get_transient($bucket);try{$limit=(int)apply_filters('pldr_future_provider_hourly_limit',self::PROVIDER_CALLS_PER_HOUR,$kind,$edition_id,$uid);}catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'future_provider_rate_policy_failed',array('provider_kind'=>$kind,'provider_failure'=>true),$uid);return PLDR_Core::machine_error('pldr_provider_rate_policy','Advanced reading provider rate policy could not be verified.',503,array('degraded'=>true,'provider_failure'=>true));}$limit=max(20,min(2000,$limit));if($count>=$limit)return PLDR_Core::machine_error('pldr_provider_rate_limit','Advanced reading provider capacity is temporarily rate limited.',429,array('retry_after'=>60,'hourly_limit'=>$limit,'provider_kind'=>$kind));if(!set_transient($bucket,$count+1,HOUR_IN_SECONDS+120))return PLDR_Core::machine_error('pldr_provider_rate_store','Advanced reading provider rate state could not be stored.',503);return true;}finally{$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
+    }
+
 
     public static function require_edition(int $edition_id, string $operation = 'read') {
         global $wpdb;
@@ -65,6 +75,7 @@ final class PLDR_Future_Data {
         $external_input_total=0;
         $external_used=false;
         if (!$pages) {
+            $provider_rate=self::consume_provider_rate('reflow',$edition_id);if(is_wp_error($provider_rate))return array('error'=>$provider_rate);
             try {
                 $external = apply_filters('pldr_reflow_extract', null, $edition_id, $edition, $page);
             } catch (Throwable $e) {
