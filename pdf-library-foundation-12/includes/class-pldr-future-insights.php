@@ -48,7 +48,12 @@ final class PLDR_Future_Insights {
         $groups=is_array($groups)?$groups:array();
         $group_scan_truncated=count($groups)>self::REPORT_GROUP_LIMIT;if($group_scan_truncated)$groups=array_slice($groups,0,self::REPORT_GROUP_LIMIT);
         $seconds=0;$pages=0;$editions=0;$recent=array();$hidden=0;
-        foreach($groups as $row){$edition_id=(int)$row['edition_id'];if(!PLDR_Access::can_access_edition($edition_id,'read',$uid)){$hidden++;continue;}$editions++;$seconds+=(int)$row['seconds'];$pages+=(int)$row['distinct_pages'];if(count($recent)<10)$recent[]=array('edition_id'=>$edition_id,'seconds'=>(int)$row['seconds'],'title'=>(string)$row['title']);}
+        foreach($groups as $row){
+            $edition_id=(int)$row['edition_id'];$wpdb->last_error='';$allowed=PLDR_Access::can_access_edition($edition_id,'read',$uid);
+            if(''!==(string)$wpdb->last_error){PLDR_Core::audit('user',$uid,'reading_insights_access_read_failed',array('edition_id'=>$edition_id,'days'=>$days),$uid);return array('error'=>PLDR_Core::machine_error('pldr_insight_access_read','Private reading-insight authorization state could not be verified reliably; no partial aggregate was returned.',503,array('degraded'=>true)));}
+            if(!$allowed){$hidden++;continue;}
+            $editions++;$seconds+=(int)$row['seconds'];$pages+=(int)$row['distinct_pages'];if(count($recent)<10)$recent[]=array('edition_id'=>$edition_id,'seconds'=>(int)$row['seconds'],'title'=>(string)$row['title']);
+        }
         $wpdb->last_error='';
         $completed_rows=$wpdb->get_col($wpdb->prepare('SELECT edition_id FROM '.PLDR_Core::table('reading_state').' WHERE user_id=%d AND percent>=%f AND updated_at>=%s ORDER BY updated_at DESC LIMIT %d',$uid,99.5,$since,self::COMPLETION_SCAN_LIMIT+1));
         if(''!==(string)$wpdb->last_error){
