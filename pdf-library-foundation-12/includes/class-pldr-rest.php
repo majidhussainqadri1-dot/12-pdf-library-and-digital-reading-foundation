@@ -7,7 +7,7 @@ final class PLDR_REST {
     private const READER_PREVIEW_GRANT_LIMIT = 50;
 
     public static function register(): void {
-        register_rest_route('pldr/v1','/library',array('methods'=>'GET','callback'=>array(__CLASS__,'library'),'permission_callback'=>'__return_true','args'=>array('q'=>array('sanitize_callback'=>'sanitize_text_field'),'type'=>array('sanitize_callback'=>'sanitize_key'),'category'=>array('sanitize_callback'=>'sanitize_key'),'language'=>array('sanitize_callback'=>'sanitize_text_field'),'page'=>array('sanitize_callback'=>'absint'),'per_page'=>array('sanitize_callback'=>'absint'))));
+        register_rest_route('pldr/v1','/library',array('methods'=>'GET','callback'=>array(__CLASS__,'library'),'permission_callback'=>'__return_true','args'=>array('q'=>array('sanitize_callback'=>'sanitize_text_field'),'type'=>array('sanitize_callback'=>'sanitize_key'),'category'=>array('sanitize_callback'=>'sanitize_key'),'language'=>array('sanitize_callback'=>'sanitize_text_field'),'page'=>array('sanitize_callback'=>'absint'),'per_page'=>array('sanitize_callback'=>'absint'),'cursor'=>array('sanitize_callback'=>'sanitize_text_field'))));
         register_rest_route('pldr/v1','/document/(?P<id>[a-f0-9\-]{36})',array('methods'=>'GET','callback'=>array(__CLASS__,'document'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1','/ingest',array('methods'=>'POST','callback'=>array(__CLASS__,'ingest'),'permission_callback'=>array(__CLASS__,'can_publish')));
         register_rest_route('pldr/v1','/documents/(?P<id>[a-f0-9\-]{36})/approve',array('methods'=>'POST','callback'=>array(__CLASS__,'approve_document'),'permission_callback'=>array(__CLASS__,'can_rights')));
