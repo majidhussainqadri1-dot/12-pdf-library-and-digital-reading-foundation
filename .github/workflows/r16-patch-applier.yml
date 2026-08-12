@@ -1,0 +1,56 @@
+name: R16 Corrective Review Patch Applier
+
+on:
+  push:
+    branches:
+      - feat/file-12-future-24-v1.1.0-rc1
+    paths:
+      - r16-review.patch.zlib.b64
+      - .github/workflows/r16-patch-applier.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/file-12-future-24-v1.1.0-rc1
+          fetch-depth: 0
+      - name: Decode reviewed R16 patch
+        run: |
+          python - <<'PY'
+          import base64, zlib
+          from pathlib import Path
+          payload = Path('r16-review.patch.zlib.b64').read_text().strip()
+          Path('/tmp/r16.patch').write_bytes(zlib.decompress(base64.b64decode(payload)))
+          PY
+      - name: Apply reviewed R16 corrections
+        run: |
+          set -euo pipefail
+          git apply --check /tmp/r16.patch
+          git apply /tmp/r16.patch
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/file-12-quality.yml')
+          s = p.read_text()
+          old = "      - name: Fifteenth fresh twenty-round corrective-review regressions\n        run: php tests/test-twenty-round-review-r15.php\n      - name: Secret scan"
+          new = "      - name: Fifteenth fresh twenty-round corrective-review regressions\n        run: php tests/test-twenty-round-review-r15.php\n      - name: Sixteenth fresh twenty-round corrective-review regressions\n        run: php tests/test-twenty-round-review-r16.php\n      - name: Secret scan"
+          if old not in s:
+              raise SystemExit('R16 quality-gate insertion marker missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          find pdf-library-foundation-12 -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+          find pdf-library-foundation-12/assets -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          php tests/test-twenty-round-review-r16.php
+      - name: Commit exact reviewed R16 state
+        run: |
+          set -euo pipefail
+          git rm r16-review.patch.zlib.b64 .github/workflows/r16-patch-applier.yml
+          git add pdf-library-foundation-12 docs tests .github/workflows/file-12-quality.yml
+          git config user.name 'Sabri File 12 R16 Corrective Review'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Apply File 12 R16 twenty-round corrective review'
+          git push origin HEAD:feat/file-12-future-24-v1.1.0-rc1
