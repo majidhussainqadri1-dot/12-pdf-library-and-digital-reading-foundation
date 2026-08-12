@@ -120,13 +120,15 @@ final class PLDR_Future_Data {
         global $wpdb;
         $edition = self::require_edition($edition_id);
         if (is_wp_error($edition)) return array('error' => $edition);
-        $external_failure=false;$external_error='';
-        try {
+        $external_failure=false;$external_error='';$external=null;
+        $provider_rate=self::consume_provider_rate('outline',$edition_id);
+        if(is_wp_error($provider_rate)){$external_failure=true;$external_error=$provider_rate->get_error_code();}
+        else{try {
             $external = apply_filters('pldr_outline_extract', null, $edition_id, $edition);
         } catch (Throwable $e) {
             $external=null;$external_failure=true;$external_error=self::limit_text(sanitize_text_field($e->getMessage()),500);
             PLDR_Core::audit('edition',$edition_id,'outline_provider_failed',array('error'=>$external_error));
-        }
+        }}
         if (is_array($external) && isset($external['items']) && is_array($external['items'])) {
             $provider=self::limit_text(sanitize_text_field((string)($external['provider']??'')),80);
             if(''===$provider){$external_failure=true;$external_error='provider-provenance-missing';}
