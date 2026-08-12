@@ -71,7 +71,7 @@ final class PLDR_REST {
     public static function reader_access(WP_REST_Request $request) {
         global $wpdb;$edition_id=absint($request['edition_id']);$operation=sanitize_key((string)($request['operation']?:'read'));$edition=PLDR_Core::edition($edition_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_reader_access_edition_read','Edition state could not be read reliably before grant issue.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_edition_missing','Edition not found.',404);
         $object_id=(int)$edition['object_id'];if(!empty($request['object_id']))$object_id=absint($request['object_id']);
-        return rest_ensure_response(PLDR_Access::issue_token($edition_id,$object_id,$operation,get_current_user_id(),absint($request['ttl']?:600)));
+        return self::idempotent($request,'reader-access',static fn()=>PLDR_Access::issue_token($edition_id,$object_id,$operation,get_current_user_id(),absint($request['ttl']?:600)));
     }
 
     public static function reader_manifest(WP_REST_Request $request) {
