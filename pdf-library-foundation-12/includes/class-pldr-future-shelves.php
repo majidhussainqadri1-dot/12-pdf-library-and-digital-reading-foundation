@@ -103,7 +103,7 @@ final class PLDR_Future_Shelves {
         return array('id'=>$shelf_id,'name'=>$name,'version'=>$next);
     }
 
-    public static function remove(int $shelf_id) {
+    public static function remove(int $shelf_id,int $expected_version=0) {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_shelf_login','Log in to manage shelves.',401);
@@ -111,10 +111,12 @@ final class PLDR_Future_Shelves {
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true));
         if(!$shelf)return PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404);
         if('custom'!==$shelf['shelf_type'])return PLDR_Core::machine_error('pldr_shelf_system','Built-in Smart Shelves cannot be deleted.',409);
+        if($expected_version<1)return PLDR_Core::machine_error('pldr_shelf_precondition','Shelf deletion requires the exact expected shelf version.',428,array('current_version'=>(int)$shelf['version']));
+        if((int)$shelf['version']!==$expected_version)return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed; refresh before deleting.',409,array('current_version'=>(int)$shelf['version']));
         if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_shelf_transaction','Shelf deletion transaction could not start.',500);
         $items=$wpdb->delete(PLDR_Core::table('shelf_items'),array('shelf_id'=>$shelf_id));
         if(false===$items){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_delete','Shelf items could not be removed.',500);}
-        $deleted=$wpdb->query($wpdb->prepare('DELETE FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d AND version=%d',$shelf_id,$uid,(int)$shelf['version']));
+        $deleted=$wpdb->query($wpdb->prepare('DELETE FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d AND version=%d',$shelf_id,$uid,$expected_version));
         if(1!==$deleted){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed concurrently; deletion was rolled back.',409);}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_commit','Shelf deletion could not be committed atomically.',500);}
         return array('id'=>$shelf_id,'deleted'=>true,'items_removed'=>(int)$items);
