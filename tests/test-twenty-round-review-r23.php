@@ -6,7 +6,7 @@ $forbid=static function(string $haystack,string $needle,string $why):void{if(fal
 $core=$read('includes/class-pldr-core.php');$plugin=$read('includes/class-pldr-plugin.php');$schema=$read('includes/class-pldr-schema.php');$fschema=$read('includes/class-pldr-future-schema.php');$access=$read('includes/class-pldr-access.php');$ingest=$read('includes/class-pldr-ingest.php');$rights=$read('includes/class-pldr-rights.php');$rest=$read('includes/class-pldr-rest.php');$frest=$read('includes/class-pldr-future-rest.php');$future=$read('includes/class-pldr-future.php');$reader=$read('includes/class-pldr-reader.php');$main=$read('pdf-library-digital-reading.php');
 $must($core,"if ('manage' === \$route) return home_url('/library/manage/');",'canonical /library/manage/ route URL missing');
 $must($plugin,"add_rewrite_rule('^library/manage/?$'",'canonical /library/manage/ rewrite missing');
-$must($plugin,"'manage'==\$route",'management route authorization/handoff missing');
+$must($plugin,"'manage'===\$route",'management route authorization/handoff missing');
 $must($core,'public static function db_error_ref','opaque DB error reference helper missing');
 $must($schema,"'last_error_ref'=>PLDR_Core::db_error_ref",'core schema still lacks safe DB diagnostic reference');
 $must($fschema,"'last_error_ref'=>PLDR_Core::db_error_ref",'Future schema still lacks safe DB diagnostic reference');
