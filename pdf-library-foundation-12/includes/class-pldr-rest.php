@@ -43,7 +43,7 @@ final class PLDR_REST {
         if(!$allowed)return PLDR_Core::machine_error('pldr_delivery_unavailable','The requested document is unavailable for this operation.',404);
         $wpdb->last_error='';
         $edition=PLDR_Core::edition($edition_id);
-        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_delivery_edition_read','Delivery edition state could not be read reliably.',503,array('degraded'=>true));
+        if(''!==(string)$wpdb->last_error){$read_code='download'===$operation?'pldr_download_edition_read':'pldr_delivery_edition_read';return PLDR_Core::machine_error($read_code,'Delivery edition state could not be read reliably.',503,array('degraded'=>true));}
         if(!$edition)return PLDR_Core::machine_error('pldr_delivery_unavailable','The requested document is unavailable for this operation.',404);
         return $edition;
     }

@@ -183,7 +183,7 @@ final class PLDR_Future_REST {
             }
             if($valid<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);
             $grant_ttl=max(60,min(900,$valid-time()));
-            $grant=PLDR_Access::issue_token($edition_id,(int)$edition['object_id'],'offline',$uid,$grant_ttl);
+            $grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline',$uid,$grant_ttl);
             if(is_wp_error($grant))return $grant;
             $grant['offline_valid_until']=gmdate('c',$valid);
             $grant['requires_logout_purge']=true;

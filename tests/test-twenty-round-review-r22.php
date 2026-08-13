@@ -32,7 +32,7 @@ $must($rest,"self::delivery_edition_or_unavailable(absint(\$request['edition_id'
 
 // R3: Patient Cases need independent clearance and covers use malware scanning.
 $must($ingest,"pldr_patient_case_publication_clearance",'patient-case publication clearance missing');
-$must($ingest,"scan_file(\$cover['tmp_name']",'cover malware scan missing');
+$must($ingest,"$cover_scan=self::scan_file",'cover malware scan missing');
 
 // R4: crypto outputs are hardened and rotation temp files are finally cleaned.
 $must($crypto,'@chmod($output, 0600)','crypto output permissions not hardened');
