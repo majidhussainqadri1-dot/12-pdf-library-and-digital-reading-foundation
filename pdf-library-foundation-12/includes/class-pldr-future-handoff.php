@@ -31,7 +31,8 @@ final class PLDR_Future_Handoff {
         $layout=sanitize_key((string)($context['layout']??'single'));
         if(!in_array($layout,array('single','continuous','spread-ltr','spread-rtl','horizontal','presentation'),true))$layout='single';
         $zoom=self::limit(sanitize_text_field((string)($context['zoom']??'page-width')),30);
-        $anchor=self::anchor((array)($context['anchor']??array()));
+        $anchor=self::anchor((array)($context['anchor']??array()),$page);
+        if(is_wp_error($anchor))return $anchor;
         $anchor_json=wp_json_encode($anchor,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         if(false===$anchor_json||strlen($anchor_json)>1600)return PLDR_Core::machine_error('pldr_handoff_anchor','Reading-session anchor is too large.',400);
         $version=max(1,(int)($current['version']??0)+1);
@@ -71,11 +72,26 @@ final class PLDR_Future_Handoff {
         );
     }
 
-    private static function anchor(array $anchor):array {
+    private static function anchor(array $anchor,int $page) {
         $out=array();
         if(isset($anchor['selection']))$out['selection']=self::limit(wp_strip_all_tags((string)$anchor['selection']),500);
-        if(isset($anchor['type'])){$type=sanitize_text_field((string)$anchor['type']);if(in_array($type,array('TextQuoteSelector','FragmentSelector','SvgSelector','CssSelector'),true))$out['type']=$type;}
-        if(isset($anchor['exact']))$out['exact']=self::limit(wp_strip_all_tags((string)$anchor['exact']),500);
+        $type='';
+        if(isset($anchor['type'])){
+            $type=sanitize_text_field((string)$anchor['type']);
+            $allowed=array('TextQuoteSelector','FragmentSelector','CssSelector');
+            if('SvgSelector'===$type)return PLDR_Core::machine_error('pldr_handoff_svg_unsupported','SVG handoff selectors are rejected until a lossless, security-reviewed SVG selector representation is available.',400,array('supported_selector_types'=>$allowed));
+            if(!in_array($type,$allowed,true))return PLDR_Core::machine_error('pldr_handoff_selector','Unsupported reading-session handoff selector.',400,array('supported_selector_types'=>$allowed));
+            $out['type']=$type;
+        }
+        foreach(array('exact'=>500,'prefix'=>120,'suffix'=>120,'value'=>300) as $key=>$max){if(isset($anchor[$key]))$out[$key]=self::limit(wp_strip_all_tags((string)$anchor[$key]),$max);}
+        if('TextQuoteSelector'===$type&&''===trim((string)($out['exact']??'')))return PLDR_Core::machine_error('pldr_handoff_exact','A text-quote handoff selector requires an exact excerpt.',400);
+        if(in_array($type,array('FragmentSelector','CssSelector'),true)&&''===trim((string)($out['value']??''))&&!isset($anchor['region']))return PLDR_Core::machine_error('pldr_handoff_selector_value','This handoff selector requires a bounded selector value or region.',400);
+        if('FragmentSelector'===$type&&!empty($out['value'])&&preg_match('/(?:^|[?&#;])page=(\d+)/',(string)$out['value'],$m)&&absint($m[1])!==$page)return PLDR_Core::machine_error('pldr_handoff_fragment_page','Handoff fragment selector page identity does not match the saved page.',409);
+        if(isset($anchor['region'])&&is_array($anchor['region'])){
+            $region=array('x'=>max(0,min(1,(float)($anchor['region']['x']??0))),'y'=>max(0,min(1,(float)($anchor['region']['y']??0))),'w'=>max(0,min(1,(float)($anchor['region']['w']??0))),'h'=>max(0,min(1,(float)($anchor['region']['h']??0))));
+            if($region['w']<=0||$region['h']<=0||($region['x']+$region['w'])>1||($region['y']+$region['h'])>1)return PLDR_Core::machine_error('pldr_handoff_region','Reading-session handoff region must remain inside the saved page with positive dimensions.',400);
+            $out['region']=$region;
+        }
         return $out;
     }
 
