@@ -37,11 +37,12 @@ $must($a11y, 'catch (Throwable $e)', 'Accessibility provider exceptions are not 
 $must($a11y, 'External accessibility findings were ignored because provider provenance was missing.', 'Anonymous accessibility provider output is not rejected.');
 $must($a11y, "'provider_failure'=>", 'Accessibility provider failure disclosure is missing.');
 
-// Round 4 — OCR correction abuse and final-decision state.
+// Round 4 — OCR correction abuse and exact final-decision CAS state.
 $must($ocr, 'pldr_ocr_correction_hourly_limit', 'OCR correction submission rate ceiling is missing.');
 $must($ocr, 'pldr_ocr_correction_rate', 'OCR correction 429 path is missing.');
 $must($ocr, "'pending'!==\$row['status']", 'Already-decided OCR corrections are not locked.');
-$must($ocr, "array('id'=>\$correction_id,'version'=>(int)\$row['version'],'status'=>'pending')", 'OCR review status/version CAS is missing.');
+$must($ocr, 'pldr_ocr_review_precondition', 'OCR review exact expected-version precondition is missing.');
+$must($ocr, "array('id'=>\$correction_id,'version'=>\$expected_version,'status'=>'pending')", 'OCR review status/version CAS is missing.');
 
 // Round 5 — optimistic synchronized preferences.
 $must($prefs, 'pldr_future_pref_precondition', 'Existing synchronized preferences do not require expected_version.');
