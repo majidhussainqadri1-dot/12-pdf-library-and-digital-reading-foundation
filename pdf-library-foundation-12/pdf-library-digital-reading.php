@@ -36,6 +36,7 @@ $pldr_files = array(
     'class-pldr-ocr-search-overlay.php',
     'class-pldr-response-policy.php',
     'class-pldr-schema-corrections.php',
+    'class-pldr-operations-policy.php',
     'class-pldr-admin.php',
     'class-pldr-privacy.php',
     'class-pldr-privacy-extension.php',
@@ -59,5 +60,6 @@ add_action('plugins_loaded', static function (): void {
     PLDR_Schema_Corrections::hooks();
     PLDR_Rights_Policy::hooks();
     PLDR_Privacy_Extension::hooks();
+    PLDR_Operations_Policy::hooks();
     PLDR_Plugin::instance()->run();
 }, 60);
