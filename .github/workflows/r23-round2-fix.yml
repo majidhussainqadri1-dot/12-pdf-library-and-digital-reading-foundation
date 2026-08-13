@@ -1,0 +1,86 @@
+name: R23 Round 2 Schema Diagnostic Hardening
+on:
+  push:
+    branches:
+      - review/file-12-r23-twenty-round-2026-08-13
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/file-12-r23-twenty-round-2026-08-13
+          fetch-depth: 1
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - name: Apply complete Round 2 post-review defect batch and retest
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('pdf-library-foundation-12')
+          p=root/'includes/class-pldr-core.php'
+          s=p.read_text()
+          if 'public static function db_error_ref' not in s:
+              needle="""    public static function trace_id(): string {
+                  try {
+                      return bin2hex(random_bytes(8));
+                  } catch (Throwable $e) {
+                      return substr(hash('sha256', uniqid('', true)), 0, 16);
+                  }
+              }
+          """
+              insert=needle+"""
+              public static function db_error_ref(string $error = ''): string {
+                  global $wpdb;
+                  if ('' === $error && isset($wpdb)) $error = (string) $wpdb->last_error;
+                  $error = trim($error);
+                  if ('' === $error) return 'db-error';
+                  return 'db-error-' . substr(hash_hmac('sha256', $error, wp_salt('auth')), 0, 16);
+              }
+          """
+              assert needle in s
+              s=s.replace(needle,insert,1)
+          old="""                $key_string = (string) $key;
+                          if (preg_match('/secret|token|password|key|patient|note_text|authorization|cookie|session|credential|nonce/i', $key_string)) continue;
+                          $safe_key = is_int($key) ? $key : sanitize_key($key_string);
+          """
+          if 'non-scalar-internal-error' not in s:
+              new="""                $key_string = (string) $key;
+                          if (preg_match('/secret|token|password|key|patient|note_text|authorization|cookie|session|credential|nonce/i', $key_string)) continue;
+                          if (preg_match('/(?:db_?error|last_?error|sql|query|stack|filesystem_?path|absolute_?path)/i', $key_string)) {
+                              $safe_key = is_int($key) ? $key : sanitize_key($key_string . '_ref');
+                              if ('' !== (string) $safe_key) $safe[$safe_key] = self::db_error_ref(is_scalar($nested) ? (string) $nested : 'non-scalar-internal-error');
+                              $seen++;
+                              continue;
+                          }
+                          $safe_key = is_int($key) ? $key : sanitize_key($key_string);
+          """
+              assert old in s
+              s=s.replace(old,new,1)
+          p.write_text(s)
+
+          for rel in ['includes/class-pldr-schema.php','includes/class-pldr-future-schema.php']:
+              p=root/rel; s=p.read_text()
+              s=s.replace("'last_error'=>(string)$wpdb->last_error", "'last_error_ref'=>PLDR_Core::db_error_ref((string)$wpdb->last_error)")
+              s=s.replace("'last_error'=>substr((string)$wpdb->last_error,0,500)", "'last_error_ref'=>PLDR_Core::db_error_ref((string)$wpdb->last_error)")
+              p.write_text(s)
+          PY
+          rm -f .github/workflows/r23-round2-fix.yml
+          find pdf-library-foundation-12 -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+          grep -q "public static function db_error_ref" pdf-library-foundation-12/includes/class-pldr-core.php
+          grep -q "last_error_ref.*db_error_ref" pdf-library-foundation-12/includes/class-pldr-schema.php
+          grep -q "last_error_ref.*db_error_ref" pdf-library-foundation-12/includes/class-pldr-future-schema.php
+          if grep -RInE "update_option\([^\n]*(last_error.*\$wpdb->last_error|db_error.*\$wpdb->last_error)" pdf-library-foundation-12/includes; then
+            echo 'Raw database error persisted in option state' >&2
+            exit 1
+          fi
+          git config user.name 'majidhussainqadri1-dot'
+          git config user.email 'majidhussainqadri1@gmail.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'R23 round 2: minimize schema and migration database diagnostics'
+          git push origin HEAD:review/file-12-r23-twenty-round-2026-08-13
