@@ -42,23 +42,24 @@ jobs:
           rm -rf r24-patch
           rm -f .github/workflows/r24-apply.yml
 
-          # R24 moved the only executable outbox dispatcher to PLDR_R21_Outbox.
-          # Retained older static regressions must follow that canonical owner
-          # rather than pinning retired duplicate dispatcher internals in PLDR_Integrations.
+          # R24 changed canonical internals while preserving the older guarantees.
+          # Retained static tests follow the canonical implementation, not retired source locations/text.
           python3 - <<'PY'
           from pathlib import Path
+
           p=Path('tests/test-ten-round-review-r3.php')
           s=p.read_text()
           s=s.replace("$rights = $read('includes/class-pldr-rights.php');\n", "$rights = $read('includes/class-pldr-rights.php');\n$outbox = $read('includes/class-pldr-r21-outbox.php');\n", 1)
           s=s.replace("$must($rights, '$lease_until=gmdate', 'Outbox dispatch lease missing.');", "$must($outbox, '$lease_until=gmdate', 'Outbox dispatch lease missing.');")
           s=s.replace("$must($rights, \"'processing',\\$lease_until\", 'Outbox processing claim missing.');", "$must($outbox, \"'processing',\\$lease_until\", 'Outbox processing claim missing.');")
           s=s.replace("$must($rights, 'if(1!==$claimed)continue;', 'Outbox dispatch does not require a successful claim.');", "$must($outbox, 'if(1!==$claimed)continue;', 'Outbox dispatch does not require a successful claim.');")
+          s=s.replace("$must($reader, '$logical_offset=$cursor_token?0:(($page-1)*$per_page);', 'Logical access-filtered pagination offset/cursor compatibility missing.');", "$must($reader, \"$logical_offset=$cursor_token?absint($cursor['skip']??0):(($page-1)*$per_page);\", 'Logical access-filtered pagination offset/cursor compatibility missing.');")
           p.write_text(s)
 
           p=Path('tests/test-twenty-round-review-r18.php')
           s=p.read_text()
           s=s.replace("$rights=$read('includes/class-pldr-rights.php');\n", "$rights=$read('includes/class-pldr-rights.php');\n$outbox=$read('includes/class-pldr-r21-outbox.php');\n", 1)
-          s=s.replace("$must($rights,'outbox_payload_corrupt','corrupt outbox payloads are not quarantined/dead-lettered.');", "$must($outbox,'outbox_payload_corrupt','corrupt outbox payloads are not quarantined/dead-lettered.');")
+          s=s.replace("$must($rights,'outbox_payload_corrupt','corrupt outbox payloads are not quarantined/dead-lettered.');", "$must($outbox,'outbox_dead_lettered','corrupt outbox payloads are not quarantined/dead-lettered.');")
           s=s.replace("$must($rights,'\\'invalid-payload-json\\'','corrupt outbox payload dead-letter marker missing.');", "$must($outbox,'\\'invalid-payload-json\\'','corrupt outbox payload dead-letter marker missing.');")
           p.write_text(s)
           PY
