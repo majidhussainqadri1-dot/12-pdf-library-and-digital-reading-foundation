@@ -55,13 +55,15 @@ final class PLDR_Future_Preservation {
                 $error=$path->get_error_message();
                 $findings[]='Original object could not be opened for integrity verification.';
             }else{
-                $integrity=PLDR_Crypto::verify_file((string)$path,(string)$object['sha256'],$error)?'verified':'failed';
+                $integrity_evidence=array();
+                $integrity=PLDR_Object_Integrity::verify($object,(string)$path,$error,$integrity_evidence)?'verified':'failed';
+                if('failed'===$integrity&&false!==stripos($error,'Encrypted object checksum'))$findings[]='Encrypted object checksum verification failed.';
             }
         }
         $health='healthy';
         if('unavailable'===$integrity)$health='needs-review';
         if('failed'===$integrity){
-            $health='quarantined';$findings[]='Plaintext checksum verification failed.';
+            $health='quarantined';if(false===stripos($error,'Encrypted object checksum'))$findings[]='Authenticated plaintext checksum verification failed.';
             if('quarantined'!==$object['object_status']){
                 if(false===$wpdb->query('START TRANSACTION'))return array('error'=>PLDR_Core::machine_error('pldr_preservation_quarantine_transaction','Integrity failure was detected but the quarantine transaction could not be started.',500));
                 $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s AND storage_name=%s AND key_id=%s AND sha256=%s AND encrypted_sha256=%s','quarantined',PLDR_Core::now(),(int)$object['id'],(string)$object['object_status'],(string)$object['storage_name'],(string)$object['key_id'],(string)$object['sha256'],(string)$object['encrypted_sha256']));
@@ -103,7 +105,7 @@ final class PLDR_Future_Preservation {
         if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_derivative_read','Preservation derivative state could not be read; no assessment record was written.',503,array('degraded'=>true)));
         $derivatives=is_array($derivatives)?$derivatives:array();
 
-        $assessment=array('integrity'=>$integrity,'findings'=>$findings,'error'=>self::limit($error,1000),'provider_failure'=>$provider_failure,'provider_requested_quarantine'=>$provider_requested_quarantine,'provider_input_total'=>$provider_input_total,'provider_findings_limit'=>self::PROVIDER_FINDINGS_LIMIT,'provider_input_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT);
+        $assessment=array('integrity'=>$integrity,'integrity_evidence'=>$integrity_evidence??array(),'findings'=>$findings,'error'=>self::limit($error,1000),'provider_failure'=>$provider_failure,'provider_requested_quarantine'=>$provider_requested_quarantine,'provider_input_total'=>$provider_input_total,'provider_findings_limit'=>self::PROVIDER_FINDINGS_LIMIT,'provider_input_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT);
         $assessment_json=wp_json_encode($assessment);
         if(!is_string($assessment_json))return array('error'=>PLDR_Core::machine_error('pldr_preservation_encode','Preservation assessment could not be encoded.',500));
         $derivative_json=wp_json_encode($derivatives);
