@@ -1,0 +1,50 @@
+name: R22 Fix Regression Assertions 2
+
+on:
+  push:
+    branches:
+      - review/file-12-r22-twenty-round-2026-08-13
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, 'R22 regression correction 2:')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/file-12-r22-twenty-round-2026-08-13
+          fetch-depth: 1
+      - name: Apply corrections and run R22 regression
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('pdf-library-foundation-12/includes/class-pldr-future-iiif.php')
+          s = p.read_text()
+          old = "PLDR_Core::machine_error('pldr_iiif_forbidden','IIIF manifest is unavailable for this document.',404)"
+          new = "PLDR_Core::machine_error('pldr_future_iiif_unavailable','IIIF manifest is unavailable for this document.',404)"
+          assert s.count(old) == 3, f'IIIF unavailable-state target drifted: {s.count(old)}'
+          p.write_text(s.replace(old,new))
+
+          p = Path('tests/test-twenty-round-review-r22.php')
+          s = p.read_text()
+          old = '$must($ingest,"$cover_scan=self::scan_file",\'cover malware scan missing\');'
+          new = "$must($ingest,'$cover_scan=self::scan_file','cover malware scan missing');"
+          assert s.count(old) == 1, 'R22 cover assertion target drifted'
+          s = s.replace(old,new)
+          old = "$must($shelves,'private const ITEM_LIMIT=5000','shelf lifetime bound missing');"
+          new = "$must($shelves,'ITEM_LIMIT = 5000','shelf lifetime bound missing');"
+          assert s.count(old) == 1, 'R22 shelf assertion target drifted'
+          p.write_text(s.replace(old,new))
+          PY
+          rm -f .github/workflows/r22-fix-iiif-test.yml .github/workflows/r22-fix-regression-2.yml
+          php tests/test-twenty-round-review-r22.php
+          git config user.name 'majidhussainqadri1-dot'
+          git config user.email 'majidhussainqadri1@gmail.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'R22: close IIIF unavailable-state and static assertion QA defects'
+          git push origin HEAD:review/file-12-r22-twenty-round-2026-08-13
