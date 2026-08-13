@@ -71,7 +71,8 @@ $must($vault, 'await clearEdition(false);F.say', 'Failed offline capture does no
 // Round 10 — clean verification scope retained.
 $must($schema, 'option_value=%s WHERE option_name=%s AND option_value=%s', 'Future migration stale-lock CAS guard is missing.');
 $must($corpus, 'pldr_ai_corpus_allowed', 'AI corpus deny-by-default allowlist boundary is missing.');
-$must($corpus, 'next_offset', 'AI corpus bounded pagination is missing.');
+$must($corpus, 'next_cursor', 'AI corpus signed bounded pagination is missing.');
+$must($corpus, 'cursor_supported', 'AI corpus cursor capability disclosure is missing.');
 $must($iiif, 'file12CanvasTruncated', 'IIIF bounded-canvas disclosure is missing.');
 $must($authority, 'pldr_authority_provider', 'Authority-provider degraded-path guard is missing.');
 
