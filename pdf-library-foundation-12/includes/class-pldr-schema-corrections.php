@@ -137,7 +137,7 @@ final class PLDR_Schema_Corrections {
         self::invalidate_health_cache();
         $verified_current=$future_expected?self::is_current():self::is_core_current();
         if(!$verified_current){
-            PLDR_Core::audit('schema',0,'schema_correction_postcondition_unverified',array('revision'=>self::REVISION,'future_expected'=>$future_expected));
+            PLDR_Core::audit('schema',0,'schema_correction_engine_unverified',array('revision'=>self::REVISION,'future_expected'=>$future_expected,'physical_postcondition'=>true));
             return;
         }
         PLDR_Core::audit('schema',0,'schema_correction_applied',array('revision'=>self::REVISION,'outbox_last_error_nullable'=>true,'transaction_engine'=>'InnoDB','converted_tables'=>$converted,'future_expected'=>$future_expected));
