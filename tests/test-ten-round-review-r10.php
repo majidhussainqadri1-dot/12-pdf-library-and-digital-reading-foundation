@@ -31,10 +31,11 @@ $must($access, 'expected_version<1', 'Access-policy missing-version guard missin
 $must($rest, 'READER_PREVIEW_GRANT_LIMIT = 50', 'Reader-manifest preview-grant ceiling missing.');
 $must($rest, 'preview_grants_deferred', 'Reader-manifest deferred-grant disclosure missing.');
 
-// Round 5 — private reading items are bounded and paginated.
+// Round 5 — private reading items are bounded and use stable signed continuation.
 $must($rest, 'min(200,absint', 'Private reading-item response ceiling missing.');
 $must($rest, 'has_more', 'Private reading-item pagination continuation missing.');
-$must($rest, 'next_offset', 'Private reading-item next-offset metadata missing.');
+$must($rest, 'next_cursor', 'Private reading-item signed continuation metadata missing.');
+$must($rest, "'cursor_supported'=>true", 'Private reading-item cursor capability disclosure missing.');
 
 // Round 6 — secure access-token issuance is rate limited and serialized.
 $must($access, 'MAX_TOKEN_ISSUES_PER_HOUR = 600', 'Secure access-token issuance ceiling missing.');
