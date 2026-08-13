@@ -80,6 +80,8 @@ jobs:
         run: php tests/test-twenty-round-review-r20.php
       - name: Twenty-first fresh twenty-round corrective-review regressions
         run: php tests/test-twenty-round-review-r21.php
+      - name: Twenty-second fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r22.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
