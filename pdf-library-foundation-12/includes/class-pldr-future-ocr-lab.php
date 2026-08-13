@@ -56,9 +56,10 @@ final class PLDR_Future_OCR_Lab {
         $original = self::limit(sanitize_textarea_field($original),4000); $corrected = self::limit(sanitize_textarea_field($corrected),4000);
         if ($page < 1 || $page > (int) $edition['pages'] || '' === trim($original) || '' === trim($corrected)) return PLDR_Core::machine_error('pldr_ocr_correction_input', 'A valid page, original OCR excerpt and corrected text are required.', 400);
         $wpdb->last_error='';
-        $source = (string) $wpdb->get_var($wpdb->prepare('SELECT text_content FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d AND page_number=%d', $edition_id, $page));
-        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_ocr_source_read','Current OCR source could not be read reliably; the correction was not accepted.',503,array('degraded'=>true));
-        if ('' === $source || false === strpos($source, $original)) return PLDR_Core::machine_error('pldr_ocr_correction_stale', 'The submitted original excerpt does not match the current OCR source layer.', 409);
+        $source_rows=PLDR_Future_Data::ocr_pages($edition_id,$page,1,0);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_ocr_source_read','Current derived OCR source could not be read reliably; the correction was not accepted.',503,array('degraded'=>true));
+        $source=(string)($source_rows[0]['text_content']??'');
+        if ('' === $source || false === strpos($source, $original)) return PLDR_Core::machine_error('pldr_ocr_correction_stale', 'The submitted original excerpt does not match the current approved-correction OCR layer.', 409,array('derived_correction_layer'=>true));
 
         $lock='pldr_ocr_corr_'.substr(hash('sha256',(string)$uid),0,32);
         $locked=(int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,1)',$lock));
@@ -105,9 +106,10 @@ final class PLDR_Future_OCR_Lab {
         if (!PLDR_Core::authorize('manage',$document_id) && !PLDR_Core::authorize('rights',$document_id)) return PLDR_Core::machine_error('pldr_ocr_review_forbidden', 'OCR correction review authority is required for this document.', 403);
         if('approved'===$decision){
             $wpdb->last_error='';
-            $source=(string)$wpdb->get_var($wpdb->prepare('SELECT text_content FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d AND page_number=%d',(int)$row['edition_id'],(int)$row['page_number']));
-            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_ocr_review_source_read','Base OCR source could not be re-read reliably; approval was not recorded.',503,array('degraded'=>true));
-            if(''===$source||false===strpos($source,(string)$row['original_text']))return PLDR_Core::machine_error('pldr_ocr_review_stale','The base OCR source changed or no longer contains the submitted excerpt; re-submit the correction against current OCR.',409);
+            $source_rows=PLDR_Future_Data::ocr_pages((int)$row['edition_id'],(int)$row['page_number'],1,0);
+            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_ocr_review_source_read','Current approved-correction OCR source could not be re-read reliably; approval was not recorded.',503,array('degraded'=>true));
+            $source=(string)($source_rows[0]['text_content']??'');
+            if(''===$source||false===strpos($source,(string)$row['original_text']))return PLDR_Core::machine_error('pldr_ocr_review_stale','The current approved-correction OCR layer changed or no longer contains the submitted excerpt; re-submit the correction against current OCR.',409,array('derived_correction_layer'=>true));
         }
         $updated=$wpdb->update(PLDR_Core::table('ocr_corrections'),array('status'=>$decision,'reviewed_by'=>get_current_user_id(),'review_note'=>$note,'version'=>(int)$row['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$correction_id,'version'=>$expected_version,'status'=>'pending'));
         if(1!==$updated)return PLDR_Core::machine_error('pldr_ocr_review_conflict','OCR correction changed concurrently; refresh before reviewing.',409);
