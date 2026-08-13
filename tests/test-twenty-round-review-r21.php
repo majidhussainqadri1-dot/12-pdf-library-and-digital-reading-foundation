@@ -45,7 +45,7 @@ $must($plugin,"'Back to PDF Library'",'native account-reading Back control missi
 $must($plugin,"'No private reading progress yet'",'private reading workspace empty state missing.');
 $must($plugin,"0===strpos(\$page,'pldr-')",'admin reader asset scope is no longer File-12-specific.');
 $must($css,'.pldr-shell button,.pldr-reader-shell button','reader button styling is not confined to File 12 surfaces.');
-$forbid($css,'button,.pldr-primary,.pldr-shell a.pldr-primary','global unscoped button styling returned.');
+if(preg_match('/(^|})button\s*,/m',$css)){fwrite(STDERR,"R21 regression: global unscoped button styling returned.\n");exit(1);}
 
 // Round 12 — logout purge survives a deliberately fail-closed domain/schema runtime.
 $must($main,"add_action('wp_logout', array('PLDR_Future', 'mark_vault_purge'))",'offline-vault logout purge is no longer registered independently of domain readiness.');
