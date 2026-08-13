@@ -85,7 +85,10 @@ final class PLDR_Future {
         }
         delete_option('pldr_future_loader_error');
 
-        PLDR_Future_Schema::maybe_upgrade();
+        if (!PLDR_Future_Schema::maybe_upgrade() || !PLDR_Future_Schema::is_current()) {
+            add_action('admin_notices', array(__CLASS__, 'schema_notice'));
+            return;
+        }
         add_action('rest_api_init', array('PLDR_Future_REST', 'register'));
         add_action('wp_enqueue_scripts', array(__CLASS__, 'assets'), 30);
         add_filter('pldr_interaction_controls_html', array(__CLASS__, 'reader_controls'), 20, 3);
