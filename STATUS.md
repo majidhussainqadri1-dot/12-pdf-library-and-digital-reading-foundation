@@ -7,14 +7,14 @@
 | F12-FUT-001 through F12-FUT-024 | **Present in code/contracts** |
 | Coded | **R19 reviewed candidate source exists** |
 | R19 source-review closure | `8eb4ef4d64f59c8280874c486bad18c111bfbb5a` |
-| Final R19 exact repository HEAD | `863a4dc56c0b2fa52c5cf1060b017cc744af9048` |
-| Static / automated QA | **GREEN on exact final HEAD, File 12 Future-24 Quality Gate run #296 / run ID 31660833180** |
+| R19 QA-certified repository head before final status metadata | `863a4dc56c0b2fa52c5cf1060b017cc744af9048` |
+| Static / automated QA evidence | **GREEN on `863a4dc56c0b2fa52c5cf1060b017cc744af9048`, File 12 Future-24 Quality Gate run #296 / run ID 31660833180** |
 | PHP compatibility QA | **PHP 8.1 / 8.3 / 8.4 all PASS on run #296** |
 | JavaScript syntax / deterministic package | **PASS on run #296** |
 | Full corrective-review regression sweep | **R1–R19 historical/current review contracts PASS on run #296** |
 | Secret scan / independent regressions | **PASS on run #296** |
-| Final R19 artifact | `file-12-pdf-library-1.1.0-rc.1` — ID `9166110060` |
-| Final R19 Actions artifact digest | `sha256:45860d90cce9b0e125668bcd34fdbe2442fc0e7eec7124de4ede377ba0b4a51d` |
+| R19 artifact from run #296 | `file-12-pdf-library-1.1.0-rc.1` — ID `9166110060` |
+| R19 Actions artifact digest from run #296 | `sha256:45860d90cce9b0e125668bcd34fdbe2442fc0e7eec7124de4ede377ba0b4a51d` |
 | Corrective review history | R1–R19 evidence committed; R19 completed 20 review → batch-fix → retest rounds |
 | Hostinger staging | **Pending / not proved by repository evidence** |
 | Live deployed | **Not claimed** |
@@ -38,7 +38,7 @@ The candidate retains the 1.0.0-rc.1 migration path for legacy File 12 data/SPL2
 
 ## Evidence law
 
-Repository source, a green CI run, and a deterministic package prove only the corresponding repository/package gates. They do **not** prove what is currently deployed on Hostinger. The final release report must separately record Repository HEAD, Deployed Version, DB Version, Migration State, and Live Verification Status.
+Repository source, a green CI run, and a deterministic package prove only the corresponding repository/package gates. They do **not** prove what is currently deployed on Hostinger. The current branch head after this evidence-only status update must pass the same exact-head quality gate before it is reported as the final repository candidate. The final release report must separately record Repository HEAD, Deployed Version, DB Version, Migration State, and Live Verification Status.
 
 ## Production-truth boundary
 
