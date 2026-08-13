@@ -41,6 +41,28 @@ jobs:
           tar -xzf /tmp/r24_repo_patch.tar.gz -C .
           rm -rf r24-patch
           rm -f .github/workflows/r24-apply.yml
+
+          # R24 moved the only executable outbox dispatcher to PLDR_R21_Outbox.
+          # Retained older static regressions must follow that canonical owner
+          # rather than pinning retired duplicate dispatcher internals in PLDR_Integrations.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/test-ten-round-review-r3.php')
+          s=p.read_text()
+          s=s.replace("$rights = $read('includes/class-pldr-rights.php');\n", "$rights = $read('includes/class-pldr-rights.php');\n$outbox = $read('includes/class-pldr-r21-outbox.php');\n", 1)
+          s=s.replace("$must($rights, '$lease_until=gmdate', 'Outbox dispatch lease missing.');", "$must($outbox, '$lease_until=gmdate', 'Outbox dispatch lease missing.');")
+          s=s.replace("$must($rights, \"'processing',\\$lease_until\", 'Outbox processing claim missing.');", "$must($outbox, \"'processing',\\$lease_until\", 'Outbox processing claim missing.');")
+          s=s.replace("$must($rights, 'if(1!==$claimed)continue;', 'Outbox dispatch does not require a successful claim.');", "$must($outbox, 'if(1!==$claimed)continue;', 'Outbox dispatch does not require a successful claim.');")
+          p.write_text(s)
+
+          p=Path('tests/test-twenty-round-review-r18.php')
+          s=p.read_text()
+          s=s.replace("$rights=$read('includes/class-pldr-rights.php');\n", "$rights=$read('includes/class-pldr-rights.php');\n$outbox=$read('includes/class-pldr-r21-outbox.php');\n", 1)
+          s=s.replace("$must($rights,'outbox_payload_corrupt','corrupt outbox payloads are not quarantined/dead-lettered.');", "$must($outbox,'outbox_payload_corrupt','corrupt outbox payloads are not quarantined/dead-lettered.');")
+          s=s.replace("$must($rights,'\\'invalid-payload-json\\'','corrupt outbox payload dead-letter marker missing.');", "$must($outbox,'\\'invalid-payload-json\\'','corrupt outbox payload dead-letter marker missing.');")
+          p.write_text(s)
+          PY
+
           find pdf-library-foundation-12 tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
           find pdf-library-foundation-12/assets -type f -name '*.js' -print0 | xargs -0 -n1 node --check
           php -d zend.assertions=1 -d assert.exception=1 tests/test-crypto.php
