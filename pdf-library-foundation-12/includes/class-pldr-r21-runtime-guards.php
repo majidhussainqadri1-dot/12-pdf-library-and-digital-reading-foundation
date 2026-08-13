@@ -13,6 +13,25 @@ final class PLDR_R21_Runtime_Guards {
     public static function hooks(): void {
         add_filter('rest_pre_dispatch', array(__CLASS__, 'cleanup_stale_idempotency'), 1, 3);
         add_filter('rest_pre_dispatch', array(__CLASS__, 'key_write_preflight'), 2, 3);
+        add_action('admin_post_pldr_safe_repair',array(__CLASS__,'admin_repair_guarded'),2);
+    }
+
+    public static function admin_repair_guarded():void {
+        $operation=sanitize_key((string)($_POST['operation']??''));
+        if(!in_array($operation,array('schema','outbox','legacy-migration'),true))return;
+        if(!PLDR_Core::authorize('repair'))wp_die('Denied',array('response'=>403));
+        check_admin_referer('pldr_safe_repair');
+        if('schema'===$operation){
+            delete_transient('pldr_r21_core_schema_ready');
+            $ok=PLDR_R21_Readiness::core_ready(true);
+            PLDR_Core::audit('system',0,'schema_repair_r21',array('ok'=>$ok,'correction_revision'=>PLDR_Schema_Corrections::revision()));
+            if(!$ok)wp_die(esc_html__('File 12 schema reconciliation did not reach a verified ready state.','pdf-library-digital-reading'),array('response'=>503));
+        }elseif('outbox'===$operation){
+            PLDR_R21_Outbox::dispatch();
+        }else{
+            self::legacy_migration_guarded();
+        }
+        wp_safe_redirect(admin_url('admin.php?page=pldr-health'));exit;
     }
 
     public static function key_write_preflight($result, $server, WP_REST_Request $request) {

@@ -21,7 +21,6 @@ final class PLDR_Plugin {
         add_action('wp_enqueue_scripts',array($this,'register_assets'));
         add_action('pldr_dispatch_outbox',array('PLDR_R21_Outbox','dispatch'));
         add_action('pldr_cleanup_tokens',array('PLDR_Access','cleanup_tokens'));
-        add_action('pldr_integrity_sample',static fn()=>PLDR_Health::integrity_sample(3));
         add_action('pldr_rights_expiry',array('PLDR_Rights','expire_rights'));
         add_action('pldr_generate_derivatives',array('PLDR_Ingest','generate_derivatives'),10,2);
         add_action('pldr_legacy_migration',array('PLDR_R21_Runtime_Guards','legacy_migration_guarded'));
