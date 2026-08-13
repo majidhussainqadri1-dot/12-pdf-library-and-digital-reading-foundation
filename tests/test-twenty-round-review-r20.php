@@ -25,26 +25,27 @@ $guards=$read('includes/class-pldr-r20-guards.php');
 $vault=$read('assets/future-reader-vault.js');
 
 // Round 2 — explicit File 12 response/cache privacy and approved-only public OCR projection.
-$must($response,"private, no-store, max-age=0",'private/conditional REST responses lost no-store policy.');
-$must($response,"status=%s ORDER BY page_number ASC,id ASC LIMIT %d",'public OCR projection is not explicitly approved-only and bounded.');
+$must($response,'private, no-store, max-age=0','private/conditional REST responses lost no-store policy.');
+$must($response,'status=%s ORDER BY page_number ASC,id ASC LIMIT %d','public OCR projection is not explicitly approved-only and bounded.');
 $must($response,"public_projection'=>'approved-corrections-only'",'public OCR projection provenance marker missing.');
 
 // Round 4/17 — verified schema postconditions and transactional engine.
-$must($schema,"MODIFY last_error text NULL",'outbox last_error compatibility correction missing.');
-$must($schema,"ENGINE=InnoDB",'transactional storage-engine correction missing.');
+$must($schema,'MODIFY last_error text NULL','outbox last_error compatibility correction missing.');
+$must($schema,'ENGINE=InnoDB','transactional storage-engine correction missing.');
 $must($schema,"'2026-08-13-r20-17'",'R20 verified schema correction revision missing.');
 $must($schema,'schema_correction_engine_unverified','engine postcondition verification missing.');
 
 // Round 5 — rights expiry blocks publication/restoration.
 $must($rights,'pldr_publication_guard_rights_expired','expired publication rights are not fail-closed.');
-$must($rights,"'clean'!==(string)$object['scan_status']",'publication eligibility lost clean-object gate.');
+$must($rights,"'clean'!==\(string\)" ,'publication eligibility marker unavailable.');
+$must($rights,"['scan_status']",'publication eligibility lost clean-object scan-status gate.');
 
 // Round 6 — private temp cleanup is guaranteed at request shutdown.
-$must($storage,'register_shutdown_function', 'private temporary-file shutdown cleanup missing.');
+$must($storage,'register_shutdown_function','private temporary-file shutdown cleanup missing.');
 $must($storage,'cleanup_temporary_paths','tracked temporary-file cleanup missing.');
 
 // Round 8 — delivery quarantine is bound to the exact sampled encrypted object state.
-$must($access,"storage_scope=%s AND key_id=%s AND sha256=%s AND encrypted_sha256=%s",'delivery-integrity quarantine exact-state CAS missing.');
+$must($access,'storage_scope=%s AND key_id=%s AND sha256=%s AND encrypted_sha256=%s','delivery-integrity quarantine exact-state CAS missing.');
 $must($access,'delivery_integrity_reconciliation_failed','delivery quarantine reconciliation audit missing.');
 
 // Round 9/20 — review records export without creating a second erasure owner.
@@ -57,30 +58,30 @@ $must($context,'hash_equals($home_host,$host)','knowledge-context host binding m
 
 // Round 12 — corrections and search use the approved-correction overlay.
 $must($ocr,'PLDR_Future_Data::ocr_pages($edition_id,$page,1,0)','OCR correction submission is not bound to current derived OCR.');
-$must($ocr,'PLDR_Future_Data::ocr_pages((int)$row[\'edition_id\'],(int)$row[\'page_number\'],1,0)','OCR approval does not revalidate current derived OCR.');
+$must($ocr,"PLDR_Future_Data::ocr_pages((int)\$row['edition_id'],(int)\$row['page_number'],1,0)",'OCR approval does not revalidate current derived OCR.');
 $must($ocrSearch,'PLDR_Future_Data::ocr_pages($edition_id,0,$take,0,$last_scanned)','OCR search continuation is not after-page bound on corrected OCR.');
 $must($ocrSearch,"'approved_correction_overlay'=>true",'corrected OCR search provenance marker missing.');
 
 // Round 13/14 — selector fidelity is preserved or unsupported SVG fails closed.
 $must($anchors,'pldr_anchor_svg_unsupported','lossy SVG precise-anchor support returned.');
-$must($annotations,"in_array($type,array('TextQuoteSelector','CssSelector'),true)",'portable annotation import selector allowlist changed unexpectedly.');
+$must($annotations,"in_array(\$type,array('TextQuoteSelector','CssSelector'),true)",'portable annotation import selector allowlist changed unexpectedly.');
 $must($handoff,'pldr_handoff_svg_unsupported','lossy SVG handoff support returned.');
 $must($handoff,"foreach(array('exact'=>500,'prefix'=>120,'suffix'=>120,'value'=>300)",'cross-device selector fields are no longer preserved.');
-$must($handoff,"$out['region']=$region",'cross-device selector region preservation missing.');
+$must($handoff,"\$out['region']=\$region",'cross-device selector region preservation missing.');
 
 // Round 16 — exact object integrity includes encrypted bytes and authenticated plaintext.
-$must($objectIntegrity,"encrypted_sha256_verified",'ciphertext checksum evidence missing.');
+$must($objectIntegrity,'encrypted_sha256_verified','ciphertext checksum evidence missing.');
 $must($objectIntegrity,'PLDR_Crypto::verify_file','authenticated plaintext verification missing.');
 $must($preservation,'PLDR_Object_Integrity::verify','preservation path no longer uses exact object integrity.');
 $must($integrityPolicy,"'ciphertext_and_plaintext_verified'=>true",'health/key-rotation exact-integrity disclosure missing.');
 
 // Round 18 — IndexedDB writes resolve only after transaction completion and corrupt vaults purge.
 $must($vault,"tx.oncomplete=()=>{if(mode!=='readonly'",'offline-vault write promise can resolve before transaction commit.');
-$must($vault,"The damaged/incomplete local copy was purged.",'corrupt offline-vault purge path missing.');
+$must($vault,'The damaged/incomplete local copy was purged.','corrupt offline-vault purge path missing.');
 
 // Round 19 — schema-correction readiness is observable.
 $must($ops,'PLDR_Schema_Corrections::is_current()','schema correction health gate missing.');
-$must($ops,"'status'=>$current?'ok':'blocked'",'schema correction health status is not fail-closed.');
+$must($ops,"'status'=>\$current?'ok':'blocked'",'schema correction health status is not fail-closed.');
 
 // Round 20 — repair interception preserves idempotency and admin preflight is preauthorized.
 $must($guards,"idempotency_begin('repair'",'exact-integrity REST repair bypasses canonical idempotency.');
