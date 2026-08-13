@@ -2,7 +2,7 @@
 
 ## Governing review discipline
 
-R21 started from exact green R20 repository head `ad153bede56accdbd591b57f959e643e96a02eb8`. Every numbered round follows one mandatory sequence: **finish the complete review first; close that round's complete defect ledger; only then apply all proven corrections as one post-review batch; retest; and only then start the next numbered round.** No defect was fixed while its numbered review was still underway.
+R21 started from exact green R20 repository head `ad153bede56accdbd591b57f959e643e96a02eb8`. Every numbered round followed one mandatory sequence: **finish the complete review first; close that round's complete defect ledger; only then apply all proven corrections as one post-review batch; retest; and only then start the next numbered round.** No defect was fixed while its numbered review was still underway.
 
 Repository review evidence is not staging/live evidence. Exact deployed version, deployed schema, migration state and live behavior remain separately unverified.
 
@@ -25,8 +25,8 @@ Repository review evidence is not staging/live evidence. Exact deployed version,
 ## Round 4
 **Focus:** private storage, ingest crypto, active-key selection and key-writing workflows.
 **Result:** Defect found. Multiple configured keys without an explicit active key could make encryption choose an arbitrary first key.
-**Post-review batch:** fail-closed ingest/key-rotation preflight when active key selection is ambiguous.
-**Correction commit:** `5452f80da25966b96498f1b742135febad3ca740`.
+**Post-review batch:** initially added a fail-closed key-writing preflight; Round 20 later moved this invariant into `PLDR_Crypto` itself so every encryption/key-rotation caller is protected without a pre-permission REST disclosure path.
+**Correction commit:** `5452f80da25966b96498f1b742135febad3ca740`; superseded/hardened in Round 20.
 
 ## Round 5
 **Focus:** access policy, grants, derivative binding, range delivery and live authorization recheck.
@@ -77,8 +77,8 @@ First-ten defect rounds: **1, 3, 4, 7, 8**
 ## Round 14
 **Focus:** legacy migration, schema continuity, deactivation/uninstall and rollback safety.
 **Result:** Defects found. Legacy migration lacked an execution lease and legacy progress reconciliation could overwrite newer native reading progress.
-**Post-review batch:** serialized legacy migration and snapshot/reconciled native progress with timestamp-aware preservation.
-**Correction commit:** `0c22cf73ff00ad2fc6bee573b7e8eca506652bd2`.
+**Post-review batch:** serialized legacy migration and snapshot/reconciled native progress with timestamp-aware preservation. Round 20 later added a durable pre-migration recovery journal so a crash/write failure cannot advance legacy state without retaining the newer native-progress evidence needed for recovery.
+**Correction commit:** `0c22cf73ff00ad2fc6bee573b7e8eca506652bd2`; crash-recovery journal hardened in Round 20.
 
 ## Round 15
 **Focus:** integrations, event/outbox contracts, consumers, retries/dead-letter and privacy classification.
@@ -106,13 +106,42 @@ First-ten defect rounds: **1, 3, 4, 7, 8**
 **Focus:** repository evidence, review documentation, STATUS/PR truth, CI retention and package-quality-gate coverage.
 **Result:** Defects found. R21 product changes had no permanent R21 regression contract/review record in the repository, the workflow had no named R21 retained gate, and STATUS/PR evidence was stale relative to the active R21 branch.
 **Post-review batch:** added this R21 review record, a permanent R21 regression contract, a named CI R21 step, and an R21 checkpoint STATUS/PR evidence update before Round 20.
-**Retest correction:** the first Round-19 CI run exposed a false-positive CSS-containment assertion in the newly added R21 test plus malformed Markdown emphasis in this checkpoint record. Those QA/documentation defects were corrected before Round 20; they were not counted as a separate product review round.
+**Retest correction:** the first Round-19 CI run exposed a false-positive CSS-containment assertion in the newly added R21 test plus malformed Markdown emphasis in this checkpoint record. Those QA/documentation defects were corrected before Round 20; they were not counted as a separate product review round. Exact Round-19 corrected checkpoint `bd6138efc397930c150e26953f18f9b26aa1eb2b` then passed quality-gate run #350.
 
 Through Round 19 defect rounds: **1, 3, 4, 7, 8, 12, 13, 14, 15, 16, 17, 19**
 Through Round 19 clean rounds: **2, 5, 6, 9, 10, 11, 18**
 
 ## Round 20
-**Status at the Round-19 evidence commit:** Reserved for the final holistic adversarial pass. It is not claimed complete in this checkpoint record. The next review must assess the corrected Round-19 repository state end-to-end before this section and the final summary are closed.
+**Focus:** final holistic adversarial pass over the corrected Round-19 state: governing invariants, startup/schema truth, permission ordering, crypto, replay/concurrency, migration crash recovery, event/outbox behavior, privacy, routes/UI, offline safety, cron/operations, regression evidence and release-truth boundaries.
+
+**Result:** Defects found. The complete review identified four final defect groups before any Round-20 coding began:
+
+1. **Schema truth incompleteness / fresh-install ordering:** the R21 core readiness gate checked only a subset of runtime columns/indexes; the R20 correction marker could report current without re-verifying physical nullability/engine state; and requiring the complete core+Future correction too early could deadlock a fresh install before Future-24 created its own tables.
+2. **Authorization/side-effect ordering around key/replay maintenance:** the Round-4 active-key REST preflight ran in `rest_pre_dispatch`, before canonical endpoint permission callbacks, so an unauthorized caller could receive configuration-derived failure information; stale replay cleanup also had a broader pre-permission side-effect scope than necessary.
+3. **Legacy migration crash recovery:** Round-14 snapshots protected the normal restore path, but a crash/write failure after legacy migration advanced state could leave failed native-progress restoration without a durable recovery journal for the next run.
+4. **Physical correction truth vs stored marker:** outbox nullability/InnoDB drift after a normal schema operation or external drift could remain hidden behind the stored correction revision until explicitly re-run.
+
+**Post-review correction batch:** only after the entire Round-20 review was closed, the following corrections were applied:
+
+- expanded R21 core readiness to the complete core runtime table/column/index contract;
+- split **core** correction readiness from complete core+Future readiness so fresh install can create Future tables without circular blocking;
+- made correction `is_current()`/`is_core_current()` physically verify outbox nullability and InnoDB state with bounded health caching, instead of trusting the revision option alone;
+- made the correction pass skip not-yet-required Future tables but verify/convert them once the Future schema is expected/present;
+- moved the multi-key active-selection invariant into `PLDR_Crypto::active_key_id()`/`is_ready()` itself: multiple keys now require an explicit active key and no pre-permission REST config disclosure is needed;
+- scoped stale pending-idempotency cleanup to the authenticated actor only, bounded it to mutation traffic, and extended the stale threshold to two hours;
+- journaled native reading-progress snapshots **before** legacy mutation, verified the journal, replayed any pending journal before a new migration batch, retained it across exceptions/write failures, and cleared it only after successful recovery.
+
+**Round-20 product correction commits:** `11062c62495ff818efdd2762ff7ce5c2b529372c`, `8fb150c7b5f7fe8e9c6a3142f65a90b8ae412ea3`, `54a4fbbddfb48e248ebee2c4b586c98468ac930b`, `e0efd1f16f4d221958b848c505cb7b086085441f`.
+
+## Final R21 round accounting
+
+Final defect rounds: **1, 3, 4, 7, 8, 12, 13, 14, 15, 16, 17, 19, 20**
+
+Final clean rounds: **2, 5, 6, 9, 10, 11, 18**
+
+First-ten defect rounds: **1, 3, 4, 7, 8**
+
+The R21 numbered review sequence is now **20/20 complete**. Final exact-head automated QA and deterministic package evidence must be taken only from the branch HEAD after this final review/test/status evidence is committed; repository metadata must not be changed after that green exact-head run if that head is to be reported as the final repository candidate.
 
 ## Production-truth boundary
 Repository source/CI/package evidence proves only those repository/package gates. Hostinger staging deployment, deployed artifact checksum, deployed DB/schema/migration state, real-role/browser/accessibility/RTL/offline/provider/backup/restore/rollback journeys, Founder acceptance and live re-test remain separate gates.
