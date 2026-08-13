@@ -28,7 +28,7 @@ final class PLDR_Future_Context {
             if(!is_array($item)||empty($item['url'])||empty($item['title']))continue;
             $owner=self::limit(sanitize_text_field((string)($item['owner']??'')),80);
             if(''===$owner||!in_array($owner,self::EXPECTED_OWNERS,true)||true!==($item['canonical']??false)){$provenance_rejected++;continue;}
-            $url=esc_url_raw((string)$item['url']);if(''===$url)continue;
+            $url=esc_url_raw((string)$item['url']);if(''===$url||!self::same_origin($url)){$provenance_rejected++;continue;}
             $eligible_total++;
             if(count($safe)<self::RESULT_LIMIT)$safe[]=array('owner'=>$owner,'title'=>self::limit(sanitize_text_field((string)$item['title']),180),'url'=>$url,'summary'=>self::limit(sanitize_text_field((string)($item['summary']??'')),500),'canonical'=>true);
         }
@@ -72,6 +72,16 @@ final class PLDR_Future_Context {
             PLDR_Core::audit('edition',$edition_id,'context_selection_provider_failed',array('page'=>$page,'provider_failure'=>true));
             return PLDR_Core::machine_error('pldr_context_selection_provider','Knowledge-context source validation is temporarily unavailable; companion lookup was not attempted.',503,array('degraded'=>true,'provider_failure'=>true));
         }
+    }
+
+    private static function same_origin(string $url):bool {
+        $target=wp_parse_url($url);$home=wp_parse_url(home_url('/'));
+        if(!is_array($target)||!is_array($home))return false;
+        $scheme=strtolower((string)($target['scheme']??''));$host=strtolower((string)($target['host']??''));
+        $home_scheme=strtolower((string)($home['scheme']??''));$home_host=strtolower((string)($home['host']??''));
+        if(!in_array($scheme,array('http','https'),true)||$host===''||$home_host==='')return false;
+        $target_port=(int)($target['port']??($scheme==='https'?443:80));$home_port=(int)($home['port']??($home_scheme==='https'?443:80));
+        return hash_equals($home_scheme,$scheme)&&hash_equals($home_host,$host)&&$target_port===$home_port;
     }
 
     private static function limit(string $value,int $length):string {return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length);}
