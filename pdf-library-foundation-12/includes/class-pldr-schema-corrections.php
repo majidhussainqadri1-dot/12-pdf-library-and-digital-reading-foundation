@@ -17,8 +17,11 @@ final class PLDR_Schema_Corrections {
         add_action('plugins_loaded',array(__CLASS__,'maybe_apply'),61);
     }
 
+    public static function revision():string { return self::REVISION; }
+    public static function is_current():bool { return self::REVISION===(string)get_option('pldr_schema_corrections_revision',''); }
+
     public static function maybe_apply():void {
-        if(self::REVISION===(string)get_option('pldr_schema_corrections_revision',''))return;
+        if(self::is_current())return;
         global $wpdb;
         $table=PLDR_Core::table('outbox');$safe='`'.str_replace('`','',$table).'`';
         $wpdb->last_error='';
@@ -65,7 +68,7 @@ final class PLDR_Schema_Corrections {
         }
 
         update_option('pldr_schema_corrections_revision',self::REVISION,false);
-        if(self::REVISION!==(string)get_option('pldr_schema_corrections_revision','')){
+        if(!self::is_current()){
             PLDR_Core::audit('schema',0,'schema_correction_revision_store_failed',array('revision'=>self::REVISION));
             return;
         }
