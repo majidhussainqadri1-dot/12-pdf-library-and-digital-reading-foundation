@@ -56,7 +56,7 @@ Repository review evidence is not staging/live evidence. Exact deployed version,
 **Focus:** OCR correction/review/search overlay, citations, anchors and portable annotations.
 **Result:** Clean. No new proven repository defect.
 
-**First-ten defect rounds: **1, 3, 4, 7, 8****
+First-ten defect rounds: **1, 3, 4, 7, 8**
 
 ## Round 11
 **Focus:** external providers, authority/context adapters, provenance, SSRF/same-origin policy and degraded provider states.
@@ -106,9 +106,10 @@ Repository review evidence is not staging/live evidence. Exact deployed version,
 **Focus:** repository evidence, review documentation, STATUS/PR truth, CI retention and package-quality-gate coverage.
 **Result:** Defects found. R21 product changes had no permanent R21 regression contract/review record in the repository, the workflow had no named R21 retained gate, and STATUS/PR evidence was stale relative to the active R21 branch.
 **Post-review batch:** added this R21 review record, a permanent R21 regression contract, a named CI R21 step, and an R21 checkpoint STATUS/PR evidence update before Round 20.
+**Retest correction:** the first Round-19 CI run exposed a false-positive CSS-containment assertion in the newly added R21 test plus malformed Markdown emphasis in this checkpoint record. Those QA/documentation defects were corrected before Round 20; they were not counted as a separate product review round.
 
-**Through Round 19 defect rounds: **1, 3, 4, 7, 8, 12, 13, 14, 15, 16, 17, 19****
-**Through Round 19 clean rounds: **2, 5, 6, 9, 10, 11, 18****
+Through Round 19 defect rounds: **1, 3, 4, 7, 8, 12, 13, 14, 15, 16, 17, 19**
+Through Round 19 clean rounds: **2, 5, 6, 9, 10, 11, 18**
 
 ## Round 20
 **Status at the Round-19 evidence commit:** Reserved for the final holistic adversarial pass. It is not claimed complete in this checkpoint record. The next review must assess the corrected Round-19 repository state end-to-end before this section and the final summary are closed.
