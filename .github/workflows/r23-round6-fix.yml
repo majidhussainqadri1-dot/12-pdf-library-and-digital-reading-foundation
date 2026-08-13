@@ -1,0 +1,46 @@
+name: R23 Round 6 Rights Restore Hardening
+on:
+  push:
+    branches:
+      - review/file-12-r23-twenty-round-2026-08-13
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/file-12-r23-twenty-round-2026-08-13
+          fetch-depth: 1
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - name: Apply complete Round 6 post-review defect batch and retest
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('pdf-library-foundation-12/includes/class-pldr-rights.php')
+          s=p.read_text()
+          old="""            if(!$edition||!$object||'available'!==$object['object_status']||'clean'!==$object['scan_status'])return PLDR_Core::machine_error('pldr_restore_unavailable','The document cannot be restored until its current edition has a clean available object.',409);
+                  }
+          """
+          new="""            if(!$edition||!$object||'available'!==$object['object_status']||'clean'!==$object['scan_status'])return PLDR_Core::machine_error('pldr_restore_unavailable','The document cannot be restored until its current edition has a clean available object.',409);
+                      if(!empty($edition['rights_expires_at']) && strtotime((string)$edition['rights_expires_at']) <= time())return PLDR_Core::machine_error('pldr_restore_rights_expired','The document cannot be restored because the current edition rights period has expired; rights evidence must be renewed first.',409);
+                  }
+          """
+          if 'pldr_restore_rights_expired' not in s:
+              assert old in s
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+          rm -f .github/workflows/r23-round6-fix.yml
+          php -l pdf-library-foundation-12/includes/class-pldr-rights.php
+          grep -q "pldr_restore_rights_expired" pdf-library-foundation-12/includes/class-pldr-rights.php
+          git config user.name 'majidhussainqadri1-dot'
+          git config user.email 'majidhussainqadri1@gmail.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'R23 round 6: prevent restoration after rights expiry'
+          git push origin HEAD:review/file-12-r23-twenty-round-2026-08-13
