@@ -51,23 +51,30 @@ final class PLDR_Response_Policy {
         $can_review=PLDR_Core::authorize('manage',$document_id)||PLDR_Core::authorize('rights',$document_id);
         if($can_review)return;
 
-        $approved=array();
-        foreach((array)$data['corrections'] as $row){
-            if(!is_array($row)||'approved'!==(string)($row['status']??''))continue;
-            $approved[]=array(
-                'id'=>(int)($row['id']??0),
-                'page_number'=>(int)($row['page_number']??0),
-                'status'=>'approved',
-                'corrected_text'=>(string)($row['corrected_text']??''),
-                'updated_at'=>(string)($row['updated_at']??''),
-            );
+        global $wpdb;
+        $limit=max(1,min(500,(int)($data['corrections_meta']['limit']??500)));
+        $table=PLDR_Core::table('ocr_corrections');
+        $wpdb->last_error='';
+        $total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.$table.' WHERE edition_id=%d AND status=%s',$edition_id,'approved'));
+        if(''!==(string)$wpdb->last_error){
+            $response->set_status(503);
+            $response->set_data(array('code'=>'pldr_ocr_public_projection_read','message'=>'Approved OCR correction projection could not be read reliably.','data'=>array('status'=>503,'degraded'=>true)));
+            return;
         }
+        $wpdb->last_error='';
+        $approved=$wpdb->get_results($wpdb->prepare('SELECT id,page_number,status,corrected_text,updated_at FROM '.$table.' WHERE edition_id=%d AND status=%s ORDER BY page_number ASC,id ASC LIMIT %d',$edition_id,'approved',$limit),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){
+            $response->set_status(503);
+            $response->set_data(array('code'=>'pldr_ocr_public_projection_read','message'=>'Approved OCR correction projection could not be read reliably.','data'=>array('status'=>503,'degraded'=>true)));
+            return;
+        }
+        $approved=is_array($approved)?$approved:array();
         $data['corrections']=$approved;
         $data['corrections_meta']=array(
-            'limit'=>(int)($data['corrections_meta']['limit']??500),
+            'limit'=>$limit,
             'returned'=>count($approved),
-            'total'=>count($approved),
-            'truncated'=>false,
+            'total'=>$total,
+            'truncated'=>$total>count($approved),
             'public_projection'=>'approved-corrections-only',
         );
         $data['review_metadata_visible']=false;
