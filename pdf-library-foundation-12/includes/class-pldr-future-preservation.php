@@ -81,7 +81,7 @@ final class PLDR_Future_Preservation {
             $external=null;$provider_failure=true;
             if('quarantined'!==$health)$health='needs-review';
             $findings[]='External preservation assessment provider failed; local integrity evidence remains authoritative.';
-            PLDR_Core::audit('edition',$edition_id,'preservation_provider_failed',array('document_id'=>$document_id,'error'=>self::limit($e->getMessage(),500)));
+            PLDR_Core::audit('edition',$edition_id,'preservation_provider_failed',array('document_id'=>$document_id,'provider_failure'=>true,'error_class'=>sanitize_key(get_class($e))));
         }
         if(is_array($external)){
             $external_health=sanitize_key((string)($external['format_health']??$health));

@@ -5,6 +5,8 @@ defined('ABSPATH') || exit;
 final class PLDR_Future_Shelves {
     private const CUSTOM_SHELF_LIMIT = 100;
     private const LIST_LIMIT = 120;
+    private const ITEM_LIMIT = 5000;
+    private const ITEM_PAGE_LIMIT = 100;
 
     public static function ensure_defaults(int $uid) {
         global $wpdb;
@@ -80,6 +82,10 @@ final class PLDR_Future_Shelves {
         if((int)$shelf['version']!==$expected_version)return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed; refresh before adding an item.',409,array('current_version'=>(int)$shelf['version']));
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return $edition;
         if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_shelf_item_transaction','Shelf membership transaction could not start.',500);
+        $wpdb->last_error='';
+        $item_count=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.PLDR_Core::table('shelf_items').' WHERE shelf_id=%d',$shelf_id));
+        if(''!==(string)$wpdb->last_error){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_item_capacity_read','Shelf capacity could not be verified; no item was added.',503,array('degraded'=>true));}
+        if($item_count>=self::ITEM_LIMIT){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_item_limit','The private shelf item limit has been reached.',409,array('limit'=>self::ITEM_LIMIT));}
         $stored=$wpdb->query($wpdb->prepare('INSERT IGNORE INTO '.PLDR_Core::table('shelf_items').' (shelf_id,edition_id,added_at) VALUES (%d,%d,%s)',$shelf_id,$edition_id,PLDR_Core::now()));
         if(false===$stored){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_item_store','Shelf item could not be stored.',500);}
         if(0===$stored){$wpdb->query('ROLLBACK');return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added'=>false,'already_present'=>true,'version'=>$expected_version);}
@@ -88,6 +94,51 @@ final class PLDR_Future_Shelves {
         if(1!==$updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_conflict','Shelf changed concurrently; membership insertion was rolled back.',409);}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_shelf_item_commit','Shelf membership could not be committed atomically.',500);}
         return array('shelf_id'=>$shelf_id,'edition_id'=>$edition_id,'added'=>true,'already_present'=>false,'version'=>$next);
+    }
+
+    public static function items(int $shelf_id,string $cursor='',int $limit=50) {
+        global $wpdb;
+        $uid=get_current_user_id();
+        if(!$uid)return array('error'=>PLDR_Core::machine_error('pldr_shelf_login','Log in to view private shelf items.',401));
+        $wpdb->last_error='';
+        $shelf=$wpdb->get_row($wpdb->prepare('SELECT id,name,shelf_type,version FROM '.PLDR_Core::table('shelves').' WHERE id=%d AND user_id=%d',$shelf_id,$uid),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_shelf_read','Private shelf state could not be read reliably.',503,array('degraded'=>true)));
+        if(!$shelf)return array('error'=>PLDR_Core::machine_error('pldr_shelf_missing','Shelf not found.',404));
+        $limit=max(1,min(self::ITEM_PAGE_LIMIT,$limit));
+        $context=hash('sha256',$uid.'|'.$shelf_id.'|shelf-items-v1');
+        $after=self::decode_cursor($cursor,$context);
+        if(is_wp_error($after))return array('error'=>$after);
+        $table=PLDR_Core::table('shelf_items');$wpdb->last_error='';
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT id,edition_id,added_at FROM '.$table.' WHERE shelf_id=%d AND id>%d ORDER BY id ASC LIMIT %d',$shelf_id,$after,$limit+1),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_shelf_items_read','Private shelf items could not be read reliably.',503,array('degraded'=>true)));
+        $rows=is_array($rows)?$rows:array();$has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
+        $items=array();$hidden=0;$last_id=0;
+        foreach($rows as $row){
+            $last_id=(int)$row['id'];$edition_id=(int)$row['edition_id'];$wpdb->last_error='';
+            $allowed=PLDR_Access::can_access_edition($edition_id,'read',$uid);
+            if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_shelf_item_access_read','Shelf item authorization state could not be verified reliably; no partial shelf page was returned.',503,array('degraded'=>true)));
+            if(!$allowed){$hidden++;continue;}
+            $wpdb->last_error='';$edition=PLDR_Core::edition($edition_id);
+            if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_shelf_item_edition_read','Shelf item edition state could not be read reliably; no partial shelf page was returned.',503,array('degraded'=>true)));
+            if(!$edition){$hidden++;continue;}
+            $items[]=array('item_id'=>(int)$row['id'],'edition_id'=>$edition_id,'document_id'=>(string)$edition['public_id'],'title'=>(string)$edition['title'],'edition_label'=>(string)$edition['edition_label'],'language'=>(string)$edition['language'],'added_at'=>(string)$row['added_at']);
+        }
+        $next=$has_more&&$last_id>0?self::encode_cursor($last_id,$context):null;
+        return array('shelf'=>array('id'=>(int)$shelf['id'],'name'=>(string)$shelf['name'],'type'=>(string)$shelf['shelf_type'],'version'=>(int)$shelf['version']),'items'=>$items,'hidden_inaccessible'=>$hidden,'limit'=>$limit,'has_more'=>$has_more,'next_cursor'=>$next,'item_limit'=>self::ITEM_LIMIT,'private'=>true);
+    }
+
+    private static function encode_cursor(int $id,string $context):string {
+        $json=wp_json_encode(array('i'=>$id,'c'=>$context));if(!is_string($json))return '';
+        $payload=rtrim(strtr(base64_encode($json),'+/','-_'),'=');return $payload.'.'.hash_hmac('sha256',$payload,wp_salt('auth'));
+    }
+
+    private static function decode_cursor(string $token,string $context) {
+        $token=trim($token);if(''===$token)return 0;
+        if(strlen($token)>500||1!==substr_count($token,'.'))return PLDR_Core::machine_error('pldr_shelf_cursor','Private shelf cursor is malformed.',400);
+        [$payload,$sig]=explode('.',$token,2);$expected=hash_hmac('sha256',$payload,wp_salt('auth'));if(!hash_equals($expected,$sig))return PLDR_Core::machine_error('pldr_shelf_cursor','Private shelf cursor signature is invalid.',400);
+        $padded=$payload.str_repeat('=',(4-strlen($payload)%4)%4);$raw=base64_decode(strtr($padded,'-_','+/'),true);$decoded=is_string($raw)?json_decode($raw,true):null;
+        if(!is_array($decoded)||!isset($decoded['i'],$decoded['c'])||!hash_equals($context,(string)$decoded['c']))return PLDR_Core::machine_error('pldr_shelf_cursor','Private shelf cursor does not match this account/shelf or is invalid.',400);
+        return absint($decoded['i']);
     }
 
     public static function rename(int $shelf_id,string $name,int $expected_version=0) {

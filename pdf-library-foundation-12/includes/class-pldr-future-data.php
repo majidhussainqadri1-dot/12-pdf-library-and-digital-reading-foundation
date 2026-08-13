@@ -18,13 +18,14 @@ final class PLDR_Future_Data {
 
     public static function require_edition(int $edition_id, string $operation = 'read') {
         global $wpdb;
-        $edition = PLDR_Core::edition($edition_id);
-        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_future_edition_read','Advanced-reader edition state could not be read reliably.',503,array('degraded'=>true));
-        if (!$edition) return PLDR_Core::machine_error('pldr_future_missing','This document edition was not found.',404);
         $wpdb->last_error='';
         $allowed=PLDR_Access::can_access_edition($edition_id,$operation,get_current_user_id());
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_future_access_read','Advanced-reader authorization state could not be verified reliably.',503,array('degraded'=>true));
-        if(!$allowed)return PLDR_Core::machine_error('pldr_future_forbidden','This document edition is unavailable for the requested advanced reading operation.',403);
+        if(!$allowed)return PLDR_Core::machine_error('pldr_future_unavailable','This document edition is unavailable for the requested advanced reading operation.',404);
+        $wpdb->last_error='';
+        $edition = PLDR_Core::edition($edition_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_future_edition_read','Advanced-reader edition state could not be read reliably.',503,array('degraded'=>true));
+        if (!$edition) return PLDR_Core::machine_error('pldr_future_unavailable','This document edition is unavailable for the requested advanced reading operation.',404);
         return $edition;
     }
 
@@ -83,7 +84,7 @@ final class PLDR_Future_Data {
             try {
                 $external = apply_filters('pldr_reflow_extract', null, $edition_id, $edition, $page);
             } catch (Throwable $e) {
-                PLDR_Core::audit('edition',$edition_id,'reflow_provider_failed',array('error'=>self::limit_text(sanitize_text_field($e->getMessage()),500)));
+                PLDR_Core::audit('edition',$edition_id,'reflow_provider_failed',array('provider_failure'=>true,'error_class'=>sanitize_key(get_class($e))));
                 return array('error'=>PLDR_Core::machine_error('pldr_reflow_provider','The approved reflow provider failed; no derived reflow text was substituted.',503,array('degraded'=>true,'provider_failure'=>true)));
             }
             if (is_array($external) && !empty($external['pages'])) {
@@ -130,8 +131,8 @@ final class PLDR_Future_Data {
         else{try {
             $external = apply_filters('pldr_outline_extract', null, $edition_id, $edition);
         } catch (Throwable $e) {
-            $external=null;$external_failure=true;$external_error=self::limit_text(sanitize_text_field($e->getMessage()),500);
-            PLDR_Core::audit('edition',$edition_id,'outline_provider_failed',array('error'=>$external_error));
+            $external=null;$external_failure=true;$external_error='provider-failed';
+            PLDR_Core::audit('edition',$edition_id,'outline_provider_failed',array('provider_failure'=>true,'error_class'=>sanitize_key(get_class($e))));
         }}
         if (is_array($external) && isset($external['items']) && is_array($external['items'])) {
             $provider=self::limit_text(sanitize_text_field((string)($external['provider']??'')),80);

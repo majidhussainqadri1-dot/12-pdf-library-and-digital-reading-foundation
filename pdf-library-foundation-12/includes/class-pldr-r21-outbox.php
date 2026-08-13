@@ -9,6 +9,8 @@ defined('ABSPATH') || exit;
 final class PLDR_R21_Outbox {
     private const CONTRACTS=array(
         'ReadingProgressUpdated.v1'=>array('privacy'=>'private-user','consumers'=>array('file-12-private','file-19-user-notifications'),'retention'=>'bounded'),
+        'PDFDocumentIngested.v1'=>array('privacy'=>'internal-operations','consumers'=>array('file-24-assurance'),'retention'=>'audit'),
+        'PDFDocumentOCRReady.v1'=>array('privacy'=>'internal-derived','consumers'=>array('file-06-knowledge','file-26-search-projection'),'retention'=>'audit'),
         'PDFReadingRoomRequested.v1'=>array('privacy'=>'private-user','consumers'=>array('file-17-communication-adapter'),'retention'=>'bounded'),
         'PDFDocumentAccessChanged.v1'=>array('privacy'=>'internal-policy','consumers'=>array('file-19-notifications','file-26-search-projection'),'retention'=>'audit'),
         'RightsReportFiled.v1'=>array('privacy'=>'confidential-rights','consumers'=>array('file-19-notifications','file-24-assurance'),'retention'=>'rights-case'),

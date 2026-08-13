@@ -37,7 +37,7 @@ final class PLDR_Future_A11y {
         if($refresh){
             try {$external=apply_filters('pldr_accessibility_inspect',null,$edition_id,$edition);} catch (Throwable $e) {
                 $external=null;$provider_failure=true;$findings[]='External accessibility inspection provider failed; local heuristic assessment remains available.';
-                PLDR_Core::audit('edition',$edition_id,'accessibility_provider_failed',array('document_id'=>$document_id,'error'=>self::limit($e->getMessage(),500)));
+                PLDR_Core::audit('edition',$edition_id,'accessibility_provider_failed',array('document_id'=>$document_id,'provider_failure'=>true,'error_class'=>sanitize_key(get_class($e))));
             }
             if(is_array($external)){
                 $provider_name=self::limit(sanitize_text_field((string)($external['provider']??'')),80);

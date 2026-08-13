@@ -496,7 +496,7 @@ final class PLDR_Schema {
                 if(false===$wpdb->query('COMMIT'))throw new RuntimeException('Legacy reconciliation transaction could not be committed.');
                 PLDR_Core::audit('migration',$legacy_id,'legacy_existing_reconciliation_'.('complete'===$reconcile?'complete':'pending'),array('document_id'=>(int)$already,'edition_id'=>(int)$edition['id']));
                 return $reconcile;
-            }catch(Throwable $e){$wpdb->query('ROLLBACK');wp_cache_delete(self::legacy_reconcile_option($legacy_id),'options');PLDR_Core::audit('migration',$legacy_id,'legacy_existing_reconciliation_failed',array('document_id'=>(int)$already,'error'=>substr($e->getMessage(),0,500)));return 'error';}
+            }catch(Throwable $e){$wpdb->query('ROLLBACK');wp_cache_delete(self::legacy_reconcile_option($legacy_id),'options');PLDR_Core::audit('migration',$legacy_id,'legacy_existing_reconciliation_failed',array('document_id'=>(int)$already,'error_class'=>sanitize_key(get_class($e))));return 'error';}
         }
         $post = get_post($legacy_id);
         if (!$post) {
@@ -518,7 +518,10 @@ final class PLDR_Schema {
             $sha=hash('sha256','legacy-unverified:'.$legacy_id.':'.$storage);
             PLDR_Core::audit('migration',$legacy_id,'legacy_checksum_unverified',array('storage_present'=>''!==$storage,'path_readable'=>$legacy_path_readable));
         }
-        $legacy_publishable='publish'===$post->post_status&&$legacy_object_ready;
+        // Legacy publication status is not malware-scan evidence. Verified checksums permit controlled migration,
+        // but migrated objects remain behind the scan gate until a current File 12 scanner returns clean.
+        $legacy_publishable=false;
+        $legacy_document_status=$legacy_object_ready?'scan':'rights_review';
 
         $legacy_type='book'; $legacy_category='homeopathy-education';
         $type_terms=get_the_terms($legacy_id,'spl_document_type'); if(is_array($type_terms)&&!empty($type_terms[0]->slug)&&isset(PLDR_Core::DOCUMENT_TYPES[$type_terms[0]->slug])) $legacy_type=$type_terms[0]->slug;
@@ -536,7 +539,7 @@ final class PLDR_Schema {
                 'encrypted_sha256' => '',
                 'key_id' => (string) get_post_meta($legacy_id, '_spl_crypto_key_id', true),
                 'format_version' => (string) get_post_meta($legacy_id, '_spl_crypto_format', true) ?: 'SPL2',
-                'scan_status' => $legacy_object_ready ? 'legacy-imported' : 'legacy-unverified',
+                'scan_status' => $legacy_object_ready ? 'legacy-imported-pending-rescan' : 'legacy-unverified',
                 'object_status' => $legacy_object_ready ? 'available' : 'quarantined',
                 'created_at' => PLDR_Core::now(),
             ));
@@ -554,7 +557,7 @@ final class PLDR_Schema {
                 'subjects_json' => '[]',
                 'collections_json' => '[]',
                 'search_text' => $search,
-                'status' => $legacy_publishable ? 'published' : 'rights_review',
+                'status' => $legacy_document_status,
                 'access_mode' => 'public',
                 'created_by' => (int) $post->post_author,
                 'version' => 1,
@@ -580,7 +583,7 @@ final class PLDR_Schema {
                 'takedown_contact' => '',
                 'sha256' => $sha,
                 'object_id' => $object_id,
-                'status' => $legacy_publishable ? 'published' : 'rights_review',
+                'status' => $legacy_document_status,
                 'version' => 1,
                 'created_at' => PLDR_Core::now(),
                 'updated_at' => PLDR_Core::now(),
@@ -608,7 +611,7 @@ final class PLDR_Schema {
             return $reconcile;
         } catch (Throwable $e) {
             $wpdb->query('ROLLBACK');
-            PLDR_Core::audit('migration', $legacy_id, 'legacy_import_failed', array('error' => substr($e->getMessage(),0,500)));
+            PLDR_Core::audit('migration', $legacy_id, 'legacy_import_failed', array('error_class' => sanitize_key(get_class($e))));
             wp_cache_delete(self::legacy_reconcile_option($legacy_id),'options');
             return 'error';
         }
