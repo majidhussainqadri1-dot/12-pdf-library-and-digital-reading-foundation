@@ -306,7 +306,10 @@ final class PLDR_Access {
         global $wpdb;
         $object_id=(int)($object['id']??0);$edition_id=(int)($grant['edition_id']??0);
         if($object_id<1||$edition_id<1)return;
-        $changed=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s','quarantined',PLDR_Core::now(),$object_id,'available'));
+        $changed=$wpdb->query($wpdb->prepare(
+            'UPDATE '.PLDR_Core::table('objects').' SET object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s AND storage_name=%s AND storage_scope=%s AND key_id=%s AND sha256=%s AND encrypted_sha256=%s',
+            'quarantined',PLDR_Core::now(),$object_id,'available',(string)($object['storage_name']??''),(string)($object['storage_scope']??''),(string)($object['key_id']??''),(string)($object['sha256']??''),(string)($object['encrypted_sha256']??'')
+        ));
         $edition=PLDR_Core::edition($edition_id);$document_id=(int)($edition['document_id']??0);
         if(1===$changed){
             if($document_id>0)self::revoke_document($document_id,'delivery-integrity-failure');
@@ -315,7 +318,7 @@ final class PLDR_Access {
         }
         $current=PLDR_Core::object($object_id);
         if($current&&'quarantined'===(string)$current['object_status'])return;
-        PLDR_Core::audit('object',$object_id,'delivery_integrity_reconciliation_failed',array('edition_id'=>$edition_id,'document_id'=>$document_id,'db_error'=>substr((string)$wpdb->last_error,0,500)));
+        PLDR_Core::audit('object',$object_id,'delivery_integrity_reconciliation_failed',array('edition_id'=>$edition_id,'document_id'=>$document_id,'db_error'=>substr((string)$wpdb->last_error,0,500),'sampled_storage_name'=>(string)($object['storage_name']??''),'state_changed'=>true));
     }
 
     private static function parse_range(int $size): array {
@@ -353,8 +356,5 @@ final class PLDR_Access {
         global $wpdb;$batch=500;
         $tokens=$wpdb->query($wpdb->prepare("DELETE FROM ".PLDR_Core::table('access_tokens')." WHERE expires_at<%s OR (revoked_at IS NOT NULL AND revoked_at<%s) ORDER BY id ASC LIMIT {$batch}",gmdate('Y-m-d H:i:s',time()-DAY_IN_SECONDS),gmdate('Y-m-d H:i:s',time()-7*DAY_IN_SECONDS)));
         if(false===$tokens)PLDR_Core::audit('system',0,'access_token_cleanup_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
-        $idem=$wpdb->query($wpdb->prepare("DELETE FROM ".PLDR_Core::table('idempotency')." WHERE expires_at<%s LIMIT {$batch}",PLDR_Core::now()));
-        if(false===$idem)PLDR_Core::audit('system',0,'idempotency_cleanup_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
-        if($batch===$tokens||$batch===$idem){if(!wp_next_scheduled('pldr_cleanup_tokens'))wp_schedule_single_event(time()+60,'pldr_cleanup_tokens');}
     }
 }
