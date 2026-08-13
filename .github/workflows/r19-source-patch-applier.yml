@@ -1,0 +1,40 @@
+name: R19 Temporary Source Patch Applier
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-r19-source:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'review/file-12-r19-twenty-round-2026-08-13' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/file-12-r19-twenty-round-2026-08-13
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Reconstruct reviewed R19 corrective source patch
+        run: |
+          cat .github/r19-patch-part-*.b64 > /tmp/r19-source.patch.gz.b64
+          echo "ede399e2055876e05f28aaeac6b7d869c1762eec9495cdad7300e4ce6f06707c  /tmp/r19-source.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/r19-source.patch.gz.b64 | gzip -d > /tmp/r19-source.patch
+          echo "bdfb223b741eb7440a5416ec9a255bdc99dfbe0f528cf9c6a8ff80d19597e7cc  /tmp/r19-source.patch" | sha256sum -c -
+          git apply --check /tmp/r19-source.patch
+      - name: Apply complete post-review corrective batch
+        run: git apply /tmp/r19-source.patch
+      - name: Syntax retest before source closure
+        run: |
+          find pdf-library-foundation-12 -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+          find pdf-library-foundation-12/assets -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Remove temporary transfer mechanism and commit source closure
+        run: |
+          rm -f .github/r19-patch-part-*.b64 .github/workflows/r19-source-patch-applier.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Correct File 12 after R19 twenty-round review"
+          git push origin HEAD:review/file-12-r19-twenty-round-2026-08-13
