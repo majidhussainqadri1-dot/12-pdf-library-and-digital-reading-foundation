@@ -25,6 +25,7 @@ $pldr_files = array(
     'class-pldr-schema.php',
     'class-pldr-storage.php',
     'class-pldr-crypto.php',
+    'class-pldr-object-integrity.php',
     'class-pldr-ingest.php',
     'class-pldr-access.php',
     'class-pldr-reader.php',
