@@ -9,10 +9,10 @@ defined('ABSPATH') || exit;
 final class PLDR_R21_Runtime_Guards {
     private static bool $idempotency_cleanup_ran = false;
     private const LEGACY_LOCK='pldr_r21_legacy_runtime_lock';
+    private const LEGACY_RECOVERY_OPTION='pldr_r21_legacy_progress_recovery';
 
     public static function hooks(): void {
         add_filter('rest_pre_dispatch', array(__CLASS__, 'cleanup_stale_idempotency'), 1, 3);
-        add_filter('rest_pre_dispatch', array(__CLASS__, 'key_write_preflight'), 2, 3);
         add_action('admin_post_pldr_safe_repair',array(__CLASS__,'admin_repair_guarded'),2);
         add_action('pldr_generate_derivatives',array(__CLASS__,'fingerprint_schedule_guard'),39,2);
     }
@@ -33,6 +33,7 @@ final class PLDR_R21_Runtime_Guards {
         check_admin_referer('pldr_safe_repair');
         if('schema'===$operation){
             delete_transient('pldr_r21_core_schema_ready');
+            PLDR_Schema_Corrections::invalidate_health_cache();
             $ok=PLDR_R21_Readiness::core_ready(true);
             PLDR_Core::audit('system',0,'schema_repair_r21',array('ok'=>$ok,'correction_revision'=>PLDR_Schema_Corrections::revision()));
             if(!$ok)wp_die(esc_html__('File 12 schema reconciliation did not reach a verified ready state.','pdf-library-digital-reading'),array('response'=>503));
@@ -44,50 +45,28 @@ final class PLDR_R21_Runtime_Guards {
         wp_safe_redirect(admin_url('admin.php?page=pldr-health'));exit;
     }
 
-    public static function key_write_preflight($result, $server, WP_REST_Request $request) {
-        if (null !== $result) return $result;
-        $route=(string)$request->get_route();
-        if ('POST'!==strtoupper((string)$request->get_method())) return $result;
-        $key_write='/pldr/v1/ingest'===$route;
-        if ('/pldr/v1/repair'===$route) {
-            $operation=sanitize_key((string)$request['operation']);
-            $key_write='rotate-keys'===$operation;
-        }
-        if (!$key_write || !self::ambiguous_active_key()) return $result;
-        PLDR_Core::audit('security',0,'ambiguous_active_encryption_key_blocked',array('route'=>$route));
-        return PLDR_Core::machine_error('pldr_active_key_ambiguous','Multiple File 12 master keys are configured but no explicit active key ID is selected; encryption/key-rotation was blocked to prevent writing under an arbitrary key.',503,array('degraded'=>true));
-    }
-
-    private static function ambiguous_active_key(): bool {
-        if (defined('PLDR_PDF_ACTIVE_KEY_ID') && ''!==sanitize_key((string)PLDR_PDF_ACTIVE_KEY_ID)) return false;
-        if (defined('SPL_PDF_ACTIVE_KEY_ID') && ''!==sanitize_key((string)SPL_PDF_ACTIVE_KEY_ID)) return false;
-        $ids=array();$sources=array();
-        if (defined('SPL_PDF_MASTER_KEYS')) $sources[]=SPL_PDF_MASTER_KEYS;
-        if (defined('SPL_PDF_MASTER_KEY')) $sources[]=array('legacy'=>SPL_PDF_MASTER_KEY);
-        if (defined('PLDR_PDF_MASTER_KEYS')) $sources[]=PLDR_PDF_MASTER_KEYS;
-        foreach($sources as $raw){
-            if(is_string($raw)){ $decoded=json_decode($raw,true); $raw=is_array($decoded)?$decoded:array(); }
-            if(!is_array($raw))continue;
-            foreach($raw as $id=>$value){ if(''!==sanitize_key((string)$id) && is_string($value))$ids[sanitize_key((string)$id)]=true; }
-        }
-        return count($ids)>1;
-    }
-
+    /**
+     * Reap only this authenticated actor's stale pending reservations. This is
+     * maintenance, not authorization: anonymous/unauthorized traffic must not
+     * be able to mutate another actor's replay state through rest_pre_dispatch.
+     */
     public static function cleanup_stale_idempotency($result, $server, WP_REST_Request $request) {
         $method=strtoupper((string)$request->get_method());
         if(in_array($method,array('GET','HEAD','OPTIONS'),true))return $result;
-        if (self::$idempotency_cleanup_ran || get_transient('pldr_r21_idempotency_reap') || 0 !== strpos((string)$request->get_route(), '/pldr/v1/')) return $result;
-        self::$idempotency_cleanup_ran = true;
+        $actor=get_current_user_id();
+        if($actor<1)return $result;
+        $throttle='pldr_r21_idempotency_reap_'.$actor;
+        if(self::$idempotency_cleanup_ran||get_transient($throttle)||0!==strpos((string)$request->get_route(),'/pldr/v1/'))return $result;
+        self::$idempotency_cleanup_ran=true;
         global $wpdb;
-        $cutoff = gmdate('Y-m-d H:i:s', time() - 1800);
-        $table = PLDR_Core::table('idempotency');
-        $wpdb->last_error = '';
-        $deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE status_code=0 AND created_at<=%s ORDER BY created_at ASC LIMIT 100", $cutoff));
-        if (false === $deleted || '' !== (string)$wpdb->last_error) {
-            PLDR_Core::audit('mutation', 0, 'stale_idempotency_cleanup_failed', array('db_error'=>substr((string)$wpdb->last_error,0,500)));
-        } else {
-            set_transient('pldr_r21_idempotency_reap','1',MINUTE_IN_SECONDS);
-            if ($deleted > 0) PLDR_Core::audit('mutation', 0, 'stale_idempotency_reservations_reaped', array('count'=>(int)$deleted,'stale_after_seconds'=>1800));
+        $cutoff=gmdate('Y-m-d H:i:s',time()-2*HOUR_IN_SECONDS);
+        $table=PLDR_Core::table('idempotency');$wpdb->last_error='';
+        $deleted=$wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE actor_id=%d AND status_code=0 AND created_at<=%s ORDER BY created_at ASC LIMIT 100",$actor,$cutoff));
+        if(false===$deleted||''!==(string)$wpdb->last_error){
+            PLDR_Core::audit('mutation',0,'stale_idempotency_cleanup_failed',array('actor_scope'=>true,'db_error'=>substr((string)$wpdb->last_error,0,500)),$actor);
+        }else{
+            set_transient($throttle,'1',MINUTE_IN_SECONDS);
+            if($deleted>0)PLDR_Core::audit('mutation',0,'stale_idempotency_reservations_reaped',array('count'=>(int)$deleted,'stale_after_seconds'=>2*HOUR_IN_SECONDS,'actor_scope'=>true),$actor);
         }
         return $result;
     }
@@ -95,22 +74,73 @@ final class PLDR_R21_Runtime_Guards {
     public static function legacy_migration_guarded(): void {
         $lock=self::acquire_legacy_lock();
         if(!$lock){
-            if(!wp_next_scheduled('pldr_legacy_migration'))wp_schedule_single_event(time()+60,'pldr_legacy_migration');
+            self::reschedule_legacy(60);
             PLDR_Core::audit('migration',0,'legacy_batch_concurrent_run_deferred',array());
             return;
         }
         try{
+            $pending=(array)get_option(self::LEGACY_RECOVERY_OPTION,array());
+            $pending_rows=is_array($pending['rows']??null)?$pending['rows']:array();
+            if($pending_rows){
+                $recovered=self::restore_current_progress($pending_rows);
+                if(empty($recovered['ok'])){
+                    self::reschedule_legacy(60);
+                    PLDR_Core::audit('migration',0,'legacy_progress_recovery_pending',array('rows'=>count($pending_rows),'failed'=>(int)($recovered['failed']??count($pending_rows))));
+                    return;
+                }
+                delete_option(self::LEGACY_RECOVERY_OPTION);
+                PLDR_Core::audit('migration',0,'legacy_progress_recovery_completed',array('rows'=>count($pending_rows)));
+            }
+
             $snapshots=self::capture_current_progress();
             if(isset($snapshots['error'])){
                 PLDR_Core::audit('migration',0,'legacy_progress_snapshot_failed',array('scope'=>$snapshots['error']));
-                if(!wp_next_scheduled('pldr_legacy_migration'))wp_schedule_single_event(time()+60,'pldr_legacy_migration');
+                self::reschedule_legacy(60);
                 return;
             }
-            PLDR_Schema::migrate_legacy_batch();
-            self::restore_current_progress($snapshots['rows']);
+            $rows=is_array($snapshots['rows']??null)?$snapshots['rows']:array();
+            if($rows&&!self::persist_recovery_journal($rows)){
+                PLDR_Core::audit('migration',0,'legacy_progress_recovery_journal_failed',array('rows'=>count($rows)));
+                self::reschedule_legacy(60);
+                return;
+            }
+
+            try{
+                PLDR_Schema::migrate_legacy_batch();
+            }catch(Throwable $e){
+                PLDR_Core::audit('migration',0,'legacy_batch_exception',array('recovery_journal'=>!empty($rows),'exception_class'=>sanitize_key(get_class($e))));
+                self::reschedule_legacy(60);
+                return;
+            }
+
+            if($rows){
+                $restored=self::restore_current_progress($rows);
+                if(empty($restored['ok'])){
+                    PLDR_Core::audit('migration',0,'legacy_native_progress_restore_incomplete',array('snapshots'=>count($rows),'failed'=>(int)($restored['failed']??0),'journal_retained'=>true));
+                    self::reschedule_legacy(60);
+                    return;
+                }
+                delete_option(self::LEGACY_RECOVERY_OPTION);
+            }
         }finally{
             self::release_legacy_lock($lock);
         }
+    }
+
+    private static function reschedule_legacy(int $delay):void {
+        if(!wp_next_scheduled('pldr_legacy_migration'))wp_schedule_single_event(time()+max(30,$delay),'pldr_legacy_migration');
+    }
+
+    private static function persist_recovery_journal(array $rows):bool {
+        if(!$rows)return true;
+        $json=wp_json_encode($rows);
+        if(!is_string($json))return false;
+        $journal=array('rows'=>$rows,'sha256'=>hash('sha256',$json),'captured_at'=>PLDR_Core::now());
+        update_option(self::LEGACY_RECOVERY_OPTION,$journal,false);
+        $stored=(array)get_option(self::LEGACY_RECOVERY_OPTION,array());
+        if(!is_array($stored['rows']??null)||!hash_equals((string)$journal['sha256'],(string)($stored['sha256']??'')))return false;
+        $stored_json=wp_json_encode($stored['rows']);
+        return is_string($stored_json)&&hash_equals((string)$journal['sha256'],hash('sha256',$stored_json));
     }
 
     private static function acquire_legacy_lock(): ?string {
@@ -161,8 +191,8 @@ final class PLDR_R21_Runtime_Guards {
         return array('rows'=>array_values($snapshots));
     }
 
-    private static function restore_current_progress(array $rows):void {
-        global $wpdb;$restored=0;$failed=0;$table=PLDR_Core::table('reading_state');
+    private static function restore_current_progress(array $rows):array {
+        global $wpdb;$restored=0;$failed_rows=array();$table=PLDR_Core::table('reading_state');
         foreach($rows as $row){
             $wpdb->last_error='';
             $sql=$wpdb->prepare(
@@ -170,9 +200,9 @@ final class PLDR_R21_Runtime_Guards {
                 (int)$row['user_id'],(int)$row['edition_id'],(int)$row['last_page'],(string)$row['percent'],(int)$row['edition_version'],(string)$row['updated_at']
             );
             $ok=$wpdb->query($sql);
-            if(false===$ok||''!==(string)$wpdb->last_error)$failed++;else$restored++;
+            if(false===$ok||''!==(string)$wpdb->last_error)$failed_rows[]=$row;else$restored++;
         }
-        if($rows)PLDR_Core::audit('migration',0,'legacy_native_progress_preserved',array('snapshots'=>count($rows),'restored'=>$restored,'failed'=>$failed));
-        if($failed&&!wp_next_scheduled('pldr_legacy_migration'))wp_schedule_single_event(time()+60,'pldr_legacy_migration');
+        if($rows)PLDR_Core::audit('migration',0,'legacy_native_progress_preserved',array('snapshots'=>count($rows),'restored'=>$restored,'failed'=>count($failed_rows),'journal_available'=>(bool)get_option(self::LEGACY_RECOVERY_OPTION)));
+        return array('ok'=>!$failed_rows,'restored'=>$restored,'failed'=>count($failed_rows),'failed_rows'=>$failed_rows);
     }
 }
