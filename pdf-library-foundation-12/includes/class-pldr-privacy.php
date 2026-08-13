@@ -45,7 +45,7 @@ final class PLDR_Privacy {
     }
 
     private static function export_failure(array $data,string $scope,int $user_id): array {
-        PLDR_Core::audit('privacy',0,'privacy_export_read_failed',array('user_id'=>$user_id,'scope'=>$scope),$user_id);
+        PLDR_Core::audit('privacy',0,'privacy_export_read_failed',array('subject_ref'=>substr(hash_hmac('sha256',(string)$user_id,wp_salt('auth')),0,24),'scope'=>$scope));
         return array('data'=>$data,'done'=>false);
     }
 
@@ -162,10 +162,10 @@ final class PLDR_Privacy {
         if(self::table_check_failed())return self::export_failure($data,'idempotency_table',$user_id);
         if($idempotency_exists){
             $table=PLDR_Core::table('idempotency');$wpdb->last_error='';
-            $rows=$wpdb->get_results($wpdb->prepare("SELECT route,key_hash,response_json,status_code,expires_at,created_at FROM {$table} WHERE actor_id=%d ORDER BY created_at ASC,route ASC LIMIT %d OFFSET %d",$user_id,$limit,$offset),ARRAY_A);
+            $rows=$wpdb->get_results($wpdb->prepare("SELECT route,key_hash,status_code,expires_at,created_at FROM {$table} WHERE actor_id=%d ORDER BY created_at ASC,route ASC LIMIT %d OFFSET %d",$user_id,$limit,$offset),ARRAY_A);
             if(''!==(string)$wpdb->last_error)return self::export_failure($data,'idempotency',$user_id);
             $rows=is_array($rows)?$rows:array();$counts[]=count($rows);
-            foreach($rows as $idx=>$row){$data[]=array('group_id'=>'pldr-idempotency','group_label'=>__('PDF Library mutation replay records','pdf-library-digital-reading'),'item_id'=>'pldr-idempotency-'.sanitize_key((string)$page.'-'.(string)$idx.'-'.substr((string)$row['key_hash'],0,12)),'data'=>array(array('name'=>'Route','value'=>(string)$row['route']),array('name'=>'Request key hash','value'=>(string)$row['key_hash']),array('name'=>'Stored response','value'=>(string)$row['response_json']),array('name'=>'Status code','value'=>(int)$row['status_code']),array('name'=>'Expires','value'=>(string)$row['expires_at']),array('name'=>'Created','value'=>(string)$row['created_at'])));}
+            foreach($rows as $idx=>$row){$data[]=array('group_id'=>'pldr-idempotency','group_label'=>__('PDF Library mutation replay records','pdf-library-digital-reading'),'item_id'=>'pldr-idempotency-'.sanitize_key((string)$page.'-'.(string)$idx.'-'.substr((string)$row['key_hash'],0,12)),'data'=>array(array('name'=>'Route','value'=>(string)$row['route']),array('name'=>'Request key hash','value'=>(string)$row['key_hash']),array('name'=>'Status code','value'=>(int)$row['status_code']),array('name'=>'Expires','value'=>(string)$row['expires_at']),array('name'=>'Created','value'=>(string)$row['created_at'])));}
         }
 
         $shelf_items_exists=self::table_exists('shelf_items');
@@ -211,7 +211,6 @@ final class PLDR_Privacy {
         return false === $deleted ? -1 : (int)$deleted;
     }
 
-
     private static function anonymize_id_batch(string $suffix,string $where_sql,array $where_args,string $set_sql,array $set_args=array()): int {
         global $wpdb;
         if(!self::table_exists($suffix))return self::table_check_failed()?-1:0;
@@ -237,7 +236,7 @@ final class PLDR_Privacy {
         try {
             $hold = (bool) apply_filters('pldr_privacy_legal_hold', false, $user_id);
         } catch (Throwable $e) {
-            PLDR_Core::audit('privacy',0,'privacy_legal_hold_provider_failed',array('user_id'=>$user_id,'provider_failure'=>true),$user_id);
+            PLDR_Core::audit('privacy',0,'privacy_legal_hold_provider_failed',array('subject_ref'=>substr(hash_hmac('sha256',(string)$user_id,wp_salt('auth')),0,24),'provider_failure'=>true));
             return array(
                 'items_removed'=>false,
                 'items_retained'=>true,
