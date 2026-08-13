@@ -207,6 +207,7 @@ final class PLDR_Rights {
             $wpdb->last_error='';$object=$edition?PLDR_Core::object((int)$edition['object_id']):null;
             if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_restore_object_read','Current object could not be read reliably before restoration.',503,array('degraded'=>true));
             if(!$edition||!$object||'available'!==$object['object_status']||'clean'!==$object['scan_status'])return PLDR_Core::machine_error('pldr_restore_unavailable','The document cannot be restored until its current edition has a clean available object.',409);
+            if(!empty($edition['rights_expires_at']) && strtotime((string)$edition['rights_expires_at']) <= time())return PLDR_Core::machine_error('pldr_restore_rights_expired','The document cannot be restored because the current edition rights period has expired; rights evidence must be renewed first.',409);
         }
         $changed=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d',$status,PLDR_Core::now(),$document_id,(int)$doc['version']));
         if(1!==$changed)return PLDR_Core::machine_error('pldr_document_conflict','Document state changed concurrently; the rights decision was not committed.',409);

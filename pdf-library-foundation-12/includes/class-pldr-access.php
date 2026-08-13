@@ -256,8 +256,12 @@ final class PLDR_Access {
 
         $size = (int) $object['byte_size'];
         if ($size < 1) self::fail_delivery(503, 'Document object has an invalid byte size.');
-        [$start, $end, $partial] = self::parse_range($size);
         $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if (!in_array($method, array('GET','HEAD'), true)) {
+            header('Allow: GET, HEAD');
+            self::fail_delivery(405, 'Only GET and HEAD are supported for signed document delivery.');
+        }
+        [$start, $end, $partial] = self::parse_range($size);
         if ('HEAD' !== $method) {
             $consumed = $wpdb->query($wpdb->prepare(
                 'UPDATE ' . PLDR_Core::table('access_tokens') . ' SET used_count=used_count+1 WHERE id=%d AND revoked_at IS NULL AND expires_at>%s AND used_count<max_uses',
@@ -329,7 +333,9 @@ final class PLDR_Access {
         if (!preg_match('/^bytes=(\d*)-(\d*)$/', $header, $m)) self::fail_delivery(416, 'Invalid byte range.');
         if ('' === $m[1] && '' === $m[2]) self::fail_delivery(416, 'Invalid byte range.');
         if ('' === $m[1]) {
-            $suffix = min($size, max(1, (int) $m[2]));
+            $requested_suffix = (int) $m[2];
+            if ($requested_suffix < 1) self::fail_delivery(416, 'Requested byte-range suffix is unsatisfiable.');
+            $suffix = min($size, $requested_suffix);
             return array($size - $suffix, $size - 1, true);
         }
         $start = (int) $m[1];

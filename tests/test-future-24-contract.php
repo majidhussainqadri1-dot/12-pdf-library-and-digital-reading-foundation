@@ -30,7 +30,7 @@ foreach ($requiredFiles as $file) {
 }
 
 $must = array(
-    'Version: 1.1.0-rc.1','PLDR_DB_VERSION', "'1.1.0'", 'PLDR_CONTRACT_VERSION',
+    'Version: 1.1.0-rc.2','PLDR_DB_VERSION', "'1.1.0'", 'PLDR_CONTRACT_VERSION',
     'Advanced Reflow Reading Mode','Read Aloud / Text-to-Speech Reader','Smart Table of Contents & Outline Recovery',
     'Edition Comparison Laboratory','Precise Scholarly Anchors','Citation Export Center',
     'Global Bibliographic Authority Enrichment','OCR Quality Laboratory','Portable Annotation Standard',

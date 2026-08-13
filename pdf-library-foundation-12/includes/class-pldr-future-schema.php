@@ -214,7 +214,7 @@ final class PLDR_Future_Schema {
             foreach ($sql as $statement) dbDelta($statement);
             $health = self::verify_schema();
             if (!$health['ok']) {
-                update_option('pldr_future_schema_error', array_merge($health, array('last_error'=>(string)$wpdb->last_error,'at'=>PLDR_Core::now())), false);
+                update_option('pldr_future_schema_error', array_merge($health, array('last_error_ref'=>PLDR_Core::db_error_ref((string)$wpdb->last_error),'at'=>PLDR_Core::now())), false);
                 PLDR_Core::audit('system', 0, 'future_24_schema_failed', $health);
                 return false;
             }

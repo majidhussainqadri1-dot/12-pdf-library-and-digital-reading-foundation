@@ -29,13 +29,25 @@ final class PLDR_Plugin {
     }
     public function cron_schedules(array $schedules):array { if(!isset($schedules['pldr_five_minutes']))$schedules['pldr_five_minutes']=array('interval'=>300,'display'=>'Every five minutes (File 12)');return $schedules; }
     public function init():void { load_plugin_textdomain('pdf-library-digital-reading',false,dirname(plugin_basename(PLDR_FILE)).'/languages');$this->rewrites();add_shortcode('pldr_library',static fn()=>PLDR_Reader::library_html());add_shortcode('pldr_reading_workspace',static fn()=>PLDR_Reader::reading_dashboard_html());PLDR_Integrations::register_contracts();if('1'===get_option('pldr_rewrite_flush_needed')){flush_rewrite_rules(false);delete_option('pldr_rewrite_flush_needed');} }
-    private function rewrites():void { add_rewrite_rule('^library/?$','index.php?pldr_route=library','top');add_rewrite_rule('^library/document/([a-f0-9\-]{36})/([^/]+)/?$','index.php?pldr_route=document&pldr_id=$matches[1]','top');add_rewrite_rule('^library/document/([a-f0-9\-]{36})/?$','index.php?pldr_route=document&pldr_id=$matches[1]','top');add_rewrite_rule('^library/read/([a-f0-9\-]{36})/?$','index.php?pldr_route=read&pldr_id=$matches[1]','top');add_rewrite_rule('^library/delivery/([A-Za-z0-9_-]{40,60})/?$','index.php?pldr_route=delivery&pldr_token=$matches[1]','top');add_rewrite_rule('^account/reading/?$','index.php?pldr_route=reading','top'); }
+    private function rewrites():void { add_rewrite_rule('^library/?$','index.php?pldr_route=library','top');add_rewrite_rule('^library/document/([a-f0-9\-]{36})/([^/]+)/?$','index.php?pldr_route=document&pldr_id=$matches[1]','top');add_rewrite_rule('^library/document/([a-f0-9\-]{36})/?$','index.php?pldr_route=document&pldr_id=$matches[1]','top');add_rewrite_rule('^library/read/([a-f0-9\-]{36})/?$','index.php?pldr_route=read&pldr_id=$matches[1]','top');add_rewrite_rule('^library/manage/?$','index.php?pldr_route=manage','top');add_rewrite_rule('^library/delivery/([A-Za-z0-9_-]{40,60})/?$','index.php?pldr_route=delivery&pldr_token=$matches[1]','top');add_rewrite_rule('^account/reading/?$','index.php?pldr_route=reading','top'); }
     public function query_vars(array $vars):array { $vars[]='pldr_route';$vars[]='pldr_id';$vars[]='pldr_token';return $vars; }
 
     public function template_redirect():void {
         $route=(string)get_query_var('pldr_route');if(!$route)return;
         if('delivery'===$route){PLDR_Access::deliver((string)get_query_var('pldr_token'));return;}
-        if('reading'===$route&&!is_user_logged_in()){auth_redirect();return;}
+        if(in_array($route,array('reading','manage'),true)&&!is_user_logged_in()){auth_redirect();return;}
+        if('manage'===$route){
+            header('X-Robots-Tag: noindex, nofollow, noarchive',true);
+            nocache_headers();
+            if(PLDR_Core::authorize('manage')){wp_safe_redirect(admin_url('admin.php?page=pldr-library'));exit;}
+            if(PLDR_Core::authorize('rights')){wp_safe_redirect(admin_url('admin.php?page=pldr-rights'));exit;}
+            if(PLDR_Core::authorize('repair')){wp_safe_redirect(admin_url('admin.php?page=pldr-health'));exit;}
+            if(PLDR_Core::authorize('publish')){wp_safe_redirect(admin_url('admin.php?page=pldr-library'));exit;}
+            status_header(403);
+            $content='<main class="pldr-shell"><section class="pldr-state" role="alert"><h1>'.esc_html__('PDF Library management is unavailable','pdf-library-digital-reading').'</h1><p>'.esc_html__('Your current account does not have File 12 management, publishing, rights-review, or repair authority.','pdf-library-digital-reading').'</p></section></main>';
+            $this->render_virtual('manage',$content);
+            return;
+        }
         $public_id=(string)get_query_var('pldr_id');
         if(in_array($route,array('document','read'),true)&&!$this->preflight_document_route($public_id,$route)){
             $this->render_virtual($route,PLDR_Reader::document_html($public_id));return;
@@ -92,7 +104,7 @@ final class PLDR_Plugin {
         $status=http_response_code();if(!$status||$status<300)status_header(200);
         nocache_headers();
         $filtered_library='library'===$route&&(!empty($_GET['q'])||!empty($_GET['type'])||!empty($_GET['category'])||!empty($_GET['language'])||absint($_GET['page']??1)>1||!empty($_GET['cursor']));
-        if(in_array($route,array('read','reading'),true)||$filtered_library||http_response_code()>=400)header('X-Robots-Tag: noindex, nofollow, noarchive',true);
+        if(in_array($route,array('read','reading','manage'),true)||$filtered_library||http_response_code()>=400)header('X-Robots-Tag: noindex, nofollow, noarchive',true);
         get_header();echo $content;get_footer();exit;
     }
 
@@ -105,7 +117,7 @@ final class PLDR_Plugin {
             $enqueue=''!==$page&&0===strpos($page,'pldr-');
         }else{
             $route=(string)get_query_var('pldr_route');
-            $enqueue=in_array($route,array('library','document','read','reading'),true);
+            $enqueue=in_array($route,array('library','document','read','reading','manage'),true);
             if(!$enqueue){
                 global $post;
                 $enqueue=$post instanceof WP_Post&&(has_shortcode((string)$post->post_content,'pldr_library')||has_shortcode((string)$post->post_content,'pldr_reading_workspace'));

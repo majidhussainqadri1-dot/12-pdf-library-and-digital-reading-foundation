@@ -67,6 +67,14 @@ final class PLDR_Core {
         }
     }
 
+    public static function db_error_ref(string $error = ''): string {
+        global $wpdb;
+        if ('' === $error && isset($wpdb)) $error = (string) $wpdb->last_error;
+        $error = trim($error);
+        if ('' === $error) return 'db-error';
+        return 'db-error-' . substr(hash_hmac('sha256', $error, wp_salt('auth')), 0, 16);
+    }
+
     public static function founder(int $user_id = 0): bool {
         $user_id = $user_id ?: get_current_user_id();
         if (!$user_id) return false;
@@ -148,6 +156,12 @@ final class PLDR_Core {
                 if ($seen >= self::AUDIT_CONTEXT_MAX_ITEMS) { $safe['_items_truncated'] = true; break; }
                 $key_string = (string) $key;
                 if (preg_match('/secret|token|password|key|patient|note_text|authorization|cookie|session|credential|nonce/i', $key_string)) continue;
+                if (preg_match('/(?:db_?error|last_?error|sql|query|stack|filesystem_?path|absolute_?path)/i', $key_string)) {
+                    $safe_key = is_int($key) ? $key : sanitize_key($key_string . '_ref');
+                    if ('' !== (string) $safe_key) $safe[$safe_key] = self::db_error_ref(is_scalar($nested) ? (string) $nested : 'non-scalar-internal-error');
+                    $seen++;
+                    continue;
+                }
                 $safe_key = is_int($key) ? $key : sanitize_key($key_string);
                 if ('' === (string) $safe_key) continue;
                 $safe[$safe_key] = self::sanitize_audit_value($nested, $depth + 1);
@@ -239,7 +253,7 @@ final class PLDR_Core {
     public static function current_edition(int $document_id): ?array {
         global $wpdb;
         $wpdb->last_error='';
-        $row = $wpdb->get_row($wpdb->prepare('SELECT e.* FROM '.self::table('editions').' e WHERE e.document_id=%d AND e.status=%s ORDER BY e.id DESC LIMIT 1',$document_id,'published'),ARRAY_A);
+        $row=$wpdb->get_row($wpdb->prepare('SELECT e.* FROM '.self::table('editions').' e WHERE e.document_id=%d AND e.status=%s ORDER BY e.id DESC LIMIT 1',$document_id,'published'),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return null;
         if(!$row){
             $wpdb->last_error='';
@@ -436,38 +450,8 @@ final class PLDR_Core {
         global $wpdb;
         if(''===$key)return true;
         [$route,$hash]=self::idempotency_identity($route,$key);
-        $deleted=$wpdb->delete(self::table('idempotency'),array('actor_id'=>$actor_id,'route'=>$route,'key_hash'=>$hash,'status_code'=>0),array('%d','%s','%s','%d'));
+        $deleted=$wpdb->query($wpdb->prepare('DELETE FROM '.self::table('idempotency').' WHERE actor_id=%d AND route=%s AND key_hash=%s AND status_code=0',$actor_id,$route,$hash));
         return false!==$deleted;
-    }
-
-    public static function idempotency_lookup(string $route, string $key, int $actor_id): ?array {
-        global $wpdb;
-        if ('' === $key) return null;
-        [$route,$hash]=self::idempotency_identity($route,$key);
-        $row = $wpdb->get_row($wpdb->prepare('SELECT response_json,status_code FROM ' . self::table('idempotency') . ' WHERE actor_id=%d AND route=%s AND key_hash=%s AND expires_at>%s AND status_code>0 LIMIT 1',$actor_id,$route,$hash,self::now()), ARRAY_A);
-        if (!$row) return null;
-        $stored=json_decode((string)$row['response_json'],true);
-        $body=is_array($stored)&&array_key_exists('response',$stored)?$stored['response']:$stored;
-        return array('body' => $body, 'status' => (int) $row['status_code']);
-    }
-
-    public static function idempotency_store(string $route, string $key, int $actor_id, $body, int $status = 200): bool {
-        global $wpdb;
-        if ('' === $key) return true;
-        [$route,$hash]=self::idempotency_identity($route,$key);
-        $json=wp_json_encode($body);
-        if(false===$json)return false;
-        $expires = gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS);
-        $stored=$wpdb->replace(self::table('idempotency'),array(
-            'actor_id' => $actor_id,
-            'route' => $route,
-            'key_hash' => $hash,
-            'response_json' => $json,
-            'status_code' => max(100,min(599,$status)),
-            'expires_at' => $expires,
-            'created_at' => self::now(),
-        ),array('%d','%s','%s','%s','%d','%s','%s'));
-        return false!==$stored;
     }
 
     public static function route_url(string $route, array $args = array()): string {
@@ -475,6 +459,7 @@ final class PLDR_Core {
         if ('document' === $route && !empty($args['id'])) return home_url('/library/document/' . rawurlencode((string) $args['id']) . '/' . rawurlencode((string) ($args['slug'] ?? 'document')) . '/');
         if ('read' === $route && !empty($args['id'])) return home_url('/library/read/' . rawurlencode((string) $args['id']) . '/');
         if ('reading' === $route) return home_url('/account/reading/');
+        if ('manage' === $route) return home_url('/library/manage/');
         return $base;
     }
 }

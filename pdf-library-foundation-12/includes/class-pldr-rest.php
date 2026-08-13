@@ -76,6 +76,11 @@ final class PLDR_REST {
             if(!PLDR_Core::idempotency_abort($route,$key,$actor))PLDR_Core::audit('mutation',0,'idempotency_abort_after_denial_failed',array('route'=>$route,'status'=>$status),$actor);
             return $result;
         }
+        if($status>=500){
+            if(!PLDR_Core::idempotency_abort($route,$key,$actor))PLDR_Core::audit('mutation',0,'pldr_idempotency_abort_after_transient_failed',array('route'=>$route,'status'=>$status),$actor);
+            if(is_wp_error($result))return $result;
+            return $response;
+        }
         $body=$response instanceof WP_REST_Response?$response->get_data():$result;
         if(!PLDR_Core::idempotency_complete($route,$key,$actor,$body,$status,$request_hash))return PLDR_Core::machine_error('pldr_idempotency_persist','The operation completed but its idempotency result could not be finalized; retry with a new key only after reconciliation.',503,array('original_status'=>$status));
         return is_wp_error($result)?$result:$response;

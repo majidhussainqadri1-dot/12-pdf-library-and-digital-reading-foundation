@@ -471,7 +471,7 @@ final class PLDR_Ingest {
         if(''!==$decoded_mime&&$decoded_mime!==(string)$check['type'])return PLDR_Core::machine_error('pldr_cover_mime','The supplied cover extension/type does not match its decoded image format.',400);
         $cover_scan=self::scan_file((string)$cover['tmp_name'],array('filename'=>sanitize_file_name((string)$cover['name'])));
         if(is_wp_error($cover_scan))return PLDR_Core::machine_error('pldr_cover_scan','The supplied cover failed the upload safety scan.',422,array('cause'=>$cover_scan->get_error_code()));
-        if('clean'!==($cover_scan['status']??'') && defined('PLDR_REQUIRE_MALWARE_SCANNER') && PLDR_REQUIRE_MALWARE_SCANNER)return PLDR_Core::machine_error('pldr_cover_scan_unavailable','A required malware scanner did not produce a clean cover result.',503,array('degraded'=>true));
+        if('clean'!==($cover_scan['status']??''))return PLDR_Core::machine_error('pldr_cover_scan_unavailable','The supplied cover cannot become an available derivative until the malware scanner produces a clean result.',503,array('degraded'=>true,'scan_status'=>sanitize_key((string)($cover_scan['status']??'unverified'))));
         $allocation = PLDR_Storage::allocate('pldr');
         if (!empty($allocation['error'])) return $allocation['error'];
         $temp = PLDR_Storage::temp('cover');
@@ -488,7 +488,7 @@ final class PLDR_Ingest {
             $stored=$wpdb->insert(PLDR_Core::table('objects'), array(
                 'storage_name' => $allocation['name'], 'storage_scope' => 'pldr', 'original_name' => sanitize_file_name($cover['name']),
                 'mime_type' => $check['type'], 'byte_size' => (int) $cover['size'], 'sha256' => $sha, 'encrypted_sha256' => $crypto['encrypted_sha256'],
-                'key_id' => $crypto['key_id'], 'format_version' => $crypto['format'], 'scan_status' => 'derived-cover', 'object_status' => 'available', 'created_at' => PLDR_Core::now(), 'verified_at' => PLDR_Core::now(),
+                'key_id' => $crypto['key_id'], 'format_version' => $crypto['format'], 'scan_status' => 'clean', 'object_status' => 'available', 'created_at' => PLDR_Core::now(), 'verified_at' => PLDR_Core::now(),
             ));
             if(false===$stored)throw new RuntimeException('Cover object metadata could not be stored.');
             $object_id=(int)$wpdb->insert_id;if($object_id<1)throw new RuntimeException('Cover object persistence could not be confirmed.');

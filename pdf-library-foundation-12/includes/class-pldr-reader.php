@@ -24,9 +24,9 @@ final class PLDR_Search {
         if ($type && isset(PLDR_Core::DOCUMENT_TYPES[$type])) { $where[]='d.document_type=%s';$base_params[]=$type; }
         if ($category && isset(PLDR_Core::CATEGORIES[$category])) { $where[]='d.category=%s';$base_params[]=$category; }
         if ($language) { $where[]='d.language=%s';$base_params[]=$language; }
-        $batch_size=min(200,max(48,$per_page*4));$target=$logical_offset+$per_page+1;$suggested_limit=max(2000,$target*8);$scan_limit_provider_failed=false;
+        $batch_size=min(128,max(48,$per_page*3));$target=$logical_offset+$per_page+1;$suggested_limit=max(256,$target*4);$scan_limit_provider_failed=false;
         try{$scan_limit=(int)apply_filters('pldr_search_scan_limit',$suggested_limit,$args,$user_id);}catch(Throwable $e){$scan_limit=$suggested_limit;$scan_limit_provider_failed=true;PLDR_Core::audit('search',0,'catalog_scan_limit_provider_failed',array('provider_failure'=>true),$user_id);}
-        $scan_limit=max($batch_size,min(20000,$scan_limit));$raw_scanned=0;$eligible=array();$scan_truncated=false;
+        $scan_limit=max($batch_size,min(1000,$scan_limit));$raw_scanned=0;$eligible=array();$scan_truncated=false;
         $after_updated=(string)($cursor['updated_at']??'');$after_id=absint($cursor['id']??0);$page_cursor=array();$exhausted=false;
         while(count($eligible)<$target&&$raw_scanned<$scan_limit){
             $limit=min($batch_size,$scan_limit-$raw_scanned);$loop_where=$where;$params=$base_params;

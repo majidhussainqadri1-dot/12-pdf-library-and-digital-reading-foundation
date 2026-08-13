@@ -3,7 +3,7 @@
  * Plugin Name: Sabri PDF Library and Digital Reading
  * Plugin URI: https://sabrihomeopathy.com/
  * Description: File 12 canonical PDF library, rights-aware digital reader, private reading state, signed range delivery, OCR/search contracts, book packs, preservation, Future Digital Reading Intelligence 24, and cross-file integrations.
- * Version: 1.1.0-rc.1
+ * Version: 1.1.0-rc.2
  * Requires at least: 7.0
  * Requires PHP: 8.1
  * Author: Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed
@@ -13,7 +13,7 @@
 
 defined('ABSPATH') || exit;
 
-define('PLDR_VERSION', '1.1.0-rc.1');
+define('PLDR_VERSION', '1.1.0-rc.2');
 define('PLDR_DB_VERSION', '1.1.0');
 define('PLDR_CONTRACT_VERSION', '1.1.0');
 define('PLDR_FILE', __FILE__);
@@ -60,6 +60,7 @@ register_deactivation_hook(PLDR_FILE, array('PLDR_Future', 'deactivate'));
 add_action('plugins_loaded', static function (): void {
     add_action('wp_logout', array('PLDR_Future', 'mark_vault_purge'));
     add_action('wp_enqueue_scripts', array('PLDR_Future', 'vault_purge_asset'), 2);
+    add_action('login_enqueue_scripts', array('PLDR_Future', 'vault_purge_asset'), 2);
 
     PLDR_R20_Guards::hooks();
     PLDR_R21_Readiness::hooks();

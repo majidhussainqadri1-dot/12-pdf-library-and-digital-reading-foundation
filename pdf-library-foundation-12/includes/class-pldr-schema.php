@@ -391,7 +391,7 @@ final class PLDR_Schema {
                 'missing_tables'=>$missing_tables,
                 'missing_columns'=>$missing_columns,
                 'missing_indexes'=>$missing_indexes,
-                'last_error'=>(string)$wpdb->last_error,
+                'last_error_ref'=>PLDR_Core::db_error_ref((string)$wpdb->last_error),
                 'at'=>PLDR_Core::now(),
             ),false);
             self::release_migration_lock($lock_payload);
@@ -431,7 +431,7 @@ final class PLDR_Schema {
         $wpdb->last_error='';
         $count = (int) $wpdb->get_var("SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_type='spl_document'");
         if(''!==(string)$wpdb->last_error){
-            update_option('pldr_legacy_migration_state',array('status'=>'error','phase'=>'legacy-presence-read','last_error'=>substr((string)$wpdb->last_error,0,500),'updated_at'=>PLDR_Core::now()),false);
+            update_option('pldr_legacy_migration_state',array('status'=>'error','phase'=>'legacy-presence-read','last_error_ref'=>PLDR_Core::db_error_ref((string)$wpdb->last_error),'updated_at'=>PLDR_Core::now()),false);
             PLDR_Core::audit('migration',0,'legacy_presence_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
             if(!wp_next_scheduled('pldr_legacy_migration'))wp_schedule_single_event(time()+60,'pldr_legacy_migration');
             return false;
