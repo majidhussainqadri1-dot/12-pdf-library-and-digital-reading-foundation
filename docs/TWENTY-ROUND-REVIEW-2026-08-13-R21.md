@@ -1,0 +1,149 @@
+# File 12 — R21 Fresh Twenty-Round Corrective Review — 2026-08-13
+
+## Governing review discipline
+
+R21 started from exact green R20 repository head `ad153bede56accdbd591b57f959e643e96a02eb8`. Every numbered round followed one mandatory sequence: **finish the complete review first; close that round's complete defect ledger; only then apply all proven corrections as one post-review batch; retest; and only then start the next numbered round.** No defect was fixed while its numbered review was still underway.
+
+Repository review evidence is not staging/live evidence. Exact deployed version, deployed schema, migration state and live behavior remain separately unverified.
+
+## Round 1
+**Focus:** activation, core/Future schema, runtime readiness, fail-closed startup.
+**Result:** Defects found. Version markers could hide physical schema drift; runtime/Future hooks could proceed after failed or incomplete upgrade/correction state.
+**Post-review batch:** added physical table/column/index readiness verification, one canonical repair attempt, schema-correction gate, and fail-closed core/Future runtime.
+**Correction commit:** `432d617e0746f42d23ce87b470eb6a1aaa068ac0`.
+
+## Round 2
+**Focus:** REST permissions, object/state authorization, IDOR and existence leakage.
+**Result:** Clean. No new proven repository defect.
+
+## Round 3
+**Focus:** idempotency, replay, mutation rate/concurrency and crash recovery.
+**Result:** Defect found. A hard crash after reservation could leave a pending idempotency row blocking same-key retry for an excessive interval.
+**Post-review batch:** bounded stale-pending reservation recovery.
+**Correction commit:** `f1963dfb30094dc17c60cfe262deb8aa66132901`.
+
+## Round 4
+**Focus:** private storage, ingest crypto, active-key selection and key-writing workflows.
+**Result:** Defect found. Multiple configured keys without an explicit active key could make encryption choose an arbitrary first key.
+**Post-review batch:** initially added a fail-closed key-writing preflight; Round 20 later moved this invariant into `PLDR_Crypto` itself so every encryption/key-rotation caller is protected without a pre-permission REST disclosure path.
+**Correction commit:** `5452f80da25966b96498f1b742135febad3ca740`; superseded/hardened in Round 20.
+
+## Round 5
+**Focus:** access policy, grants, derivative binding, range delivery and live authorization recheck.
+**Result:** Clean. No new proven repository defect.
+
+## Round 6
+**Focus:** rights reports, decisions, appeals, expiry, publication/restoration and revocation.
+**Result:** Clean. No new proven repository defect.
+
+## Round 7
+**Focus:** privacy export/erase, legal hold, retention and audit minimization.
+**Result:** Defects found. Privacy export included idempotency response bodies that may carry signed/sensitive response material; privacy failure audits used direct subject identity rather than a pseudonymous subject reference.
+**Post-review batch:** removed replay response bodies from export and pseudonymized privacy failure audit subject references.
+**Correction commit:** `5917d3a0360915e93134cc1d8686293d70af27cb`.
+
+## Round 8
+**Focus:** public routes, catalog/search, cache/SEO status and canonical document URLs.
+**Result:** Defects found. Virtual document states could be emitted under HTTP 200, slug variants lacked canonical redirect, and filtered catalog routes lacked explicit noindex treatment.
+**Post-review batch:** 404/503 route semantics, canonical slug redirect and filtered-catalog noindex policy.
+**Correction commit:** `05aa5b36dd657b269b0d368229165a96a422006b`.
+
+## Round 9
+**Focus:** reading progress, bookmarks, notes, ownership, page bounds and cursor/delete concurrency.
+**Result:** Clean. No new proven repository defect.
+
+## Round 10
+**Focus:** OCR correction/review/search overlay, citations, anchors and portable annotations.
+**Result:** Clean. No new proven repository defect.
+
+First-ten defect rounds: **1, 3, 4, 7, 8**
+
+## Round 11
+**Focus:** external providers, authority/context adapters, provenance, SSRF/same-origin policy and degraded provider states.
+**Result:** Clean. No new proven repository defect.
+
+## Round 12
+**Focus:** encrypted offline vault, local authorization expiry and logout purge.
+**Result:** Defect found. The new fail-closed runtime gate could prevent logout-purge hooks from registering while a previously stored browser vault still existed.
+**Post-review batch:** registered logout purge marker/purge asset independently of File 12 domain schema readiness.
+**Correction commit:** `e4d77cfcfe0d0dc0d2c6fccc74e4f58b7d594dc8`.
+
+## Round 13
+**Focus:** UI containment, RTL/responsive/accessibility, touch targets and page navigation.
+**Result:** Defects found. Reader CSS contained unscoped global form/button selectors, and the private reading workspace lacked a native Back/Home path and explicit empty state.
+**Post-review batch:** confined File 12 styles, retained 44px targets/focus/reduced-motion rules, and added native route navigation/empty-state support.
+**Correction commit:** `7f7e178df4740b369d878f8c0cc04946326ea4f2`.
+
+## Round 14
+**Focus:** legacy migration, schema continuity, deactivation/uninstall and rollback safety.
+**Result:** Defects found. Legacy migration lacked an execution lease and legacy progress reconciliation could overwrite newer native reading progress.
+**Post-review batch:** serialized legacy migration and snapshot/reconciled native progress with timestamp-aware preservation. Round 20 later added a durable pre-migration recovery journal so a crash/write failure cannot advance legacy state without retaining the newer native-progress evidence needed for recovery.
+**Correction commit:** `0c22cf73ff00ad2fc6bee573b7e8eca506652bd2`; crash-recovery journal hardened in Round 20.
+
+## Round 15
+**Focus:** integrations, event/outbox contracts, consumers, retries/dead-letter and privacy classification.
+**Result:** Defects found. Event contracts lacked explicit privacy/consumer metadata, unknown outbox event names were dispatchable, and arbitrary consumer exception text could be persisted in outbox failure state.
+**Post-review batch:** explicit event schema registry, known-event fail-closed dispatch, at-least-once/idempotent-consumer declaration and bounded non-secret failure codes.
+**Correction commit:** `f46409229ce9d28a2c7fc21c41c4dcd8469969e4`.
+
+## Round 16
+**Focus:** health, exact integrity, safe repair and operational observability.
+**Result:** Defects found. One scheduled event could run both exact R20 integrity verification and older legacy verification; admin safe-repair paths for schema/outbox/legacy migration could bypass R21 canonical guards.
+**Post-review batch:** retained the exact integrity sampler as the single scheduled integrity owner and guarded schema/outbox/legacy operational repairs.
+**Correction commit:** `a4d4d06af983546dae0658906f6404b56aeba576`.
+
+## Round 17
+**Focus:** performance, bounded maintenance, cron deduplication and asset loading.
+**Result:** Defects found. Stale-idempotency maintenance could run on read-only REST traffic, fingerprint duplicate checking used an argument tuple different from the scheduled event, and reader CSS was enqueued outside File 12 surfaces.
+**Post-review batch:** mutation-only/throttled stale cleanup, canonical fingerprint scheduling tuple, and route/shortcode/admin-scoped reader assets.
+**Correction commit:** `84f78286b7c2f0c43622e8898332b29a2cf8e445`.
+
+## Round 18
+**Focus:** XSS/CSRF, signed delivery, object binding, secrets, mutation abuse and browser security headers.
+**Result:** Clean. Existing output escaping, nonce/capability gates, object/derivative binding, token audience checks, delivery `nosniff`/`no-referrer`/sandbox policy and bounded mutation protections did not reveal a new proven repository defect in this round.
+
+## Round 19
+**Focus:** repository evidence, review documentation, STATUS/PR truth, CI retention and package-quality-gate coverage.
+**Result:** Defects found. R21 product changes had no permanent R21 regression contract/review record in the repository, the workflow had no named R21 retained gate, and STATUS/PR evidence was stale relative to the active R21 branch.
+**Post-review batch:** added this R21 review record, a permanent R21 regression contract, a named CI R21 step, and an R21 checkpoint STATUS/PR evidence update before Round 20.
+**Retest correction:** the first Round-19 CI run exposed a false-positive CSS-containment assertion in the newly added R21 test plus malformed Markdown emphasis in this checkpoint record. Those QA/documentation defects were corrected before Round 20; they were not counted as a separate product review round. Exact Round-19 corrected checkpoint `bd6138efc397930c150e26953f18f9b26aa1eb2b` then passed quality-gate run #350.
+
+Through Round 19 defect rounds: **1, 3, 4, 7, 8, 12, 13, 14, 15, 16, 17, 19**
+Through Round 19 clean rounds: **2, 5, 6, 9, 10, 11, 18**
+
+## Round 20
+**Focus:** final holistic adversarial pass over the corrected Round-19 state: governing invariants, startup/schema truth, permission ordering, crypto, replay/concurrency, migration crash recovery, event/outbox behavior, privacy, routes/UI, offline safety, cron/operations, regression evidence and release-truth boundaries.
+
+**Result:** Defects found. The complete review identified four final defect groups before any Round-20 coding began:
+
+1. **Schema truth incompleteness / fresh-install ordering:** the R21 core readiness gate checked only a subset of runtime columns/indexes; the R20 correction marker could report current without re-verifying physical nullability/engine state; and requiring the complete core+Future correction too early could deadlock a fresh install before Future-24 created its own tables.
+2. **Authorization/side-effect ordering around key/replay maintenance:** the Round-4 active-key REST preflight ran in `rest_pre_dispatch`, before canonical endpoint permission callbacks, so an unauthorized caller could receive configuration-derived failure information; stale replay cleanup also had a broader pre-permission side-effect scope than necessary.
+3. **Legacy migration crash recovery:** Round-14 snapshots protected the normal restore path, but a crash/write failure after legacy migration advanced state could leave failed native-progress restoration without a durable recovery journal for the next run.
+4. **Physical correction truth vs stored marker:** outbox nullability/InnoDB drift after a normal schema operation or external drift could remain hidden behind the stored correction revision until explicitly re-run.
+
+**Post-review correction batch:** only after the entire Round-20 review was closed, the following corrections were applied:
+
+- expanded R21 core readiness to the complete core runtime table/column/index contract;
+- split **core** correction readiness from complete core+Future readiness so fresh install can create Future tables without circular blocking;
+- made correction `is_current()`/`is_core_current()` physically verify outbox nullability and InnoDB state with bounded health caching, instead of trusting the revision option alone;
+- made the correction pass skip not-yet-required Future tables but verify/convert them once the Future schema is expected/present;
+- moved the multi-key active-selection invariant into `PLDR_Crypto::active_key_id()`/`is_ready()` itself: multiple keys now require an explicit active key and no pre-permission REST config disclosure is needed;
+- scoped stale pending-idempotency cleanup to the authenticated actor only, bounded it to mutation traffic, and extended the stale threshold to two hours;
+- journaled native reading-progress snapshots **before** legacy mutation, verified the journal, replayed any pending journal before a new migration batch, retained it across exceptions/write failures, and cleared it only after successful recovery.
+
+**Round-20 product correction commits:** `11062c62495ff818efdd2762ff7ce5c2b529372c`, `8fb150c7b5f7fe8e9c6a3142f65a90b8ae412ea3`, `54a4fbbddfb48e248ebee2c4b586c98468ac930b`, `e0efd1f16f4d221958b848c505cb7b086085441f`.
+
+## Final R21 round accounting
+
+Final defect rounds: **1, 3, 4, 7, 8, 12, 13, 14, 15, 16, 17, 19, 20**
+
+Final clean rounds: **2, 5, 6, 9, 10, 11, 18**
+
+First-ten defect rounds: **1, 3, 4, 7, 8**
+
+The R21 numbered review sequence is now **20/20 complete**. Final exact-head automated QA and deterministic package evidence must be taken only from the branch HEAD after this final review/test/status evidence is committed; repository metadata must not be changed after that green exact-head run if that head is to be reported as the final repository candidate.
+
+## Production-truth boundary
+Repository source/CI/package evidence proves only those repository/package gates. Hostinger staging deployment, deployed artifact checksum, deployed DB/schema/migration state, real-role/browser/accessibility/RTL/offline/provider/backup/restore/rollback journeys, Founder acceptance and live re-test remain separate gates.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
