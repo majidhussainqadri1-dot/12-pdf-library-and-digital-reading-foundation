@@ -66,6 +66,8 @@ jobs:
         run: php tests/test-twenty-round-review-r17.php
       - name: Eighteenth fresh twenty-round corrective-review regressions
         run: php tests/test-twenty-round-review-r18.php
+      - name: Nineteenth fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r19.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
