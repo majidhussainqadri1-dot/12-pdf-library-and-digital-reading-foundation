@@ -53,7 +53,7 @@ jobs:
           s=s.replace("$must($rights, '$lease_until=gmdate', 'Outbox dispatch lease missing.');", "$must($outbox, '$lease_until=gmdate', 'Outbox dispatch lease missing.');")
           s=s.replace("$must($rights, \"'processing',\\$lease_until\", 'Outbox processing claim missing.');", "$must($outbox, \"'processing',\\$lease_until\", 'Outbox processing claim missing.');")
           s=s.replace("$must($rights, 'if(1!==$claimed)continue;', 'Outbox dispatch does not require a successful claim.');", "$must($outbox, 'if(1!==$claimed)continue;', 'Outbox dispatch does not require a successful claim.');")
-          s=s.replace("$must($reader, '$logical_offset=$cursor_token?0:(($page-1)*$per_page);', 'Logical access-filtered pagination offset/cursor compatibility missing.');", "$must($reader, \"$logical_offset=$cursor_token?absint($cursor['skip']??0):(($page-1)*$per_page);\", 'Logical access-filtered pagination offset/cursor compatibility missing.');")
+          s=s.replace("$must($reader, '$logical_offset=$cursor_token?0:(($page-1)*$per_page);', 'Logical access-filtered pagination offset/cursor compatibility missing.');", "$must($reader, 'cursor_skip_remaining', 'Logical access-filtered pagination offset/cursor compatibility missing.');")
           p.write_text(s)
 
           p=Path('tests/test-twenty-round-review-r18.php')
