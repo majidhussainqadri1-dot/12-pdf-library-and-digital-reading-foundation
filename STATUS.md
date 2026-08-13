@@ -5,17 +5,26 @@
 | New central + File 12 governing plan reconciliation | Complete in candidate scope |
 | Founder-approved Future-24 change request | **Implemented in source candidate** |
 | F12-FUT-001 through F12-FUT-024 | **Present in code/contracts** |
-| Coded | **Candidate source exists; exact-head evidence is required for each reviewed head** |
-| Deterministic package | Built only by the exact-head GitHub Actions package gate |
-| Static / automated QA | **Previously green through the R18 exact head; the current R19 review branch requires its own final exact-head green run before merge** |
-| PHP compatibility QA | PHP 8.1 / 8.3 / 8.4 CI matrix configured |
-| JavaScript syntax QA | Base + all Future-24 reader scripts included in CI |
-| Cryptographic range/tamper QA | Retained from core gate |
-| Future-24 contract regression gate | Added |
-| Corrective review history | R1–R18 evidence committed; R19 is the current fresh 20-round review/fix/retest cycle |
+| Coded | **R19 reviewed candidate source exists** |
+| R19 source-review closure | `8eb4ef4d64f59c8280874c486bad18c111bfbb5a` |
+| R19 reviewed/evidence candidate before this status-only commit | `b9e3e16bc8b4366e5781eac468d4a2720af8edf7` |
+| Static / automated QA | **GREEN on `b9e3e16bc8b4366e5781eac468d4a2720af8edf7`, File 12 Future-24 Quality Gate run #295 / run ID 31660775070** |
+| PHP compatibility QA | **PHP 8.1 / 8.3 / 8.4 all PASS on run #295** |
+| JavaScript syntax / deterministic package | **PASS on run #295** |
+| Full corrective-review regression sweep | **R1–R19 historical/current review contracts PASS on run #295** |
+| Secret scan / independent regressions | **PASS on run #295** |
+| R19 artifact | `file-12-pdf-library-1.1.0-rc.1` — ID `9166090583` |
+| R19 Actions artifact digest | `sha256:5d82fe1c2937af4170656a379f63b5e89c838d3c64889ce69679a042814cc888` |
+| Corrective review history | R1–R19 evidence committed; R19 completed 20 review → batch-fix → retest rounds |
 | Hostinger staging | **Pending / not proved by repository evidence** |
 | Live deployed | **Not claimed** |
 | Operational | **Not claimed** |
+
+## R19 review discipline and result
+
+R19 followed the mandatory sequence for every numbered round: complete the entire review first, accumulate that round's complete defect ledger, then correct all proven defects as one post-review batch, retest, and only then start the next round. No round was interrupted to begin coding as soon as its first defect was found.
+
+R19 defect rounds: **2, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20**. Clean rounds: **1, 4, 7, 12**.
 
 ## Future-24 runtime dependencies and degraded modes
 
@@ -29,7 +38,7 @@ The candidate retains the 1.0.0-rc.1 migration path for legacy File 12 data/SPL2
 
 ## Evidence law
 
-Repository source, a green CI run, and a deterministic package prove only the corresponding repository/package gates. They do **not** prove what is currently deployed on Hostinger. The final incident/release report must separately record Repository HEAD, Deployed Version, DB Version, Migration State, and Live Verification Status.
+Repository source, a green CI run, and a deterministic package prove only the corresponding repository/package gates. They do **not** prove what is currently deployed on Hostinger. This status-only evidence commit must itself pass the exact-head quality gate before it can be called the final repository candidate. The final release report must separately record Repository HEAD, Deployed Version, DB Version, Migration State, and Live Verification Status.
 
 ## Production-truth boundary
 
