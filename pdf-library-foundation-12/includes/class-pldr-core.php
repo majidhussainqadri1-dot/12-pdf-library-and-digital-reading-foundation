@@ -67,6 +67,14 @@ final class PLDR_Core {
         }
     }
 
+    public static function db_error_ref(string $error = ''): string {
+        global $wpdb;
+        if ('' === $error && isset($wpdb)) $error = (string) $wpdb->last_error;
+        $error = trim($error);
+        if ('' === $error) return 'db-error';
+        return 'db-error-' . substr(hash_hmac('sha256', $error, wp_salt('auth')), 0, 16);
+    }
+
     public static function founder(int $user_id = 0): bool {
         $user_id = $user_id ?: get_current_user_id();
         if (!$user_id) return false;
@@ -148,6 +156,12 @@ final class PLDR_Core {
                 if ($seen >= self::AUDIT_CONTEXT_MAX_ITEMS) { $safe['_items_truncated'] = true; break; }
                 $key_string = (string) $key;
                 if (preg_match('/secret|token|password|key|patient|note_text|authorization|cookie|session|credential|nonce/i', $key_string)) continue;
+                if (preg_match('/(?:db_?error|last_?error|sql|query|stack|filesystem_?path|absolute_?path)/i', $key_string)) {
+                    $safe_key = is_int($key) ? $key : sanitize_key($key_string . '_ref');
+                    if ('' !== (string) $safe_key) $safe[$safe_key] = self::db_error_ref(is_scalar($nested) ? (string) $nested : 'non-scalar-internal-error');
+                    $seen++;
+                    continue;
+                }
                 $safe_key = is_int($key) ? $key : sanitize_key($key_string);
                 if ('' === (string) $safe_key) continue;
                 $safe[$safe_key] = self::sanitize_audit_value($nested, $depth + 1);
