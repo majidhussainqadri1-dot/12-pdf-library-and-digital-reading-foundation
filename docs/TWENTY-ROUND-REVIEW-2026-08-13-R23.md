@@ -52,9 +52,9 @@ Repository/package evidence is not staging/live evidence. Exact deployed source,
 **Focus:** first-ten holistic reconciliation, Future features F12-FUT-001–012, plan traceability and negative-path recheck.
 **Result:** Clean. No new proven repository defect.
 
-**First-ten defect rounds: 1, 2, 3, 4, 6**
+First-ten defect rounds: **1, 2, 3, 4, 6**
 
-**First-ten clean rounds: 5, 7, 8, 9, 10**
+First-ten clean rounds: **5, 7, 8, 9, 10**
 
 ## Round 11
 **Focus:** Future provider boundaries, authority enrichment, Knowledge Context, Reading Rooms, Patient Case privacy and AI deny-by-default rules.
@@ -101,13 +101,13 @@ Repository/package evidence is not staging/live evidence. Exact deployed source,
 **Post-review batch:** bumped the candidate software/package identity to `1.1.0-rc.2` without changing DB/contract schema `1.1.0`; added this permanent R23 review record and regression test; extended the canonical quality gate to execute R23 explicitly.
 
 ## Final R23 accounting
-**Reviews completed:** 20/20
+Reviews completed: **20/20**
 
-**First-ten defect rounds:** **1, 2, 3, 4, 6**
+First-ten defect rounds: **1, 2, 3, 4, 6**
 
-**Final defect rounds:** **1, 2, 3, 4, 6, 13, 15, 19, 20**
+Final defect rounds: **1, 2, 3, 4, 6, 13, 15, 19, 20**
 
-**Final clean rounds:** **5, 7, 8, 9, 10, 11, 12, 14, 16, 17, 18**
+Final clean rounds: **5, 7, 8, 9, 10, 11, 12, 14, 16, 17, 18**
 
 The numbered R23 sequence is complete. Exact-head CI/package evidence must be taken from the final R23 branch head after this closure commit.
 
