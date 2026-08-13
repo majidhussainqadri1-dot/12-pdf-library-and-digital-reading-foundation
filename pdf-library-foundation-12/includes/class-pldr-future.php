@@ -94,8 +94,6 @@ final class PLDR_Future {
         add_filter('pldr_interaction_controls_html', array(__CLASS__, 'reader_controls'), 20, 3);
         add_action('pldr_future_preservation_scan', array('PLDR_Future_Preservation', 'scheduled_scan'));
         add_action('pldr_future_cleanup', array(__CLASS__, 'cleanup'));
-        add_action('wp_logout', array(__CLASS__, 'mark_vault_purge'));
-        add_action('wp_enqueue_scripts', array(__CLASS__, 'vault_purge_asset'), 2);
         if (!wp_next_scheduled('pldr_future_preservation_scan')) {
             wp_schedule_event(time() + 300, 'daily', 'pldr_future_preservation_scan');
         }

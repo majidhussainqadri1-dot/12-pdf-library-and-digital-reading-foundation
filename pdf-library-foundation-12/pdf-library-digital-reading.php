@@ -60,6 +60,7 @@ register_deactivation_hook(PLDR_FILE, array('PLDR_Future', 'deactivate'));
 add_action('plugins_loaded', static function (): void {
     add_action('wp_logout', array('PLDR_Future', 'mark_vault_purge'));
     add_action('wp_enqueue_scripts', array('PLDR_Future', 'vault_purge_asset'), 2);
+    add_action('login_enqueue_scripts', array('PLDR_Future', 'vault_purge_asset'), 2);
 
     PLDR_R20_Guards::hooks();
     PLDR_R21_Readiness::hooks();
