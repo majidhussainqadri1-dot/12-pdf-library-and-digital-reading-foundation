@@ -29,6 +29,7 @@ $pldr_files = array(
     'class-pldr-integrity-policy.php',
     'class-pldr-r20-guards.php',
     'class-pldr-r21-readiness.php',
+    'class-pldr-r21-runtime-guards.php',
     'class-pldr-ingest.php',
     'class-pldr-access.php',
     'class-pldr-reader.php',
@@ -58,6 +59,7 @@ register_deactivation_hook(PLDR_FILE, array('PLDR_Future', 'deactivate'));
 add_action('plugins_loaded', static function (): void {
     PLDR_R20_Guards::hooks();
     PLDR_R21_Readiness::hooks();
+    PLDR_R21_Runtime_Guards::hooks();
     PLDR_Response_Policy::hooks();
     PLDR_OCR_Search_Overlay::hooks();
     PLDR_Integrity_Policy::hooks();
