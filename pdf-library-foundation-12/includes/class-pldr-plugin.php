@@ -95,5 +95,22 @@ final class PLDR_Plugin {
         if(in_array($route,array('read','reading'),true)||$filtered_library||http_response_code()>=400)header('X-Robots-Tag: noindex, nofollow, noarchive',true);
         get_header();echo $content;get_footer();exit;
     }
-    public function register_assets():void { wp_register_style('pldr-reader',PLDR_URL.'assets/reader.css',array(),PLDR_VERSION);wp_register_script('pldr-reader',PLDR_URL.'assets/reader.js',array(),PLDR_VERSION,true);wp_enqueue_style('pldr-reader'); }
+
+    public function register_assets(string $hook_suffix=''):void {
+        wp_register_style('pldr-reader',PLDR_URL.'assets/reader.css',array(),PLDR_VERSION);
+        wp_register_script('pldr-reader',PLDR_URL.'assets/reader.js',array(),PLDR_VERSION,true);
+        $enqueue=false;
+        if(is_admin()){
+            $page=sanitize_key((string)($_GET['page']??''));
+            $enqueue=''!==$page&&0===strpos($page,'pldr-');
+        }else{
+            $route=(string)get_query_var('pldr_route');
+            $enqueue=in_array($route,array('library','document','read','reading'),true);
+            if(!$enqueue){
+                global $post;
+                $enqueue=$post instanceof WP_Post&&(has_shortcode((string)$post->post_content,'pldr_library')||has_shortcode((string)$post->post_content,'pldr_reading_workspace'));
+            }
+        }
+        if($enqueue)wp_enqueue_style('pldr-reader');
+    }
 }

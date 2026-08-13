@@ -14,6 +14,16 @@ final class PLDR_R21_Runtime_Guards {
         add_filter('rest_pre_dispatch', array(__CLASS__, 'cleanup_stale_idempotency'), 1, 3);
         add_filter('rest_pre_dispatch', array(__CLASS__, 'key_write_preflight'), 2, 3);
         add_action('admin_post_pldr_safe_repair',array(__CLASS__,'admin_repair_guarded'),2);
+        add_action('pldr_generate_derivatives',array(__CLASS__,'fingerprint_schedule_guard'),39,2);
+    }
+
+    public static function fingerprint_schedule_guard(int $edition_id,int $cursor=0):void {
+        if(0!==$cursor)return;
+        remove_action('pldr_generate_derivatives',array('PLDR_Future','after_derivatives'),40);
+        $args=array($edition_id,0);
+        if(!wp_next_scheduled('pldr_future_fingerprint_edition',$args)){
+            wp_schedule_single_event(time()+90,'pldr_future_fingerprint_edition',$args);
+        }
     }
 
     public static function admin_repair_guarded():void {
@@ -64,7 +74,9 @@ final class PLDR_R21_Runtime_Guards {
     }
 
     public static function cleanup_stale_idempotency($result, $server, WP_REST_Request $request) {
-        if (self::$idempotency_cleanup_ran || 0 !== strpos((string)$request->get_route(), '/pldr/v1/')) return $result;
+        $method=strtoupper((string)$request->get_method());
+        if(in_array($method,array('GET','HEAD','OPTIONS'),true))return $result;
+        if (self::$idempotency_cleanup_ran || get_transient('pldr_r21_idempotency_reap') || 0 !== strpos((string)$request->get_route(), '/pldr/v1/')) return $result;
         self::$idempotency_cleanup_ran = true;
         global $wpdb;
         $cutoff = gmdate('Y-m-d H:i:s', time() - 1800);
@@ -73,8 +85,9 @@ final class PLDR_R21_Runtime_Guards {
         $deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE status_code=0 AND created_at<=%s ORDER BY created_at ASC LIMIT 100", $cutoff));
         if (false === $deleted || '' !== (string)$wpdb->last_error) {
             PLDR_Core::audit('mutation', 0, 'stale_idempotency_cleanup_failed', array('db_error'=>substr((string)$wpdb->last_error,0,500)));
-        } elseif ($deleted > 0) {
-            PLDR_Core::audit('mutation', 0, 'stale_idempotency_reservations_reaped', array('count'=>(int)$deleted,'stale_after_seconds'=>1800));
+        } else {
+            set_transient('pldr_r21_idempotency_reap','1',MINUTE_IN_SECONDS);
+            if ($deleted > 0) PLDR_Core::audit('mutation', 0, 'stale_idempotency_reservations_reaped', array('count'=>(int)$deleted,'stale_after_seconds'=>1800));
         }
         return $result;
     }
