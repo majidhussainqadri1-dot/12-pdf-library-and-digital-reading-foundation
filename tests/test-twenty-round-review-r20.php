@@ -36,9 +36,9 @@ $must($schema,"'2026-08-13-r20-17'",'R20 verified schema correction revision mis
 $must($schema,'schema_correction_engine_unverified','engine postcondition verification missing.');
 
 // Round 5 — rights expiry blocks publication/restoration.
-$must($rights,'pldr_publication_guard_rights_expired','expired publication rights are not fail-closed.');
-$must($rights,"'clean'!==\(string\)" ,'publication eligibility marker unavailable.');
+$must($rights,"'clean'!==",'publication eligibility lost clean-object gate.');
 $must($rights,"['scan_status']",'publication eligibility lost clean-object scan-status gate.');
+$must($rights,'pldr_publication_guard_rights_expired','expired publication rights are not fail-closed.');
 
 // Round 6 — private temp cleanup is guaranteed at request shutdown.
 $must($storage,'register_shutdown_function','private temporary-file shutdown cleanup missing.');
