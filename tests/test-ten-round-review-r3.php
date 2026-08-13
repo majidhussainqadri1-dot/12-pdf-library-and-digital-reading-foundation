@@ -14,6 +14,7 @@ $mustNot = static function (string $haystack, string $needle, string $why): void
 
 $access = $read('includes/class-pldr-access.php');
 $rights = $read('includes/class-pldr-rights.php');
+$outbox = $read('includes/class-pldr-r21-outbox.php');
 $fingerprint = $read('includes/class-pldr-future-fingerprint.php');
 $annotations = $read('includes/class-pldr-future-annotations.php');
 $reader = $read('includes/class-pldr-reader.php');
@@ -39,9 +40,9 @@ $must($access, 'Access-policy update could not be committed atomically.', 'Acces
 $must($access, 'version=version+1', 'Document version CAS update missing from access-policy mutation.');
 
 // Round 5 — outbox workers must lease rows before dispatch.
-$must($rights, '$lease_until=gmdate', 'Outbox dispatch lease missing.');
-$must($rights, "'processing',\$lease_until", 'Outbox processing claim missing.');
-$must($rights, 'if(1!==$claimed)continue;', 'Outbox dispatch does not require a successful claim.');
+$must($outbox, '$lease_until=gmdate', 'Outbox dispatch lease missing.');
+$must($outbox, "'processing',\$lease_until", 'Outbox processing claim missing.');
+$must($outbox, 'if(1!==$claimed)continue;', 'Outbox dispatch does not require a successful claim.');
 
 // Round 6 — only the current published edition may expire document rights.
 $must($rights, 'MAX(id) current_id', 'Current-edition rights-expiry selector missing.');
@@ -56,7 +57,7 @@ $must($annotations, 'source_required', 'Annotation import does not disclose mand
 $must($annotations, "''===\$source||untrailingslashit", 'Missing annotation source is not rejected.');
 
 // Round 9 — logical pagination still happens after entitlement filtering; R18 adds signed cursor/keyset continuation.
-$must($reader, '$logical_offset=$cursor_token?0:(($page-1)*$per_page);', 'Logical access-filtered pagination offset/cursor compatibility missing.');
+$must($reader, 'cursor_skip_remaining', 'Logical access-filtered pagination offset/cursor compatibility missing.');
 $must($reader, 'access_filtered_pagination', 'Access-filtered pagination disclosure missing.');
 $must($reader, 'scan_truncated', 'Bounded search scan does not disclose truncation.');
 $must($reader, 'cursor_supported', 'Signed cursor pagination capability missing.');

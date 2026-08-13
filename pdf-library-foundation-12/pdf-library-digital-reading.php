@@ -3,7 +3,7 @@
  * Plugin Name: Sabri PDF Library and Digital Reading
  * Plugin URI: https://sabrihomeopathy.com/
  * Description: File 12 canonical PDF library, rights-aware digital reader, private reading state, signed range delivery, OCR/search contracts, book packs, preservation, Future Digital Reading Intelligence 24, and cross-file integrations.
- * Version: 1.1.0-rc.2
+ * Version: 1.1.0-rc.3
  * Requires at least: 7.0
  * Requires PHP: 8.1
  * Author: Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed
@@ -13,7 +13,7 @@
 
 defined('ABSPATH') || exit;
 
-define('PLDR_VERSION', '1.1.0-rc.2');
+define('PLDR_VERSION', '1.1.0-rc.3');
 define('PLDR_DB_VERSION', '1.1.0');
 define('PLDR_CONTRACT_VERSION', '1.1.0');
 define('PLDR_FILE', __FILE__);

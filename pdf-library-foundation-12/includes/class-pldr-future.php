@@ -113,11 +113,17 @@ final class PLDR_Future {
 
     public static function after_derivatives(int $edition_id, int $cursor = 0): void {
         if (0 !== $cursor) return;
-        if (!wp_next_scheduled('pldr_future_fingerprint_edition', array($edition_id))) {
+        if (!self::fingerprint_job_scheduled($edition_id)) {
             wp_schedule_single_event(time() + 90, 'pldr_future_fingerprint_edition', array($edition_id,0));
         }
     }
 
+    private static function fingerprint_job_scheduled(int $edition_id): bool {
+        for($attempt=0;$attempt<=3;$attempt++){
+            if(wp_next_scheduled('pldr_future_fingerprint_edition',array($edition_id,$attempt)))return true;
+        }
+        return false;
+    }
 
     public static function fingerprint_job(int $edition_id,int $attempt=0): void {
         $attempt=max(0,min(3,$attempt));
@@ -127,7 +133,8 @@ final class PLDR_Future {
         PLDR_Core::audit('edition',$edition_id,'fingerprint_background_failed',array('attempt'=>$attempt,'error_code'=>$error->get_error_code()));
         if($attempt>=3)return;
         $delay=min(3600,60*(2**$attempt));
-        wp_schedule_single_event(time()+$delay,'pldr_future_fingerprint_edition',array($edition_id,$attempt+1));
+        $next_attempt=$attempt+1;
+        if(!wp_next_scheduled('pldr_future_fingerprint_edition',array($edition_id,$next_attempt)))wp_schedule_single_event(time()+$delay,'pldr_future_fingerprint_edition',array($edition_id,$next_attempt));
     }
 
     public static function cleanup(): void {

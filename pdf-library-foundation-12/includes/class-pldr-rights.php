@@ -169,6 +169,8 @@ final class PLDR_Rights {
         if ($expected_version<1) return PLDR_Core::machine_error('pldr_approve_precondition','Document publication approval requires the exact expected document version.',428,array('current_version'=>(int)$doc['version']));
         if ((int)$doc['version'] !== $expected_version) return PLDR_Core::machine_error('pldr_document_conflict','Document changed; refresh before approval.',409,array('current_version'=>(int)$doc['version']));
         if (!in_array($doc['status'],array('rights_review','scan','restricted'),true)) return PLDR_Core::machine_error('pldr_approve_state','Document is not in an approvable state.',409);
+        $eligibility=PLDR_Rights_Policy::check($document_id);
+        if(is_wp_error($eligibility))return $eligibility;
         $wpdb->last_error='';$edition = PLDR_Core::latest_edition($document_id);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_approve_edition_read','Latest edition state could not be read reliably before publication approval.',503,array('degraded'=>true));
         $object=null;if($edition){$wpdb->last_error='';$object=PLDR_Core::object((int)$edition['object_id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_approve_object_read','Encrypted object state could not be read reliably before publication approval.',503,array('degraded'=>true));}
@@ -202,6 +204,8 @@ final class PLDR_Rights {
         $allowed=array('published','restricted','removed','superseded','rights_review','scan');
         if(!in_array($status,$allowed,true))return PLDR_Core::machine_error('pldr_document_status','Invalid document rights state.',400);
         if('published'===$status){
+            $eligibility=PLDR_Rights_Policy::check($document_id);
+            if(is_wp_error($eligibility))return $eligibility;
             $wpdb->last_error='';$edition=PLDR_Core::latest_edition($document_id);
             if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_restore_edition_read','Current edition could not be read reliably before restoration.',503,array('degraded'=>true));
             $wpdb->last_error='';$object=$edition?PLDR_Core::object((int)$edition['object_id']):null;
@@ -309,42 +313,14 @@ final class PLDR_Integrations {
         do_action('spf_register_contract','file-12',PLDR_CONTRACT_VERSION,$contracts[0]);
         do_action('sabri_register_module',array('file'=>12,'slug'=>'pdf-library-digital-reading','version'=>PLDR_VERSION,'contract'=>PLDR_CONTRACT_VERSION));
         foreach(array(
-            array('route'=>'/library/','owner'=>'12','visibility'=>'public'),array('route'=>'/library/document/{id}/{slug}/','owner'=>'12','visibility'=>'public-conditional'),array('route'=>'/library/read/{id}/','owner'=>'12','visibility'=>'conditional-noindex'),array('route'=>'/account/reading/','owner'=>'12','visibility'=>'authenticated-noindex-no-cache')
+            array('route'=>'/library/','owner'=>'12','visibility'=>'public'),array('route'=>'/library/document/{id}/{slug}/','owner'=>'12','visibility'=>'public-conditional'),array('route'=>'/library/read/{id}/','owner'=>'12','visibility'=>'conditional-noindex'),array('route'=>'/library/manage/','owner'=>'12','visibility'=>'authenticated-noindex-no-cache'),array('route'=>'/account/reading/','owner'=>'12','visibility'=>'authenticated-noindex-no-cache')
         ) as $route) do_action('spf_register_route',$route);
         do_action('suas_register_slot','file-12-reader',array('owner'=>'12','layout'=>'immersive','shell_owner'=>'20'));
         do_action('spui_register_component_provider','file-12',array('components'=>array('document-card','reader-toolbar','download-manager'),'visual_owner'=>'25'));
     }
 
     public static function dispatch_outbox():void {
-        global $wpdb;
-        $now=PLDR_Core::now();
-        $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('outbox').' WHERE status IN (%s,%s,%s) AND available_at<=%s ORDER BY id ASC LIMIT 50','pending','retry','processing',$now),ARRAY_A);
-        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'outbox_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return;}
-        foreach(is_array($rows)?$rows:array() as $row){
-            $lease_until=gmdate('Y-m-d H:i:s',time()+10*MINUTE_IN_SECONDS);
-            $claimed=$wpdb->query($wpdb->prepare(
-                'UPDATE '.PLDR_Core::table('outbox').' SET status=%s,available_at=%s WHERE id=%d AND status IN (%s,%s,%s) AND available_at<=%s',
-                'processing',$lease_until,(int)$row['id'],'pending','retry','processing',$now
-            ));
-            if(1!==$claimed)continue;
-            $payload=json_decode((string)$row['payload_json'],true);
-            if(!is_array($payload)||JSON_ERROR_NONE!==json_last_error()){
-                $dead=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>'dead-letter','attempts'=>max(8,(int)$row['attempts']+1),'last_error'=>'invalid-payload-json'),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
-                PLDR_Core::audit('outbox',(int)$row['id'],'outbox_payload_corrupt',array('event_id'=>(string)$row['event_id'],'dead_letter_persisted'=>1===$dead));
-                continue;
-            }
-            try{
-                $accepted=apply_filters('pldr_dispatch_event',true,(string)$row['event_name'],$payload,(string)$row['event_id']);
-                if(false===$accepted)throw new RuntimeException('A consumer requested retry.');
-                do_action('sabri_domain_event',(string)$row['event_name'],$payload,(string)$row['event_id'],'file-12');
-                do_action('pldr_event',(string)$row['event_name'],$payload,(string)$row['event_id']);
-                $stored=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>'sent','sent_at'=>PLDR_Core::now(),'last_error'=>''),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
-                if(1!==$stored)throw new RuntimeException('Dispatched event lease changed or state could not be persisted.');
-            }catch(Throwable $e){
-                $attempts=(int)$row['attempts']+1;$status=$attempts>=8?'dead-letter':'retry';$delay=min(3600,30*(2**min($attempts,6)));
-                $retry=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>$status,'attempts'=>$attempts,'available_at'=>gmdate('Y-m-d H:i:s',time()+$delay),'last_error'=>'consumer-dispatch-failed'),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
-                if(false===$retry)PLDR_Core::audit('outbox',(int)$row['id'],'outbox_retry_persist_failed',array('event_id'=>(string)$row['event_id']));
-            }
-        }
+        // Backward-compatible legacy entrypoint; the governed R21 dispatcher is the single implementation.
+        PLDR_R21_Outbox::dispatch();
     }
 }

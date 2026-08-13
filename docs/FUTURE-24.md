@@ -3,9 +3,9 @@
 Founder-approved change request for **File 12 — PDF Library and Digital Reading**.
 
 - Change set: `F12-FUT-001` through `F12-FUT-024`
-- Candidate: `1.1.0-rc.1`
+- Current repository candidate: `1.1.0-rc.3`
 - DB/contract: `1.1.0`
-- Change date: 11 August 2026
+- Change date: 11 August 2026; repository review alignment through R24 on 13 August 2026
 - Governing law: latest Founder instruction > latest consolidated central plan > File 12 plan > verified implementation evidence.
 - Architectural law: one canonical owner per entity/fact; this change may extend File 12 document/reader state but may not duplicate File 00 identity, File 05 learning truth, File 06 encyclopedia truth, File 16 AI output, communication backends, File 20 shell/navigation, or File 25 global visual-system ownership.
 
@@ -45,7 +45,7 @@ Eligible editions SHOULD expose a rights-aware IIIF Presentation-style manifest 
 Lawful OCR/full-text search MUST be able to return per-page match counts for a visual heatmap and direct page navigation. Access/entitlement checks apply before search results are returned.
 
 ### F12-FUT-012 — Encrypted Offline Reading Vault
-Where the access policy permits offline use, authenticated users MAY capture encrypted local chunks using a non-extractable WebCrypto key. Local expiry, explicit purge and logout purge MUST be supported. Online-only policy MUST remain online-only.
+Where the access policy permits offline use, authenticated users MAY capture encrypted local chunks using a non-extractable WebCrypto key. Local expiry, explicit purge and logout purge MUST be supported. Online-only policy MUST remain online-only. After an offline session reconnects, the client MUST obtain current server authorization before opening/recapturing the protected local copy; inability to reauthorize MUST fail closed rather than silently continue under stale rights.
 
 ### F12-FUT-013 — Ultra-Low-Bandwidth Reader
 The reader MUST support a data-saver/text-first mode and SHOULD auto-enable it for browser-reported very slow/save-data connections. It MUST preserve reading access without forcing full PDF download before useful text/navigation appears.
@@ -95,7 +95,7 @@ Optional external authority, translation/transliteration, companion context, rea
 
 - Private reading state, shelves, anchors, insights, handoff and offline material are private by default.
 - Every object/edition endpoint revalidates current access.
-- Offline capture requires offline permission and current user authorization.
+- Offline capture requires offline permission and current user authorization; reconnect/open reauthorization is required after an offline transition.
 - AI corpus access is deny-by-default.
 - External enrichment retains provenance and cannot silently become canonical truth.
 - No raw protected original or private note is published through public manifests/caches.

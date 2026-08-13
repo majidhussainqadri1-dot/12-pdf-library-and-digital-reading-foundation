@@ -23,6 +23,7 @@ final class PLDR_Future_REST {
         register_rest_route('pldr/v1', '/future/iiif/(?P<id>[a-f0-9\-]{36})/manifest', array('methods'=>'GET','callback'=>array(__CLASS__,'iiif'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/search-heatmap/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'heatmap'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/offline-grant', array('methods'=>'POST','callback'=>array(__CLASS__,'offline_grant'),'permission_callback'=>array(__CLASS__,'logged_in')));
+        register_rest_route('pldr/v1', '/future/offline-authorization/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'offline_authorization'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/preferences', array(
             array('methods'=>'GET','callback'=>array(__CLASS__,'preferences_get'),'permission_callback'=>array(__CLASS__,'logged_in')),
             array('methods'=>'POST','callback'=>array(__CLASS__,'preferences_save'),'permission_callback'=>array(__CLASS__,'logged_in')),
@@ -57,7 +58,7 @@ final class PLDR_Future_REST {
         register_rest_route('pldr/v1', '/future/reading-room', array('methods'=>'POST','callback'=>array(__CLASS__,'reading_room'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/context/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'context'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/corpus/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'corpus'),'permission_callback'=>'__return_true','args'=>array('cursor'=>array('sanitize_callback'=>'sanitize_text_field'),'limit'=>array('sanitize_callback'=>'absint'),'offset'=>array('sanitize_callback'=>'absint'))));
-        register_rest_route('pldr/v1', '/future/derive-text', array('methods'=>'POST','callback'=>array(__CLASS__,'derive_text'),'permission_callback'=>'__return_true'));
+        register_rest_route('pldr/v1', '/future/derive-text', array('methods'=>'POST','callback'=>array(__CLASS__,'derive_text'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/preservation/(?P<edition>\d+)', array(
             array('methods'=>'GET','callback'=>array(__CLASS__,'preservation'),'permission_callback'=>array(__CLASS__,'logged_in')),
             array('methods'=>'POST','callback'=>array(__CLASS__,'preservation_refresh'),'permission_callback'=>array(__CLASS__,'can_preservation')),
@@ -196,6 +197,19 @@ final class PLDR_Future_REST {
             $grant['device_vault_policy']='non-extractable WebCrypto key; local expiry enforced; future refresh requires server reauthorization';
             return $grant;
         });
+    }
+    public static function offline_authorization(WP_REST_Request $r) {
+        $edition_id=absint($r['edition']);
+        $edition=PLDR_Future_Data::require_edition($edition_id,'offline');
+        if(is_wp_error($edition))return $edition;
+        $valid_until=null;
+        if(!empty($edition['rights_expires_at'])){
+            $rights=strtotime((string)$edition['rights_expires_at']);
+            if(false===$rights)return PLDR_Core::machine_error('pldr_offline_rights_state','Offline rights expiry could not be interpreted safely.',503,array('degraded'=>true));
+            if($rights<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);
+            $valid_until=gmdate('c',$rights);
+        }
+        return rest_ensure_response(array('authorized'=>true,'edition_id'=>$edition_id,'checked_at'=>gmdate('c'),'rights_valid_until'=>$valid_until,'reconnect_reauthorized'=>true));
     }
     public static function preferences_get(WP_REST_Request $r) { return self::response(PLDR_Future_Preferences::get((string)($r['key']?:'reader'))); }
     public static function preferences_save(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'preferences-save',static fn()=>PLDR_Future_Preferences::save((string)($b['key']??'reader'),(array)($b['value']??array()),absint($b['expected_version']??0))); }
