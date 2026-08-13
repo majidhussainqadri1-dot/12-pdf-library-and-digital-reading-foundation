@@ -73,7 +73,21 @@ final class PLDR_Plugin {
         return true;
     }
 
+    private function native_nav_html(string $route):string {
+        if(!in_array($route,array('library','reading'),true))return '';
+        $home=home_url('/');$library=PLDR_Core::route_url('library');
+        $links=array();
+        if('reading'===$route)$links[]='<a href="'.esc_url($library).'">'.esc_html__('Back to PDF Library','pdf-library-digital-reading').'</a>';
+        $links[]='<a href="'.esc_url($home).'">'.esc_html__('Home','pdf-library-digital-reading').'</a>';
+        return '<nav class="pldr-local-nav pldr-native-route-nav" aria-label="'.esc_attr__('Page navigation','pdf-library-digital-reading').'">'.implode('',$links).'</nav>';
+    }
+
     private function render_virtual(string $route,string $content):void {
+        $nav=$this->native_nav_html($route);
+        if(''!==$nav&&false!==strpos($content,'<main class="pldr-shell"'))$content=preg_replace('/(<main class="pldr-shell"[^>]*>)/','$1'.$nav,$content,1)?:$content;
+        if('reading'===$route&&false===strpos($content,'class="pldr-card"')&&false===strpos($content,'class="pldr-state"')){
+            $content=str_replace('</main>','<div class="pldr-empty"><h2>'.esc_html__('No private reading progress yet','pdf-library-digital-reading').'</h2><p>'.esc_html__('Open an eligible document and start reading; your private progress will appear here.','pdf-library-digital-reading').'</p></div></main>',$content);
+        }
         try{$handled=(bool)apply_filters('pldr_shell_rendered',false,$route,$content);}catch(Throwable $e){$handled=false;PLDR_Core::audit('system',0,'shell_adapter_failed',array('route'=>sanitize_key($route),'provider_failure'=>true));}
         if($handled)exit;
         $status=http_response_code();if(!$status||$status<300)status_header(200);
