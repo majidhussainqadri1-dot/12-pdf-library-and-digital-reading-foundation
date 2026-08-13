@@ -38,8 +38,24 @@ final class PLDR_Ingest {
         if ('platform-publications' === $category && !PLDR_Core::founder($actor_id) && !PLDR_Core::authorize('manage', 0, $actor_id)) {
             return PLDR_Core::machine_error('pldr_official_only', 'Platform Publications are reserved for authorized institutional publishing.', 403);
         }
-        if ('patient-cases' === $category && empty($data['patient_case_consent'])) {
-            return PLDR_Core::machine_error('pldr_patient_case_consent', 'Patient Case documents require verified anonymization and publication-consent confirmation.', 400);
+        if ('patient-cases' === $category) {
+            if (empty($data['patient_case_consent'])) {
+                return PLDR_Core::machine_error('pldr_patient_case_consent', 'Patient Case documents require verified anonymization and publication-consent confirmation.', 400);
+            }
+            try {
+                $clearance = apply_filters('pldr_patient_case_publication_clearance', null, array(
+                    'actor_id'=>$actor_id,
+                    'document_public_id'=>$existing_doc['public_id']??'',
+                    'consent_reference'=>sanitize_text_field((string)($data['patient_case_consent_ref']??'')),
+                    'anonymization_reference'=>sanitize_text_field((string)($data['patient_case_anonymization_ref']??'')),
+                ));
+            } catch (Throwable $e) {
+                return PLDR_Core::machine_error('pldr_patient_case_clearance_provider','Patient-case consent/anonymization clearance could not be verified; ingest is fail-closed.',503,array('degraded'=>true,'provider_failure'=>true));
+            }
+            $clearance_ok = true === $clearance || (is_array($clearance) && !empty($clearance['verified']) && !empty($clearance['verification_ref']));
+            if (!$clearance_ok) {
+                return PLDR_Core::machine_error('pldr_patient_case_clearance','Patient Case documents require an independently verified consent/anonymization clearance before File 12 ingest.',428);
+            }
         }
 
         $rights_basis = sanitize_key((string) $data['rights_basis']);
@@ -273,7 +289,8 @@ final class PLDR_Ingest {
         } catch (Throwable $e) {
             $wpdb->query('ROLLBACK');
             PLDR_Storage::delete($allocation['path']);
-            return PLDR_Core::machine_error('pldr_ingest_transaction', $e->getMessage(), 500);
+            PLDR_Core::audit('document',0,'ingest_transaction_failed',array('error_class'=>sanitize_key(get_class($e))),$actor_id);
+            return PLDR_Core::machine_error('pldr_ingest_transaction', 'PDF ingest could not be committed safely; no document mutation was accepted.', 500);
         }
 
         if (!empty($files['cover']['tmp_name']) && is_uploaded_file($files['cover']['tmp_name'])) {
@@ -452,6 +469,9 @@ final class PLDR_Ingest {
         if($pixels<1||$pixels>40000000)return PLDR_Core::machine_error('pldr_cover_dimensions','The supplied cover exceeds the governed decoded-pixel limit.',413,array('max_pixels'=>40000000));
         $decoded_mime=sanitize_text_field((string)($image['mime']??''));
         if(''!==$decoded_mime&&$decoded_mime!==(string)$check['type'])return PLDR_Core::machine_error('pldr_cover_mime','The supplied cover extension/type does not match its decoded image format.',400);
+        $cover_scan=self::scan_file((string)$cover['tmp_name'],array('filename'=>sanitize_file_name((string)$cover['name'])));
+        if(is_wp_error($cover_scan))return PLDR_Core::machine_error('pldr_cover_scan','The supplied cover failed the upload safety scan.',422,array('cause'=>$cover_scan->get_error_code()));
+        if('clean'!==($cover_scan['status']??'') && defined('PLDR_REQUIRE_MALWARE_SCANNER') && PLDR_REQUIRE_MALWARE_SCANNER)return PLDR_Core::machine_error('pldr_cover_scan_unavailable','A required malware scanner did not produce a clean cover result.',503,array('degraded'=>true));
         $allocation = PLDR_Storage::allocate('pldr');
         if (!empty($allocation['error'])) return $allocation['error'];
         $temp = PLDR_Storage::temp('cover');
@@ -478,7 +498,7 @@ final class PLDR_Ingest {
             ));
             if(false===$linked)throw new RuntimeException('Cover derivative metadata could not be linked.');
             if(false===$wpdb->query('COMMIT'))throw new RuntimeException('Cover metadata transaction could not be committed.');
-        }catch(Throwable $e){$wpdb->query('ROLLBACK');PLDR_Storage::delete($allocation['path']);return PLDR_Core::machine_error('pldr_cover_store',$e->getMessage(),500);}
+        }catch(Throwable $e){$wpdb->query('ROLLBACK');PLDR_Storage::delete($allocation['path']);PLDR_Core::audit('edition',$edition_id,'cover_store_failed',array('error_class'=>sanitize_key(get_class($e))),$actor_id);return PLDR_Core::machine_error('pldr_cover_store','The supplied cover could not be stored safely.',500);}
         PLDR_Core::audit('edition', $edition_id, 'cover_stored', array('object_id' => $object_id), $actor_id);
         return array('object_id'=>$object_id,'stored'=>true);
     }
@@ -548,7 +568,7 @@ final class PLDR_Ingest {
                 if(false===$linked)throw new RuntimeException('Thumbnail derivative metadata could not be linked.');
                 if(false===$wpdb->query('COMMIT'))throw new RuntimeException('Thumbnail metadata transaction could not be committed.');
                 $committed_path='';
-            }catch(Throwable $e){$wpdb->query('ROLLBACK');if($tmp)PLDR_Storage::delete($tmp);if($committed_path)PLDR_Storage::delete($committed_path);PLDR_Core::audit('edition',(int)$edition['id'],'thumbnail_failed',array('page'=>$page+1,'error'=>substr($e->getMessage(),0,500)));}
+            }catch(Throwable $e){$wpdb->query('ROLLBACK');if($tmp)PLDR_Storage::delete($tmp);if($committed_path)PLDR_Storage::delete($committed_path);PLDR_Core::audit('edition',(int)$edition['id'],'thumbnail_failed',array('page'=>$page+1,'error_class'=>sanitize_key(get_class($e))));}
         }
         if($end<$pages){
             $scheduled=wp_schedule_single_event(time()+10,'pldr_generate_derivatives',array((int)$edition['id'],$end),true);

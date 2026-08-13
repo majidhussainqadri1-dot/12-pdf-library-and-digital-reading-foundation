@@ -33,10 +33,9 @@ final class PLDR_Future_Rooms {
         try{
             $provider=apply_filters('pldr_create_reading_room_provider',null,$uid,$context);
         }catch(Throwable $e){
-            $message=self::limit(sanitize_text_field($e->getMessage()),300);
             $failed_state=$wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'provider-error','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid));
             if(false===$failed_state)PLDR_Core::audit('room_context',$context_id,'provider_failure_state_persist_failed',array('room_key'=>$room_key),$uid);
-            PLDR_Core::audit('room_context',$context_id,'provider_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'error'=>$message),$uid);
+            PLDR_Core::audit('room_context',$context_id,'provider_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_failure'=>true,'error_class'=>sanitize_key(get_class($e))),$uid);
             return PLDR_Core::machine_error('pldr_room_provider','Reading-room provider failed; the local context remains for safe retry/reconciliation.',503,array('room_key'=>$room_key,'degraded'=>true));
         }
         $provider_ref=is_array($provider)?self::limit(sanitize_text_field((string)($provider['reference']??'')),190):'';

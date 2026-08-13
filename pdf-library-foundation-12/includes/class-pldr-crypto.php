@@ -59,6 +59,7 @@ final class PLDR_Crypto {
         $key = $keys[$key_id];
         $in = fopen($input, 'rb');
         $out = fopen($output, 'wb');
+        if (is_resource($out)) @chmod($output, 0600);
         if (!$in || !$out) {
             if (is_resource($in)) fclose($in);
             if (is_resource($out)) fclose($out);
@@ -117,6 +118,7 @@ final class PLDR_Crypto {
 
     public static function decrypt_to_file(string $encrypted, string $output, string &$error = ''): bool {
         $out = fopen($output, 'wb');
+        if (is_resource($out)) @chmod($output, 0600);
         if (!$out) { $error = 'Temporary decrypt target could not be opened.'; return false; }
         $meta = array();
         $ok = self::stream_range($encrypted, 0, null, static function (string $chunk) use ($out): void { if (!self::write_all($out, $chunk)) throw new RuntimeException('Temporary decrypted object could not be written.'); }, $meta, $error);

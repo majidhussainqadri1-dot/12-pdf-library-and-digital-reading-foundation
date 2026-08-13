@@ -1,36 +1,34 @@
-# File 12 Status — R21 Final Twenty-Round Review Candidate — 1.1.0-rc.1
+# File 12 Status — R22 Final Twenty-Round Review Candidate — 1.1.0-rc.1
 
 | Gate | Status |
 |---|---|
 | Governing source | Central Master Plan v3.0 + File 12 Future-24 amended plan |
-| R21 baseline | `ad153bede56accdbd591b57f959e643e96a02eb8` — exact green R20 head |
-| R21 numbered review | **20/20 complete** under complete-review → post-review batch-fix → retest discipline |
-| First-ten defect rounds | **1, 3, 4, 7, 8** |
-| Final defect rounds | **1, 3, 4, 7, 8, 12, 13, 14, 15, 16, 17, 19, 20** |
-| Final clean rounds | **2, 5, 6, 9, 10, 11, 18** |
-| Round-19 corrected checkpoint | `bd6138efc397930c150e26953f18f9b26aa1eb2b` — quality-gate run #350 GREEN before Round 20 |
-| Round-20 product-code correction closure | `e0efd1f16f4d221958b848c505cb7b086085441f` |
-| R21 review record | `docs/TWENTY-ROUND-REVIEW-2026-08-13-R21.md` |
-| R21 permanent regression | `tests/test-twenty-round-review-r21.php` |
-| Exact final R21 automated QA | **Must be the current branch HEAD after this status record; report GREEN only from that exact-head run** |
+| R22 baseline | `89cb5cdd6fbcb21b9e4f7e6947ce032c646212b3` — exact green R21 head |
+| R22 numbered review | **20/20 complete** under complete-review → post-review batch-fix → retest discipline |
+| First-ten defect rounds | **2, 3, 4, 6, 7** |
+| Final defect rounds | **2, 3, 4, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20** |
+| Final clean rounds | **1, 5, 8, 9, 10** |
+| R22 review record | `docs/TWENTY-ROUND-REVIEW-2026-08-13-R22.md` |
+| R22 permanent regression | `tests/test-twenty-round-review-r22.php` |
+| Exact final R22 automated QA | **Pending exact-head GitHub Actions; report GREEN only from the final unchanged branch HEAD** |
 | Software candidate | `1.1.0-rc.1` |
 | Repository DB contract | `1.1.0` |
-| Forward schema-correction revision | `2026-08-13-r20-17`, now physically revalidated rather than marker-only |
+| Forward schema-correction revision | `2026-08-13-r20-17`, physically revalidated rather than marker-only |
 | Hostinger staging | **Not verified by repository evidence** |
 | Live deployed version | **Unverified** |
 | Deployed DB/schema version | **Unverified** |
 | Migration state on deployed site | **Unverified** |
 | Operational/live verification | **Not claimed** |
 
-## R21 final repository review result
+## R22 final repository review result
 
-R21 performed twenty fresh numbered reviews from the exact green R20 baseline. Every round was completed in full before that round's defect ledger was corrected; no mid-review patching was used. The first-ten defect checkpoint was **1, 3, 4, 7, 8**. The final defect rounds are **1, 3, 4, 7, 8, 12, 13, 14, 15, 16, 17, 19, 20**; the clean rounds are **2, 5, 6, 9, 10, 11, 18**.
+R22 performed twenty fresh numbered reviews from the exact green R21 baseline. Every round was completed in full before that round's complete defect ledger was corrected; no mid-review patching was used. The first-ten defect checkpoint is **2, 3, 4, 6, 7**. The final defect rounds are **2, 3, 4, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20**; the clean rounds are **1, 5, 8, 9, 10**.
 
-The final Round-20 pass hardened the remaining cross-cutting risks: complete physical core-schema readiness; physically verified schema-correction truth; fresh-install-safe separation of core and Future correction readiness; explicit multi-key active-key selection in the crypto owner rather than pre-permission REST disclosure; authenticated actor-scoped stale replay maintenance; and a verified pre-migration recovery journal that survives legacy migration exceptions/write failures until newer native reading progress is restored.
+R22 hardened protected REST/Future mutation preauthorization and replay cleanup, Patient Case provider privacy gates, cover malware scanning, crypto temporary-file cleanup and permissions, rights appeals, reading-progress optimistic concurrency, legacy rescan quarantine, complete outbox event contracts, generic Future/IIIF unavailable states, offline grant ordering, bounded Smart Shelves with item enumeration, provider error minimization, accessibility/reduced-motion/error recovery, canonical operational repairs and cleanup, plus final cross-cutting denial/exception idempotency safety.
 
 ## Exact-head evidence rule
 
-This status record intentionally does not claim a final green HEAD before the CI run exists. The branch HEAD produced by this final evidence commit must run the complete quality gate unchanged. If that exact run is green, its head SHA, run ID and deterministic artifact may be reported externally without making another repository commit; otherwise the review reopens and the failed gate must be corrected/retested.
+This status intentionally does not claim an automated-green final HEAD before that exact run exists. The branch HEAD produced by the final R22 source/review/test/status commit must run the complete quality gate unchanged. If that exact run is green, its head SHA, run ID and deterministic artifact may be reported externally without another repository commit; otherwise R22 reopens and the failed gate must be corrected/retested.
 
 ## Production-truth boundary
 

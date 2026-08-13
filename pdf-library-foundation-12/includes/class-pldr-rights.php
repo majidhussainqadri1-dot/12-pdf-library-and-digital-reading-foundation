@@ -139,7 +139,10 @@ final class PLDR_Rights {
         if(!empty($parent['parent_case_id'])){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_depth','An appeal decision cannot create an unbounded nested appeal chain.',409);}
         if(!in_array($parent['state'],array('closed','reviewed'),true)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_state','This case is not eligible for appeal yet.',409);}
         $document_id=(int)$parent['document_id'];
-        if((int)$parent['reporter_id']!==$actor_id && !PLDR_Core::authorize('rights',$document_id,$actor_id) && !PLDR_Core::authorize('manage',$document_id,$actor_id)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_forbidden','You cannot appeal this rights case.',403);}
+        $wpdb->last_error='';$document=PLDR_Core::document($document_id);
+        if(''!==(string)$wpdb->last_error){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_document_read','The affected document ownership state could not be verified reliably.',503,array('degraded'=>true));}
+        $affected_publisher=$document && (int)($document['created_by']??0)===$actor_id;
+        if((int)$parent['reporter_id']!==$actor_id && !$affected_publisher && !PLDR_Core::authorize('rights',$document_id,$actor_id) && !PLDR_Core::authorize('manage',$document_id,$actor_id)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_forbidden','You cannot appeal this rights case.',403);}
         $wpdb->last_error='';
         $existing=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('rights_cases').' WHERE parent_case_id=%d LIMIT 1',$case_id));
         if(''!==(string)$wpdb->last_error){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_existing_read','Existing appeal state could not be read reliably.',503,array('degraded'=>true));}
@@ -338,7 +341,7 @@ final class PLDR_Integrations {
                 if(1!==$stored)throw new RuntimeException('Dispatched event lease changed or state could not be persisted.');
             }catch(Throwable $e){
                 $attempts=(int)$row['attempts']+1;$status=$attempts>=8?'dead-letter':'retry';$delay=min(3600,30*(2**min($attempts,6)));
-                $retry=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>$status,'attempts'=>$attempts,'available_at'=>gmdate('Y-m-d H:i:s',time()+$delay),'last_error'=>sanitize_text_field($e->getMessage())),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
+                $retry=$wpdb->update(PLDR_Core::table('outbox'),array('status'=>$status,'attempts'=>$attempts,'available_at'=>gmdate('Y-m-d H:i:s',time()+$delay),'last_error'=>'consumer-dispatch-failed'),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
                 if(false===$retry)PLDR_Core::audit('outbox',(int)$row['id'],'outbox_retry_persist_failed',array('event_id'=>(string)$row['event_id']));
             }
         }

@@ -25,6 +25,7 @@
   let zoom = 'page-width';
   let saveTimer = null;
   let tokenUrl = cfg.url;
+  let progressRevision = String(cfg.progressRevision || '');
 
   const say = (message) => { if (status) status.textContent = message || ''; };
   const updateFrame = () => {
@@ -41,7 +42,8 @@
   };
   const saveProgress = async () => {
     try {
-      await api('reading/progress', {method: 'POST', body: {edition_id: cfg.editionId, page}, headers: {'Idempotency-Key': crypto.randomUUID?.() || `progress-${cfg.editionId}-${page}-${Date.now()}-${Math.random()}`}});
+      const saved = await api('reading/progress', {method: 'POST', body: {edition_id: cfg.editionId, page, expected_updated_at: progressRevision}, headers: {'Idempotency-Key': crypto.randomUUID?.() || `progress-${cfg.editionId}-${page}-${Date.now()}-${Math.random()}`}});
+      progressRevision = String(saved.updated_at || progressRevision);
       say(cfg.strings?.saved || 'Saved privately.');
     } catch (error) { say(error.message); }
   };
@@ -139,7 +141,7 @@
   const dmChecksum = root.querySelector('[data-download-checksum]');
   let download = {paused:false,running:false,session:null,chunks:[],next:0,loaded:0};
   const openDownloadManager = async () => {
-    if (!dm) return; dm.hidden=false; dm.scrollIntoView({behavior:'smooth',block:'nearest'});
+    if (!dm) return; dm.hidden=false; const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches; dm.scrollIntoView({behavior:reduced?'auto':'smooth',block:'nearest'});
     if (!download.session) {
       try { download.session=await api('downloads/session',{method:'POST',body:{edition_id:cfg.editionId},headers:{'Idempotency-Key':crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`}}); dmChecksum.textContent=download.session.checksum; dmStatus.textContent='Ready. Range-resumable access will be revalidated on every chunk.'; } catch(e){dmStatus.textContent=e.message;}
     }

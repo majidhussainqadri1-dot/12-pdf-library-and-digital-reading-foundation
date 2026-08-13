@@ -136,7 +136,7 @@ final class PLDR_Search {
 }
 
 final class PLDR_Reading {
-    public static function save_progress(int $edition_id, int $page, int $user_id = 0) {
+    public static function save_progress(int $edition_id, int $page, int $user_id = 0, string $expected_updated_at = '') {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
         if (!$user_id) return PLDR_Core::machine_error('pldr_progress_forbidden', 'Reading progress cannot be saved for this document.', 403);
@@ -152,12 +152,22 @@ final class PLDR_Reading {
         if ($page < 1 || $page > $pages) return PLDR_Core::machine_error('pldr_page_range', 'Reading page is outside the document.', 400);
         $percent = round(($page / $pages) * 100, 2);
         if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_progress_transaction','Reading-progress transaction could not be started.',500);
-        $ok = $wpdb->replace(PLDR_Core::table('reading_state'), array('user_id' => $user_id, 'edition_id' => $edition_id, 'last_page' => $page, 'percent' => $percent, 'edition_version' => (int) $edition['version'], 'updated_at' => PLDR_Core::now()), array('%d','%d','%d','%f','%d','%s'));
-        if (false === $ok){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_store', 'Reading progress could not be saved.', 500);}
-        $event=PLDR_Core::emit('ReadingProgressUpdated.v1', 'edition', $edition_id, array('user_id' => $user_id, 'edition_id' => $edition_id, 'page' => $page, 'percent' => $percent));
+        $table=PLDR_Core::table('reading_state');$wpdb->last_error='';
+        $current=$wpdb->get_row($wpdb->prepare('SELECT updated_at FROM '.$table.' WHERE user_id=%d AND edition_id=%d FOR UPDATE',$user_id,$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_revision_read','Reading-progress revision could not be verified reliably.',503,array('degraded'=>true));}
+        $current_revision=(string)($current['updated_at']??'');
+        if($current_revision!==$expected_updated_at){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_conflict','Reading progress changed on another session or device; refresh before replacing that position.',409,array('current_updated_at'=>$current_revision));}
+        $updated_at=PLDR_Core::now();
+        if($current){
+            $ok=$wpdb->query($wpdb->prepare('UPDATE '.$table.' SET last_page=%d,percent=%s,edition_version=%d,updated_at=%s WHERE user_id=%d AND edition_id=%d AND updated_at=%s',$page,(string)$percent,(int)$edition['version'],$updated_at,$user_id,$edition_id,$current_revision));
+        }else{
+            $ok=$wpdb->insert($table,array('user_id'=>$user_id,'edition_id'=>$edition_id,'last_page'=>$page,'percent'=>$percent,'edition_version'=>(int)$edition['version'],'updated_at'=>$updated_at),array('%d','%d','%d','%f','%d','%s'));
+        }
+        if (1 !== $ok){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_conflict', 'Reading progress changed concurrently; refresh before saving again.', 409);}
+        $event=PLDR_Core::emit('ReadingProgressUpdated.v1', 'edition', $edition_id, array('user_id' => $user_id, 'edition_id' => $edition_id, 'page' => $page, 'percent' => $percent, 'updated_at'=>$updated_at));
         if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_event_atomic','Reading progress was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false,'edition_id'=>$edition_id,'page'=>$page));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_commit','Reading progress could not be committed atomically.',500);}
-        return array('page' => $page, 'percent' => $percent, 'updated_at' => PLDR_Core::now());
+        return array('page' => $page, 'percent' => $percent, 'updated_at' => $updated_at);
     }
 
     public static function state(int $edition_id, int $user_id = 0): array {
@@ -347,7 +357,7 @@ final class PLDR_Reader {
         $policy=PLDR_Core::policy((int)$doc['id']);
         if(''!==(string)$wpdb->last_error||!$policy)return self::state_html('error');
         $config = array(
-            'editionId'=>(int)$edition['id'],'publicId'=>$public_id,'title'=>(string)$doc['title'],'pages'=>(int)$edition['pages'],'url'=>$grant['url'],'expiresAt'=>$grant['expires_at'],'startPage'=>max(1,(int)$state['page']),
+            'editionId'=>(int)$edition['id'],'publicId'=>$public_id,'title'=>(string)$doc['title'],'pages'=>(int)$edition['pages'],'url'=>$grant['url'],'expiresAt'=>$grant['expires_at'],'startPage'=>max(1,(int)$state['page']),'progressRevision'=>(string)($state['updated_at']??''),
             'rest'=>esc_url_raw(rest_url('pldr/v1/')),'nonce'=>wp_create_nonce('wp_rest'),'thumbnails'=>$thumbs,'canDownload'=>!empty($policy['download_allowed']),'canPrint'=>!empty($policy['print_allowed']),'canOffline'=>!empty($policy['offline_allowed']),
             'strings'=>array('loading'=>__('Loading document…','pdf-library-digital-reading'),'error'=>__('The reader could not load this document. Retry or use the accessible fallback.','pdf-library-digital-reading'),'saved'=>__('Reading position saved privately.','pdf-library-digital-reading')),
         );
@@ -404,5 +414,11 @@ final class PLDR_Reader {
 
     private static function cover_token(int $edition_id): string { global $wpdb; $wpdb->last_error=''; $oid=(int)$wpdb->get_var($wpdb->prepare('SELECT object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s LIMIT 1',$edition_id,'cover','available')); if(''!==(string)$wpdb->last_error){PLDR_Core::audit('edition',$edition_id,'cover_derivative_read_failed',array());return'';} if(!$oid)return''; $grant=PLDR_Access::issue_token($edition_id,$oid,'preview',get_current_user_id(),900); return is_array($grant)?$grant['url']:''; }
     private static function thumbnail_tokens(int $edition_id): array { global $wpdb; $wpdb->last_error=''; $rows=$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT %d',$edition_id,'thumbnail','available',self::THUMBNAIL_GRANT_LIMIT),ARRAY_A); if(''!==(string)$wpdb->last_error){PLDR_Core::audit('edition',$edition_id,'thumbnail_derivative_read_failed',array());return array();} $rows=is_array($rows)?$rows:array(); $out=array(); foreach($rows as $r){$g=PLDR_Access::issue_token($edition_id,(int)$r['object_id'],'preview',get_current_user_id(),900);if(is_array($g))$out[(int)$r['page_number']]=$g['url'];} return $out; }
-    private static function state_html(string $state): string { $messages=array('not-found'=>__('Document not found.','pdf-library-digital-reading'),'restricted'=>__('This document is restricted, expired, embargoed, or not available to your account.','pdf-library-digital-reading'),'error'=>__('The document reader is temporarily unavailable.','pdf-library-digital-reading')); return '<main class="pldr-shell"><div class="pldr-state"><h1>'.esc_html($messages[$state]??$messages['error']).'</h1><a href="'.esc_url(PLDR_Core::route_url('library')).'">'.esc_html__('Return to PDF Library','pdf-library-digital-reading').'</a></div></main>'; }
+    private static function state_html(string $state): string {
+        $messages=array('not-found'=>__('Document not found.','pdf-library-digital-reading'),'restricted'=>__('This document is restricted, expired, embargoed, or not available to your account.','pdf-library-digital-reading'),'error'=>__('The document reader is temporarily unavailable.','pdf-library-digital-reading'));
+        $trace='error'===$state?PLDR_Core::trace_id():'';
+        $actions='<nav class="pldr-local-nav" aria-label="'.esc_attr__('Recovery navigation','pdf-library-digital-reading').'"><a href="'.esc_url(PLDR_Core::route_url('library')).'">'.esc_html__('Return to PDF Library','pdf-library-digital-reading').'</a><a href="'.esc_url(home_url('/')).'">'.esc_html__('Home','pdf-library-digital-reading').'</a></nav>';
+        if('error'===$state){$actions.='<p><a href="'.esc_url((string)($_SERVER['REQUEST_URI']??PLDR_Core::route_url('library'))).'">'.esc_html__('Retry this page','pdf-library-digital-reading').'</a></p><p class="pldr-kicker">'.esc_html(sprintf(__('Support reference: %s','pdf-library-digital-reading'),$trace)).'</p>';}
+        return '<main class="pldr-shell"><div class="pldr-state"><h1>'.esc_html($messages[$state]??$messages['error']).'</h1>'.$actions.'</div></main>';
+    }
 }

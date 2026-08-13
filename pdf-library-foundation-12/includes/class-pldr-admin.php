@@ -42,7 +42,7 @@ final class PLDR_Health {
     public static function repair(string $operation) {
         if(!PLDR_Core::authorize('repair'))return PLDR_Core::machine_error('pldr_repair_forbidden','Repair authority is required.',403);
         global $wpdb;
-        if('schema'===$operation){$ok=PLDR_Schema::upgrade();PLDR_Core::audit('system',0,'schema_repair',array('ok'=>$ok));return array('operation'=>'schema','ok'=>$ok);}
+        if('schema'===$operation){delete_transient('pldr_r21_core_schema_ready');PLDR_Schema_Corrections::invalidate_health_cache();$ok=PLDR_R21_Readiness::core_ready(true);PLDR_Core::audit('system',0,'schema_repair_r21',array('ok'=>$ok,'correction_revision'=>PLDR_Schema_Corrections::revision()));return array('operation'=>'schema','ok'=>$ok,'canonical_guard'=>'R21');}
         if('search-index'===$operation){
             $state=(array)get_option('pldr_search_repair_state',array());$after=absint($state['after_id']??0);$limit=100;
             $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare('SELECT d.id,d.title,d.language,d.subjects_json,d.collections_json,e.author_name,e.translator,e.publisher,e.isbn FROM '.PLDR_Core::table('documents').' d LEFT JOIN '.PLDR_Core::table('editions').' e ON e.id=(SELECT MAX(e2.id) FROM '.PLDR_Core::table('editions').' e2 WHERE e2.document_id=d.id) WHERE d.id>%d ORDER BY d.id ASC LIMIT %d',$after,$limit),ARRAY_A);
@@ -51,8 +51,8 @@ final class PLDR_Health {
             $done=count($rows)<$limit;if($done)delete_option('pldr_search_repair_state');else update_option('pldr_search_repair_state',array('after_id'=>$last,'updated_at'=>PLDR_Core::now()),false);PLDR_Core::audit('system',0,'search_index_rebuilt_batch',array('documents'=>count($rows),'after_id'=>$last,'done'=>$done));return array('operation'=>'search-index','documents'=>count($rows),'done'=>$done,'after_id'=>$last,'batch_limit'=>$limit,'resumable'=>true);
         }
         if('tokens'===$operation){PLDR_Access::cleanup_tokens();return array('operation'=>'tokens','ok'=>true);}
-        if('outbox'===$operation){PLDR_Integrations::dispatch_outbox();return array('operation'=>'outbox','ok'=>true);}
-        if('legacy-migration'===$operation){PLDR_Schema::migrate_legacy_batch();return array('operation'=>'legacy-migration','state'=>get_option('pldr_legacy_migration_state'));}
+        if('outbox'===$operation){PLDR_R21_Outbox::dispatch();return array('operation'=>'outbox','ok'=>true,'canonical_guard'=>'R21');}
+        if('legacy-migration'===$operation){PLDR_R21_Runtime_Guards::legacy_migration_guarded();return array('operation'=>'legacy-migration','state'=>get_option('pldr_legacy_migration_state'),'canonical_guard'=>'R21');}
         if('rescan-pending'===$operation){$wpdb->last_error='';$ids=$wpdb->get_col("SELECT id FROM ".PLDR_Core::table('documents')." WHERE status='scan' ORDER BY id ASC LIMIT 25");if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_queue_read','Pending rescan queue could not be read reliably.',503,array('degraded'=>true));$results=array();foreach(is_array($ids)?$ids:array() as $id)$results[]=PLDR_Ingest::rescan_document((int)$id);return array('operation'=>'rescan-pending','results'=>$results);}
         if('rotate-keys'===$operation){return self::rotate_keys(10);}
         if('integrity-sample'===$operation){return self::integrity_sample(10);}
