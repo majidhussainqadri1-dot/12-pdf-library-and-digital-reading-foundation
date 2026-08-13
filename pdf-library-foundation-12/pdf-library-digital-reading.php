@@ -25,13 +25,22 @@ $pldr_files = array(
     'class-pldr-schema.php',
     'class-pldr-storage.php',
     'class-pldr-crypto.php',
+    'class-pldr-object-integrity.php',
+    'class-pldr-integrity-policy.php',
+    'class-pldr-r20-guards.php',
     'class-pldr-ingest.php',
     'class-pldr-access.php',
     'class-pldr-reader.php',
     'class-pldr-rights.php',
+    'class-pldr-rights-policy.php',
     'class-pldr-rest.php',
+    'class-pldr-ocr-search-overlay.php',
+    'class-pldr-response-policy.php',
+    'class-pldr-schema-corrections.php',
+    'class-pldr-operations-policy.php',
     'class-pldr-admin.php',
     'class-pldr-privacy.php',
+    'class-pldr-privacy-extension.php',
     'class-pldr-future.php',
     'class-pldr-future-rest.php',
     'class-pldr-plugin.php',
@@ -46,5 +55,13 @@ register_deactivation_hook(PLDR_FILE, array('PLDR_Schema', 'deactivate'));
 register_deactivation_hook(PLDR_FILE, array('PLDR_Future', 'deactivate'));
 
 add_action('plugins_loaded', static function (): void {
+    PLDR_R20_Guards::hooks();
+    PLDR_Response_Policy::hooks();
+    PLDR_OCR_Search_Overlay::hooks();
+    PLDR_Integrity_Policy::hooks();
+    PLDR_Schema_Corrections::hooks();
+    PLDR_Rights_Policy::hooks();
+    PLDR_Privacy_Extension::hooks();
+    PLDR_Operations_Policy::hooks();
     PLDR_Plugin::instance()->run();
 }, 60);

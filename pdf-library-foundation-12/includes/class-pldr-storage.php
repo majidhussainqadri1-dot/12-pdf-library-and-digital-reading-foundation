@@ -3,6 +3,8 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Storage {
+    private static array $temporary_paths=array();
+    private static bool $shutdown_registered=false;
     public static function root(string $scope = 'pldr') {
         if ('spl' === $scope) {
             $configured = defined('SPL_PDF_STORAGE_DIR') ? (string) SPL_PDF_STORAGE_DIR : '';
@@ -81,7 +83,20 @@ final class PLDR_Storage {
             return new WP_Error('pldr_temp_create', 'The File 12 private temporary directory could not be created.');
         }
         self::protect($dir);
-        return trailingslashit($dir) . sanitize_key($purpose) . '-' . PLDR_Core::uuid() . '.tmp';
+        $path=trailingslashit($dir) . sanitize_key($purpose) . '-' . PLDR_Core::uuid() . '.tmp';
+        self::$temporary_paths[$path]=true;
+        if(!self::$shutdown_registered){
+            self::$shutdown_registered=true;
+            register_shutdown_function(array(__CLASS__,'cleanup_temporary_paths'));
+        }
+        return $path;
+    }
+
+    public static function cleanup_temporary_paths():void {
+        foreach(array_keys(self::$temporary_paths) as $path){
+            if(is_file($path))@unlink($path);
+        }
+        self::$temporary_paths=array();
     }
 
     public static function atomic_commit(string $temp, string $final): bool {

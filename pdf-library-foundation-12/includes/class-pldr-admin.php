@@ -60,9 +60,49 @@ final class PLDR_Health {
     }
 
     public static function rotate_keys(int $limit=10):array {
-        global $wpdb; $active=PLDR_Crypto::active_key_id(); if(!$active)return array('operation'=>'rotate-keys','rotated'=>array(),'error'=>'No active key.');
-        $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM ".PLDR_Core::table('objects')." WHERE object_status='available' AND key_id<>%s ORDER BY id ASC LIMIT %d",$active,max(1,min(25,$limit))),ARRAY_A);if(''!==(string)$wpdb->last_error)return array('operation'=>'rotate-keys','results'=>array(),'error'=>'Object key-rotation state could not be read reliably.');$rows=is_array($rows)?$rows:array();$results=array();
-        foreach($rows as $object){$old=PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);if(is_wp_error($old)){$results[]=array('object_id'=>(int)$object['id'],'ok'=>false,'error'=>$old->get_error_message());continue;}$plain=PLDR_Storage::temp('key-rotate-plain');$enc=PLDR_Storage::temp('key-rotate-encrypted');if(is_wp_error($plain)||is_wp_error($enc)){$results[]=array('object_id'=>(int)$object['id'],'ok'=>false,'error'=>'Temporary storage unavailable.');continue;}$error='';if(!PLDR_Crypto::decrypt_to_file($old,$plain,$error)){$results[]=array('object_id'=>(int)$object['id'],'ok'=>false,'error'=>$error);PLDR_Storage::delete($plain);continue;}$allocation=PLDR_Storage::allocate('pldr');$meta=array();if(!empty($allocation['error'])||!PLDR_Crypto::encrypt_file($plain,$enc,$meta,$error)||!PLDR_Storage::atomic_commit($enc,$allocation['path'])){$results[]=array('object_id'=>(int)$object['id'],'ok'=>false,'error'=>$error?:'Key rotation encryption/commit failed.');PLDR_Storage::delete($plain);PLDR_Storage::delete($enc);continue;}PLDR_Storage::delete($plain);if(false===$wpdb->query('START TRANSACTION')){PLDR_Storage::delete($allocation['path']);$results[]=array('object_id'=>(int)$object['id'],'ok'=>false,'error'=>'Key rotation transaction could not be started.');continue;}$updated=$wpdb->update(PLDR_Core::table('objects'),array('storage_name'=>$allocation['name'],'storage_scope'=>'pldr','encrypted_sha256'=>$meta['encrypted_sha256'],'key_id'=>$meta['key_id'],'format_version'=>$meta['format'],'verified_at'=>PLDR_Core::now()),array('id'=>(int)$object['id']));if(false===$updated){$wpdb->query('ROLLBACK');PLDR_Storage::delete($allocation['path']);$results[]=array('object_id'=>(int)$object['id'],'ok'=>false,'error'=>'Object metadata key rotation failed.');continue;}if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');PLDR_Storage::delete($allocation['path']);$results[]=array('object_id'=>(int)$object['id'],'ok'=>false,'error'=>'Key rotation commit failed.');continue;}PLDR_Storage::delete($old);PLDR_Core::audit('object',(int)$object['id'],'key_rotated',array('old_key'=>$object['key_id'],'new_key'=>$meta['key_id']));$results[]=array('object_id'=>(int)$object['id'],'ok'=>true,'key_id'=>$meta['key_id']);}
+        global $wpdb;
+        $active=PLDR_Crypto::active_key_id();
+        if(!$active)return array('operation'=>'rotate-keys','results'=>array(),'error'=>'No active key.');
+        $wpdb->last_error='';
+        $rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM ".PLDR_Core::table('objects')." WHERE object_status='available' AND key_id<>%s ORDER BY id ASC LIMIT %d",$active,max(1,min(25,$limit))),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array('operation'=>'rotate-keys','results'=>array(),'error'=>'Object key-rotation state could not be read reliably.');
+        $rows=is_array($rows)?$rows:array();$results=array();
+        foreach($rows as $object){
+            $object_id=(int)$object['id'];
+            $old=PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);
+            if(is_wp_error($old)){$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>$old->get_error_message());continue;}
+            $error='';
+            if(!PLDR_Crypto::verify_file((string)$old,(string)$object['sha256'],$error)){
+                $results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Key rotation refused an object that failed plaintext integrity verification: '.$error,'integrity_verified'=>false);continue;
+            }
+            $plain=PLDR_Storage::temp('key-rotate-plain');$enc=PLDR_Storage::temp('key-rotate-encrypted');
+            if(is_wp_error($plain)||is_wp_error($enc)){$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Temporary storage unavailable.');continue;}
+            if(!PLDR_Crypto::decrypt_to_file((string)$old,(string)$plain,$error)){$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>$error);PLDR_Storage::delete((string)$plain);continue;}
+            $plain_hash=hash_file('sha256',(string)$plain)?:'';
+            if(''===$plain_hash||!hash_equals(strtolower((string)$object['sha256']),strtolower($plain_hash))){PLDR_Storage::delete((string)$plain);$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Key rotation plaintext checksum reconciliation failed.');continue;}
+            $allocation=PLDR_Storage::allocate('pldr');$meta=array();
+            if(!empty($allocation['error'])||!PLDR_Crypto::encrypt_file((string)$plain,(string)$enc,$meta,$error)||!PLDR_Storage::atomic_commit((string)$enc,(string)$allocation['path'])){
+                $results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>$error?:'Key rotation encryption/commit failed.');PLDR_Storage::delete((string)$plain);PLDR_Storage::delete((string)$enc);continue;
+            }
+            PLDR_Storage::delete((string)$plain);
+            if((string)($meta['key_id']??'')!==$active||''===(string)($meta['encrypted_sha256']??'')){
+                PLDR_Storage::delete((string)$allocation['path']);$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Key rotation output did not bind to the configured active key.');continue;
+            }
+            $verify_error='';
+            if(!PLDR_Crypto::verify_file((string)$allocation['path'],(string)$object['sha256'],$verify_error)){
+                PLDR_Storage::delete((string)$allocation['path']);$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Key rotation output failed post-encryption decrypt/checksum verification: '.$verify_error);continue;
+            }
+            if(false===$wpdb->query('START TRANSACTION')){PLDR_Storage::delete((string)$allocation['path']);$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Key rotation transaction could not be started.');continue;}
+            $updated=$wpdb->query($wpdb->prepare(
+                'UPDATE '.PLDR_Core::table('objects').' SET storage_name=%s,storage_scope=%s,encrypted_sha256=%s,key_id=%s,format_version=%s,verified_at=%s WHERE id=%d AND object_status=%s AND storage_name=%s AND storage_scope=%s AND key_id=%s AND sha256=%s AND encrypted_sha256=%s',
+                (string)$allocation['name'],'pldr',(string)$meta['encrypted_sha256'],(string)$meta['key_id'],(string)$meta['format'],PLDR_Core::now(),$object_id,'available',(string)$object['storage_name'],(string)$object['storage_scope'],(string)$object['key_id'],(string)$object['sha256'],(string)$object['encrypted_sha256']
+            ));
+            if(1!==$updated){$wpdb->query('ROLLBACK');PLDR_Storage::delete((string)$allocation['path']);$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Object state changed during key rotation; no stale metadata was committed.','cas_conflict'=>true);continue;}
+            if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');PLDR_Storage::delete((string)$allocation['path']);$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Key rotation commit failed.');continue;}
+            PLDR_Storage::delete((string)$old);
+            PLDR_Core::audit('object',$object_id,'key_rotated',array('old_key'=>$object['key_id'],'new_key'=>$meta['key_id'],'plaintext_integrity_verified'=>true,'post_rotation_verified'=>true,'cas_committed'=>true));
+            $results[]=array('object_id'=>$object_id,'ok'=>true,'key_id'=>$meta['key_id'],'plaintext_integrity_verified'=>true,'post_rotation_verified'=>true,'cas_committed'=>true);
+        }
         return array('operation'=>'rotate-keys','active_key_id'=>$active,'results'=>$results);
     }
 

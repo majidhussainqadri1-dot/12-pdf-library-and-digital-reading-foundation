@@ -8,9 +8,10 @@ final class PLDR_Future_Anchors {
         $edition = PLDR_Future_Data::require_edition($edition_id);
         if (is_wp_error($edition)) return $edition;
         if ($page < 1 || $page > (int) $edition['pages']) return PLDR_Core::machine_error('pldr_anchor_page', 'Scholarly anchor page is outside this edition.', 400);
-        $allowed_types = array('TextQuoteSelector','FragmentSelector','SvgSelector','CssSelector');
+        $allowed_types = array('TextQuoteSelector','FragmentSelector','CssSelector');
         $type = sanitize_text_field((string) ($selector['type'] ?? 'TextQuoteSelector'));
-        if (!in_array($type, $allowed_types, true)) return PLDR_Core::machine_error('pldr_anchor_selector', 'Unsupported scholarly anchor selector.', 400);
+        if ('SvgSelector' === $type) return PLDR_Core::machine_error('pldr_anchor_svg_unsupported', 'SVG selectors are rejected until File 12 has a lossless, security-reviewed SVG selector storage path.', 400, array('supported_selector_types'=>$allowed_types));
+        if (!in_array($type, $allowed_types, true)) return PLDR_Core::machine_error('pldr_anchor_selector', 'Unsupported scholarly anchor selector.', 400, array('supported_selector_types'=>$allowed_types));
         $clean = array('type' => $type);
         if (isset($selector['exact'])) { $value=wp_strip_all_tags((string)$selector['exact']); $clean['exact']=self::limit($value,260); }
         if (isset($selector['prefix'])) { $value=wp_strip_all_tags((string)$selector['prefix']); $clean['prefix']=self::limit($value,80); }
