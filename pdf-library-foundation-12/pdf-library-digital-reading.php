@@ -31,6 +31,7 @@ $pldr_files = array(
     'class-pldr-rights.php',
     'class-pldr-rights-policy.php',
     'class-pldr-rest.php',
+    'class-pldr-ocr-search-overlay.php',
     'class-pldr-response-policy.php',
     'class-pldr-schema-corrections.php',
     'class-pldr-admin.php',
@@ -51,6 +52,7 @@ register_deactivation_hook(PLDR_FILE, array('PLDR_Future', 'deactivate'));
 
 add_action('plugins_loaded', static function (): void {
     PLDR_Response_Policy::hooks();
+    PLDR_OCR_Search_Overlay::hooks();
     PLDR_Schema_Corrections::hooks();
     PLDR_Rights_Policy::hooks();
     PLDR_Privacy_Extension::hooks();
