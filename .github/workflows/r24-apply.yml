@@ -41,6 +41,7 @@ jobs:
           tar -xzf /tmp/r24_repo_patch.tar.gz -C .
           rm -rf r24-patch
           rm -f .github/workflows/r24-apply.yml
+          sed -i 's/[[:space:]]\+$//' MANIFEST.md
 
           # R24 changed canonical internals while preserving the older guarantees.
           # Retained static tests follow the canonical implementation, not retired source locations/text.
