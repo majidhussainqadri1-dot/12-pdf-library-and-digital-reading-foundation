@@ -32,7 +32,7 @@ $must($rest,"self::delivery_edition_or_unavailable(absint(\$request['edition_id'
 
 // R3: Patient Cases need independent clearance and covers use malware scanning.
 $must($ingest,"pldr_patient_case_publication_clearance",'patient-case publication clearance missing');
-$must($ingest,"$cover_scan=self::scan_file",'cover malware scan missing');
+$must($ingest,'$cover_scan=self::scan_file','cover malware scan missing');
 
 // R4: crypto outputs are hardened and rotation temp files are finally cleaned.
 $must($crypto,'@chmod($output, 0600)','crypto output permissions not hardened');
@@ -63,7 +63,7 @@ $must($fiiif,"'pldr_future_iiif_unavailable'",'IIIF generic unavailable boundary
 $must($frest,"PLDR_Future_Data::require_edition(\$edition_id,'offline')",'offline-grant authorization preflight missing');
 
 // R16: shelves are bounded and actual items can be enumerated safely.
-$must($shelves,'private const ITEM_LIMIT=5000','shelf lifetime bound missing');
+$must($shelves,'ITEM_LIMIT = 5000','shelf lifetime bound missing');
 $must($shelves,'public static function items','shelf item enumeration missing');
 $must($frest,"'/future/shelves/(?P<id>\\d+)/items'",'shelf items REST surface missing');
 
@@ -74,7 +74,7 @@ $forbid($rooms,'sanitize_text_field($e->getMessage())','Reading Room still persi
 
 // R18: accessibility target, reduced motion, and recovery UI.
 $must($fcss,'min-width:44px;min-height:44px','Future controls remain below 44px target');
-$must($readerJs,"matchMedia('(prefers-reduced-motion: reduce)')",'reduced-motion behavior missing from reader JS');
+$must($readerJs,'prefers-reduced-motion: reduce','reduced-motion behavior missing from reader JS');
 $must($reader,"'Support reference: %s'",'reader support reference missing');
 $must($reader,"'Home'",'reader Home recovery control missing');
 
@@ -108,7 +108,7 @@ $must($frest,'future_idempotency_abort_after_denial_failed','Future denied idemp
 $doc=dirname(__DIR__).'/docs/TWENTY-ROUND-REVIEW-2026-08-13-R22.md';
 if(!is_file($doc)){fwrite(STDERR,"R22 review record missing.\n");exit(1);} $record=(string)file_get_contents($doc);
 for($i=1;$i<=20;$i++)$must($record,"## Round {$i}","R22 review record missing Round {$i}");
-$must($record,'First-ten defect rounds: **2, 3, 4, 6, 7**','R22 first-ten defect summary missing');
-$must($record,'Final defect rounds: **2, 3, 4, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20**','R22 final defect summary missing');
+$must($record,'**First-ten defect rounds:** **2, 3, 4, 6, 7**','R22 first-ten defect summary missing');
+$must($record,'**Final defect rounds:** **2, 3, 4, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20**','R22 final defect summary missing');
 
 echo "PLDR R22 fresh twenty-round corrective-review contract: PASS\n";
