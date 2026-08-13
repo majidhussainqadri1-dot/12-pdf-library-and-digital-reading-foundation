@@ -3,15 +3,17 @@
 defined('ABSPATH') || exit;
 
 /**
- * Privacy coverage for durable File 12 review/governance records that remain
- * distinct from the private reading-state exporter/eraser.
+ * Export-only coverage for durable File 12 review/governance records.
+ *
+ * Erasure/anonymization remains canonically owned by PLDR_Privacy, which
+ * already handles OCR correction actors, accessibility verifiers and closed
+ * rights-case reporters under the common legal-hold/reconciliation policy.
  */
 final class PLDR_Privacy_Extension {
     private const BATCH=50;
 
     public static function hooks():void {
         add_filter('wp_privacy_personal_data_exporters',array(__CLASS__,'exporters'),20);
-        add_filter('wp_privacy_personal_data_erasers',array(__CLASS__,'erasers'),20);
     }
 
     public static function exporters(array $exporters):array {
@@ -20,14 +22,6 @@ final class PLDR_Privacy_Extension {
             'callback'=>array(__CLASS__,'export'),
         );
         return $exporters;
-    }
-
-    public static function erasers(array $erasers):array {
-        $erasers['pldr-review-records']=array(
-            'eraser_friendly_name'=>__('PDF Library retained review and rights records','pdf-library-digital-reading'),
-            'callback'=>array(__CLASS__,'erase'),
-        );
-        return $erasers;
     }
 
     private static function user_id(string $email):int {
@@ -62,16 +56,5 @@ final class PLDR_Privacy_Extension {
             foreach($rows as $row){$fields=array();foreach($spec['fields'] as $field)$fields[]=array('name'=>$field,'value'=>is_scalar($row[$field]??'')?(string)($row[$field]??''):wp_json_encode($row[$field]??null));$data[]=array('group_id'=>$spec['group'],'group_label'=>$spec['label'],'item_id'=>$spec['group'].'-'.sanitize_key((string)($row[$spec['id']]??'0')),'data'=>$fields);}
         }
         return array('data'=>$data,'done'=>max($counts?:array(0))<$limit);
-    }
-
-    public static function erase(string $email,int $page=1):array {
-        global $wpdb;$user_id=self::user_id($email);if(!$user_id)return array('items_removed'=>false,'items_retained'=>false,'messages'=>array(),'done'=>true);
-        if(!self::exists('rights_cases')){
-            if(''!==(string)$wpdb->last_error)return array('items_removed'=>false,'items_retained'=>true,'messages'=>array(__('File 12 retained rights-case state could not be reconciled; retry is required.','pdf-library-digital-reading')),'done'=>false);
-            return array('items_removed'=>false,'items_retained'=>false,'messages'=>array(),'done'=>true);
-        }
-        $table=PLDR_Core::table('rights_cases');$wpdb->last_error='';$open=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE reporter_id=%d AND state<>%s",$user_id,'closed'));
-        if(''!==(string)$wpdb->last_error)return array('items_removed'=>false,'items_retained'=>true,'messages'=>array(__('File 12 retained rights-case state could not be reconciled; retry is required.','pdf-library-digital-reading')),'done'=>false);
-        return array('items_removed'=>false,'items_retained'=>$open>0,'messages'=>$open>0?array(__('Open File 12 rights/dispute records remain retained until their governed case lifecycle is closed.','pdf-library-digital-reading')):array(),'done'=>true);
     }
 }
