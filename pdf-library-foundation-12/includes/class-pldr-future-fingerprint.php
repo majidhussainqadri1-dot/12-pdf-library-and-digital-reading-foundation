@@ -33,7 +33,7 @@ final class PLDR_Future_Fingerprint {
 
     public static function candidates(int $edition_id): array {
         global $wpdb;
-        $wpdb->last_error='';$edition=PLDR_Core::edition($edition_id);if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_edition_read','Edition state could not be read reliably for scan-fingerprint review.',503,array('degraded'=>true)));if(!$edition)return array();if(!self::can_inspect($edition))return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_review_forbidden','Scan-fingerprint candidates are review evidence and require document review or repair authority.',403));
+        $wpdb->last_error='';$edition=PLDR_Core::edition($edition_id);if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_edition_read','Edition state could not be read reliably for scan-fingerprint review.',503,array('degraded'=>true)));if(!$edition)return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_edition','Edition not found.',404));if(!self::can_inspect($edition))return array('error'=>PLDR_Core::machine_error('pldr_fingerprint_review_forbidden','Scan-fingerprint candidates are review evidence and require document review or repair authority.',403));
         $wpdb->last_error='';
         $rowsCurrent=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('scan_fingerprints').' WHERE edition_id=%d',$edition_id),ARRAY_A);
         if(''!==(string)$wpdb->last_error){

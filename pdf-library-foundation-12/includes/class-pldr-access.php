@@ -87,10 +87,9 @@ final class PLDR_Access {
         if(1!==$doc_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_document_conflict','Document changed concurrently; access-policy update was rolled back.',409,array('current_document_version'=>(int)(PLDR_Core::document($document_id)['version']??$doc['version'])));}
         $event=PLDR_Core::emit('PDFDocumentAccessChanged.v1','document',$document_id,array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience));
         if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_event_atomic','Access-policy update was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false,'policy_version'=>$row['version']));}
-        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_commit','Access-policy update could not be committed atomically.',500);}
-
         $revoked=PLDR_Access::revoke_document($document_id,'access-policy-change');
-        if($revoked<0)return PLDR_Core::machine_error('pldr_policy_revoke_reconcile','Access policy was committed but prior delivery grants could not be revoked; reconciliation is required before retry.',503,array('committed'=>true,'policy_version'=>$row['version']));
+        if($revoked<0){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_revoke_atomic','Access-policy update was rolled back because prior delivery grants could not be revoked atomically.',503,array('committed'=>false,'policy_version'=>$row['version']));}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_policy_commit','Access-policy update could not be committed atomically.',500);}
         PLDR_Core::audit('document',$document_id,'access_policy_updated',array('version'=>$row['version'],'audience'=>$audience),$actor_id);
         return array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience);
     }
@@ -110,7 +109,10 @@ final class PLDR_Access {
             return PLDR_Core::machine_error('pldr_operation', 'Unsupported File 12 delivery operation.', 400);
         }
         $user_id = $user_id ?: get_current_user_id();
-        if (!self::can_access_edition($edition_id, $operation, $user_id)) {
+        $wpdb->last_error='';
+        $allowed=self::can_access_edition($edition_id, $operation, $user_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_access_authorization_read','Delivery authorization state could not be verified reliably; no grant was issued.',503,array('degraded'=>true));
+        if (!$allowed) {
             return PLDR_Core::machine_error('pldr_access_denied', 'The requested document is unavailable for this operation.', 403);
         }
         $wpdb->last_error='';
@@ -204,11 +206,11 @@ final class PLDR_Access {
     public static function revoke_document(int $document_id, string $reason = 'policy-change'): int {
         global $wpdb;
         $wpdb->last_error='';
-        $edition_ids = $wpdb->get_col($wpdb->prepare('SELECT id FROM ' . PLDR_Core::table('editions') . ' WHERE document_id=%d', $document_id));
-        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('document',$document_id,'access_revoke_edition_read_failed',array('reason'=>$reason));return -1;}
-        if (!$edition_ids) return 0;
-        $ids = implode(',', array_map('absint', $edition_ids));
-        $count = $wpdb->query('UPDATE ' . PLDR_Core::table('access_tokens') . " SET revoked_at='" . esc_sql(PLDR_Core::now()) . "' WHERE revoked_at IS NULL AND edition_id IN ($ids)");
+        $token_table=PLDR_Core::table('access_tokens');$edition_table=PLDR_Core::table('editions');
+        $count=$wpdb->query($wpdb->prepare(
+            'UPDATE '.$token_table.' t INNER JOIN '.$edition_table.' e ON e.id=t.edition_id SET t.revoked_at=%s WHERE t.revoked_at IS NULL AND e.document_id=%d',
+            PLDR_Core::now(),$document_id
+        ));
         if(false===$count){PLDR_Core::audit('document',$document_id,'access_revoke_failed',array('reason'=>$reason,'db_error'=>substr((string)$wpdb->last_error,0,500)));return -1;}
         PLDR_Core::audit('document', $document_id, 'access_revoked', array('reason' => $reason, 'tokens' => (int) $count));
         return (int) $count;

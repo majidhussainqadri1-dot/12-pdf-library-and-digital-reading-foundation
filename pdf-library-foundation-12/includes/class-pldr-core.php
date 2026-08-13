@@ -3,6 +3,11 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Core {
+    private const AUDIT_CONTEXT_MAX_BYTES = 16384;
+    private const AUDIT_CONTEXT_MAX_DEPTH = 4;
+    private const AUDIT_CONTEXT_MAX_ITEMS = 50;
+    private const AUDIT_CONTEXT_MAX_STRING = 1000;
+    private const OUTBOX_PAYLOAD_MAX_BYTES = 65536;
     public const DOCUMENT_TYPES = array(
         'book' => 'Book',
         'reference-book' => 'Reference Book',
@@ -129,18 +134,41 @@ final class PLDR_Core {
         return trim((string) preg_replace('/\s+/u', ' ', $text));
     }
 
+    private static function sanitize_audit_value($value, int $depth = 0) {
+        if ($depth > self::AUDIT_CONTEXT_MAX_DEPTH) return '[depth-limit]';
+        if (null === $value || is_bool($value) || is_int($value) || is_float($value)) return $value;
+        if (is_string($value)) {
+            $value = sanitize_text_field($value);
+            if (function_exists('mb_substr')) return mb_substr($value, 0, self::AUDIT_CONTEXT_MAX_STRING, 'UTF-8');
+            return substr($value, 0, self::AUDIT_CONTEXT_MAX_STRING);
+        }
+        if (is_array($value)) {
+            $safe = array(); $seen = 0;
+            foreach ($value as $key => $nested) {
+                if ($seen >= self::AUDIT_CONTEXT_MAX_ITEMS) { $safe['_items_truncated'] = true; break; }
+                $key_string = (string) $key;
+                if (preg_match('/secret|token|password|key|patient|note_text|authorization|cookie|session|credential|nonce/i', $key_string)) continue;
+                $safe_key = is_int($key) ? $key : sanitize_key($key_string);
+                if ('' === (string) $safe_key) continue;
+                $safe[$safe_key] = self::sanitize_audit_value($nested, $depth + 1);
+                $seen++;
+            }
+            return $safe;
+        }
+        return '[non-scalar-context]';
+    }
+
     public static function audit(string $object_type, int $object_id, string $action, array $context = array(), int $actor_id = 0): bool {
         global $wpdb;
         $actor_id = $actor_id ?: get_current_user_id();
-        $safe = array();
-        foreach ($context as $key => $value) {
-            if (preg_match('/secret|token|password|key|patient|note_text/i', (string) $key)) continue;
-            $safe_key=sanitize_key((string)$key);if(''===$safe_key)continue;
-            if(is_scalar($value)||null===$value)$safe[$safe_key]=(string)$value;
-            else{$encoded=wp_json_encode($value);$safe[$safe_key]=is_string($encoded)?$encoded:'[unencodable-context]';}
-        }
+        $safe = self::sanitize_audit_value($context, 0);
+        if (!is_array($safe)) $safe = array('_context'=>'invalid');
         $context_json=wp_json_encode($safe);
         if(!is_string($context_json)){error_log('[PLDR]['.self::trace_id().'] audit-context-encode-failed '.sanitize_key($action));return false;}
+        if(strlen($context_json)>self::AUDIT_CONTEXT_MAX_BYTES){
+            $context_json=wp_json_encode(array('_context_truncated'=>'size-limit','max_bytes'=>self::AUDIT_CONTEXT_MAX_BYTES));
+            if(!is_string($context_json))return false;
+        }
         $ok=$wpdb->insert(self::table('audit'), array(
             'trace_id' => self::trace_id(),
             'object_type' => sanitize_key($object_type),
@@ -161,6 +189,10 @@ final class PLDR_Core {
         if (!is_string($payload_json)) {
             error_log('[PLDR][' . self::trace_id() . '] outbox-payload-encode-failed ' . sanitize_text_field($event_name));
             return self::machine_error('pldr_outbox_encode','Reliable event payload could not be encoded; reconciliation is required.',500,array('event_name'=>sanitize_text_field($event_name)));
+        }
+        if (strlen($payload_json) > self::OUTBOX_PAYLOAD_MAX_BYTES) {
+            self::audit('outbox',0,'outbox_payload_rejected',array('event_name'=>$event_name,'payload_bytes'=>strlen($payload_json),'max_bytes'=>self::OUTBOX_PAYLOAD_MAX_BYTES));
+            return self::machine_error('pldr_outbox_payload_size','Reliable event payload exceeds the bounded File 12 event contract; it was not persisted.',413,array('max_bytes'=>self::OUTBOX_PAYLOAD_MAX_BYTES));
         }
         $ok=$wpdb->insert(self::table('outbox'), array(
             'event_id' => $event_id,

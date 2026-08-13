@@ -68,9 +68,8 @@ final class PLDR_Rights {
         }
         $event=PLDR_Core::emit('RightsReportFiled.v1','rights_case',$case_id,array('case_key'=>$case_key,'document_id'=>$doc['public_id'],'reason'=>$reason));
         if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_event_atomic','Rights report was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false));}
+        if(is_array($transition)&&PLDR_Access::revoke_document($document_id,'temporary-'.$reason)<0){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_sensitive_revoke_atomic','Sensitive rights restriction was rolled back because prior delivery grants could not be revoked atomically.',503,array('committed'=>false));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_commit','Rights report could not be committed atomically.',500);}
-
-        if(is_array($transition)){ $after=self::after_document_status_change($transition['document'],'restricted','temporary-'.$reason); if(is_wp_error($after))return $after; }
         PLDR_Core::audit('rights_case',$case_id,'reported',array('document_id'=>$document_id,'reason'=>$reason,'sensitive_restriction_committed'=>(bool)$transition),$reporter_id);
         return array('case_id'=>$case_id,'case_key'=>$case_key,'state'=>'reported','sensitive_restriction_committed'=>$sensitive ? ('restricted'===$doc['status']||'removed'===$doc['status']||(bool)$transition) : false);
     }
@@ -86,6 +85,11 @@ final class PLDR_Rights {
         if($expected_version<1)return PLDR_Core::machine_error('pldr_case_precondition','Rights-case decisions require the exact expected case version.',428,array('current_version'=>(int)$case['version']));
         if((int)$case['version']!==$expected_version)return PLDR_Core::machine_error('pldr_case_conflict','Rights case changed; refresh before deciding.',409,array('current_version'=>(int)$case['version']));
         if('closed'===$case['state'])return PLDR_Core::machine_error('pldr_case_state','This rights case cannot transition from its current state.',409);
+        if(empty($case['parent_case_id'])){
+            $wpdb->last_error='';$appeal_id=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('rights_cases').' WHERE parent_case_id=%d LIMIT 1',$case_id));
+            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_case_appeal_read','Rights-case appeal state could not be read reliably.',503,array('degraded'=>true));
+            if($appeal_id)return PLDR_Core::machine_error('pldr_case_appealed','The original rights case is frozen because an appeal already exists.',409,array('appeal_case_id'=>(int)$appeal_id));
+        }
         $allowed=array('restrict','remove','restore','dismiss','request-evidence');
         if(!in_array($decision,$allowed,true))return PLDR_Core::machine_error('pldr_case_decision','Invalid rights-case decision.',400);
         $note=self::limit_text($note,self::REVIEW_NOTE_MAX);
@@ -109,37 +113,47 @@ final class PLDR_Rights {
         }
         $event=PLDR_Core::emit('PDFRightsCaseDecided.v1','rights_case',$case_id,array('case_id'=>$case_id,'document_id'=>$document_id,'decision'=>$decision,'state'=>$new_state));
         if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_decision_event_atomic','Rights decision was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false,'case_id'=>$case_id));}
+        if(is_array($transition)&&PLDR_Access::revoke_document($document_id,$reason)<0){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_revoke_atomic','Rights decision was rolled back because prior delivery grants could not be revoked atomically.',503,array('committed'=>false,'case_id'=>$case_id));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_commit','Rights decision could not be committed atomically.',500);}
-        if(is_array($transition)){ $after=self::after_document_status_change($transition['document'],$status,$reason); if(is_wp_error($after))return $after; }
         PLDR_Core::audit('rights_case',$case_id,'decided',array('decision'=>$decision,'document_id'=>$document_id),$reviewer_id);
         return array('case_id'=>$case_id,'state'=>$new_state,'decision'=>$decision,'version'=>(int)$case['version']+1);
     }
 
-    public static function appeal(int $case_id,string $reason,array $evidence,int $actor_id=0) {
+    public static function appeal(int $case_id,string $reason,array $evidence,int $actor_id=0,int $expected_version=0) {
         global $wpdb;
         $actor_id=$actor_id?:get_current_user_id();
         if(!$actor_id)return PLDR_Core::machine_error('pldr_appeal_login','Log in to appeal.',401);
-        $wpdb->last_error='';$parent=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('rights_cases').' WHERE id=%d',$case_id),ARRAY_A);
-        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_appeal_parent_read','Appeal parent state could not be read reliably.',503,array('degraded'=>true));
-        if(!$parent)return PLDR_Core::machine_error('pldr_case_missing','Rights case not found.',404);
-        if(!in_array($parent['state'],array('closed','reviewed'),true))return PLDR_Core::machine_error('pldr_appeal_state','This case is not eligible for appeal yet.',409);
-        $document_id=(int)$parent['document_id'];
-        if((int)$parent['reporter_id']!==$actor_id && !PLDR_Core::authorize('rights',$document_id,$actor_id) && !PLDR_Core::authorize('manage',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_appeal_forbidden','You cannot appeal this rights case.',403);
         $safe_evidence=self::sanitize_evidence($evidence);
         if(is_wp_error($safe_evidence))return $safe_evidence;
         $appeal_reason=self::limit_text($reason,self::REVIEW_NOTE_MAX);
         if(''===trim($appeal_reason))return PLDR_Core::machine_error('pldr_appeal_reason','A bounded appeal reason is required.',400);
         $appeal_payload=wp_json_encode(array('reason'=>$appeal_reason,'evidence'=>$safe_evidence['data']),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
         if(!is_string($appeal_payload)||strlen($appeal_payload)>self::EVIDENCE_JSON_MAX)return PLDR_Core::machine_error('pldr_case_evidence_size','Rights appeal evidence exceeds the bounded safe payload size.',413,array('max_bytes'=>self::EVIDENCE_JSON_MAX));
-        $key=PLDR_Core::uuid();
         if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_appeal_transaction','Rights appeal transaction could not be started.',500);
+        $wpdb->last_error='';
+        $parent=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('rights_cases').' WHERE id=%d FOR UPDATE',$case_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_parent_read','Appeal parent state could not be read reliably.',503,array('degraded'=>true));}
+        if(!$parent){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_case_missing','Rights case not found.',404);}
+        if($expected_version<1){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_precondition','Rights-case appeal requires the exact expected parent-case version.',428,array('current_version'=>(int)$parent['version']));}
+        if((int)$parent['version']!==$expected_version){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_conflict','Rights case changed; refresh before appealing.',409,array('current_version'=>(int)$parent['version']));}
+        if(!empty($parent['parent_case_id'])){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_depth','An appeal decision cannot create an unbounded nested appeal chain.',409);}
+        if(!in_array($parent['state'],array('closed','reviewed'),true)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_state','This case is not eligible for appeal yet.',409);}
+        $document_id=(int)$parent['document_id'];
+        if((int)$parent['reporter_id']!==$actor_id && !PLDR_Core::authorize('rights',$document_id,$actor_id) && !PLDR_Core::authorize('manage',$document_id,$actor_id)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_forbidden','You cannot appeal this rights case.',403);}
+        $wpdb->last_error='';
+        $existing=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('rights_cases').' WHERE parent_case_id=%d LIMIT 1',$case_id));
+        if(''!==(string)$wpdb->last_error){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_existing_read','Existing appeal state could not be read reliably.',503,array('degraded'=>true));}
+        if($existing){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_exists','An appeal already exists for this rights case.',409,array('appeal_case_id'=>(int)$existing));}
+        $parent_updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('rights_cases').' SET version=version+1,updated_at=%s WHERE id=%d AND version=%d',PLDR_Core::now(),$case_id,$expected_version));
+        if(1!==$parent_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_conflict','Rights case changed concurrently; no appeal was created.',409);}
+        $key=PLDR_Core::uuid();
         $inserted=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>$key,'document_id'=>$document_id,'reporter_id'=>$actor_id,'parent_case_id'=>$case_id,'state'=>'appealed','reason'=>'appeal','evidence_json'=>$appeal_payload,'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now(),'closed_at'=>null));
         $new_id=(int)$wpdb->insert_id;
         if(false===$inserted||$new_id<1){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_store','The rights appeal could not be persisted; no appeal event was emitted.',500);}
-        $event=PLDR_Core::emit('PDFRightsCaseAppealed.v1','rights_case',$new_id,array('case_id'=>$new_id,'parent_case_id'=>$case_id,'document_id'=>$document_id));
+        $event=PLDR_Core::emit('PDFRightsCaseAppealed.v1','rights_case',$new_id,array('case_id'=>$new_id,'parent_case_id'=>$case_id,'document_id'=>$document_id,'parent_version'=>$expected_version+1));
         if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_event_atomic','Rights appeal was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_appeal_commit','Rights appeal could not be committed atomically.',500);}
-        return array('case_id'=>$new_id,'case_key'=>$key,'state'=>'appealed');
+        return array('case_id'=>$new_id,'case_key'=>$key,'state'=>'appealed','parent_case_id'=>$case_id,'parent_version'=>$expected_version+1);
     }
 
     public static function approve_document(int $document_id, int $reviewer_id = 0, int $expected_version = 0) {
@@ -169,9 +183,8 @@ final class PLDR_Rights {
         if(1!==$edition_updated){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_edition_publish_conflict','The target edition changed concurrently; publication was rolled back.',409);}
         $event=PLDR_Core::emit('PDFDocumentPublished.v1','document',$document_id,array('document_id'=>$doc['public_id'],'edition_id'=>(int)$edition['id']));
         if(is_wp_error($event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_publish_event_atomic','Publication was rolled back because its reliable event could not be persisted atomically.',503,array('committed'=>false,'document_id'=>$doc['public_id']));}
+        if(PLDR_Access::revoke_document($document_id,'publication-state-change')<0){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_publish_revoke_atomic','Publication was rolled back because prior delivery grants could not be revoked atomically.',503,array('committed'=>false));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_approve_commit','Document publication could not be committed atomically.',500);}
-
-        if(PLDR_Access::revoke_document($document_id,'publication-state-change')<0)return PLDR_Core::machine_error('pldr_publish_revoke_reconcile','Publication was committed but prior delivery grants could not be revoked; reconciliation is required.',503,array('committed'=>true));
         PLDR_Core::audit('document',$document_id,'approved',array('edition_id'=>(int)$edition['id'],'superseded_editions'=>(int)$superseded),$reviewer_id);
         return array('document_id'=>$doc['public_id'],'status'=>'published','version'=>(int)$doc['version']+1);
     }
@@ -202,13 +215,6 @@ final class PLDR_Rights {
         return PLDR_Core::emit($event,'document',(int)$doc['id'],array('document_id'=>$doc['public_id'],'status'=>$status,'reason'=>$reason));
     }
 
-    private static function after_document_status_change(array $doc,string $status,string $reason) {
-        $document_id=(int)$doc['id'];
-        $revoked=PLDR_Access::revoke_document($document_id,$reason);
-        if($revoked<0){PLDR_Core::audit('document',$document_id,'rights_status_revoke_reconciliation_required',array('status'=>$status,'reason'=>$reason));return PLDR_Core::machine_error('pldr_rights_revoke_reconcile','Rights state changed but prior grants could not be revoked; reconciliation is required.',503,array('committed'=>true));}
-        return true;
-    }
-
     private static function set_document_status(int $document_id,string $status,string $reason) {
         global $wpdb;
         if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_document_status_transaction','Document rights-state transaction could not be started.',500);
@@ -216,9 +222,8 @@ final class PLDR_Rights {
         if(is_wp_error($transition)){$wpdb->query('ROLLBACK');return $transition;}
         $status_event=self::queue_document_status_event($transition['document'],$status,$reason);
         if(is_wp_error($status_event)){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_rights_event_atomic','Document rights state was rolled back because its reliable event could not be persisted in the same transaction.',503,array('committed'=>false));}
+        if(PLDR_Access::revoke_document($document_id,$reason)<0){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_rights_revoke_atomic','Document rights-state transition was rolled back because prior delivery grants could not be revoked atomically.',503,array('committed'=>false));}
         if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_document_status_commit','Document rights-state transition could not be committed.',500);}
-        $after=self::after_document_status_change($transition['document'],$status,$reason);
-        if(is_wp_error($after))return $after;
         return true;
     }
 
@@ -280,7 +285,16 @@ final class PLDR_Book_Packs {
         return array('id'=>$id,'pack_key'=>$canonical['pack_key'],'version'=>$canonical['version'],'manifest_sha256'=>$manifest_hash,'status'=>'registered','immutable_version'=>true);
     }
 
-    public static function scan_bundled_manifests():void { $dir=PLDR_DIR.'book-packs'; if(!is_dir($dir))return; foreach(glob($dir.'/*.json')?:array() as $file){$raw=file_get_contents($file);$manifest=json_decode((string)$raw,true);if(is_array($manifest))self::register($manifest,0);} }
+    public static function scan_bundled_manifests():void {
+        $dir=PLDR_DIR.'book-packs';if(!is_dir($dir))return;
+        $files=glob($dir.'/*.json')?:array();
+        if(count($files)>100){PLDR_Core::audit('book_pack',0,'bundled_manifest_count_exceeded',array('count'=>count($files),'limit'=>100));$files=array_slice($files,0,100);}
+        foreach($files as $file){
+            $size=@filesize($file);if(false===$size||$size>1048576){PLDR_Core::audit('book_pack',0,'bundled_manifest_file_rejected',array('file'=>basename($file),'size'=>false===$size?null:(int)$size,'max_bytes'=>1048576));continue;}
+            $raw=file_get_contents($file);if(false===$raw)continue;
+            $manifest=json_decode((string)$raw,true);if(is_array($manifest))self::register($manifest,0);
+        }
+    }
 }
 
 final class PLDR_Integrations {

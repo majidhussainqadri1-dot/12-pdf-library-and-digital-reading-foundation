@@ -141,7 +141,7 @@ final class PLDR_REST {
         if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_reader_a11y_thumbnail_read','Reader accessibility preview state could not be read reliably.',503,array('degraded'=>true)));
         return array('title'=>$edition['title'],'author'=>$edition['author_name'],'language'=>$edition['language'],'pages'=>(int)$edition['pages'],'ocr_status'=>$ocr['status']??'unknown','ocr_quality'=>isset($ocr['quality_score'])?(float)$ocr['quality_score']:0,'ocr_language'=>$ocr['language']??$edition['language'],'thumbnail_pages'=>$thumbs,'screen_reader_fallback'=>$ocr&&'available'===$ocr['status']?'ocr-text':'document-metadata');
     }
-    public static function ocr_search(WP_REST_Request $request) { $result=PLDR_Search::ocr(absint($request['edition']),(string)$request['q'],get_current_user_id());if(isset($result['error'])&&is_wp_error($result['error']))return $result['error'];return rest_ensure_response(array('items'=>$result)); }
+    public static function ocr_search(WP_REST_Request $request) { $result=PLDR_Search::ocr(absint($request['edition']),(string)$request['q'],get_current_user_id(),(string)$request['cursor'],absint($request['limit']?:50));if(isset($result['error'])&&is_wp_error($result['error']))return $result['error'];return rest_ensure_response($result); }
     public static function save_progress(WP_REST_Request $request) { return self::idempotent($request,'reading-progress',static fn()=>PLDR_Reading::save_progress(absint($request['edition_id']),absint($request['page']))); }
     public static function reading_items(WP_REST_Request $request) {
         global $wpdb;
@@ -151,13 +151,17 @@ final class PLDR_REST {
         $allowed=PLDR_Access::can_access_edition($edition_id,'read',$uid);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_items_access_read','Private reading-item authorization state could not be verified reliably.',503,array('degraded'=>true));
         if(!$allowed)return PLDR_Core::machine_error('pldr_items_forbidden','Private reading items are unavailable.',403);
-        $limit=max(1,min(200,absint($request['limit']?:100)));$offset=max(0,min(100000,absint($request['offset'])));
-        $table=PLDR_Core::table('reading_items');
-        $wpdb->last_error='';
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM '.$table.' WHERE user_id=%d AND edition_id=%d ORDER BY page_number ASC,id ASC LIMIT %d OFFSET %d',$uid,$edition_id,$limit+1,$offset),ARRAY_A);
+        if(absint($request['offset'])>0)return PLDR_Core::machine_error('pldr_items_cursor_required','Offset pagination is not supported for private reading items; use the signed cursor returned by the previous page.',400);
+        $limit=max(1,min(200,absint($request['limit']?:100)));
+        $context=hash('sha256',$uid.'|'.$edition_id.'|reading-items-v1');
+        $after=self::decode_reading_items_cursor((string)$request['cursor'],$context);
+        if(is_wp_error($after))return $after;
+        $table=PLDR_Core::table('reading_items');$params=array($uid,$edition_id);$where='user_id=%d AND edition_id=%d';
+        if(!empty($after['id'])){$where.=' AND (page_number>%d OR (page_number=%d AND id>%d))';$params[]=(int)$after['page'];$params[]=(int)$after['page'];$params[]=(int)$after['id'];}
+        $params[]=$limit+1;$wpdb->last_error='';
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM '.$table.' WHERE '.$where.' ORDER BY page_number ASC,id ASC LIMIT %d',$params),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_items_read','Private reading items could not be read reliably.',503,array('degraded'=>true));
-        $rows=is_array($rows)?$rows:array();
-        $has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
+        $rows=is_array($rows)?$rows:array();$has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
         foreach($rows as &$row){
             $row['id']=(int)$row['id'];$row['page_number']=(int)$row['page_number'];$row['version']=(int)$row['version'];
             $tags=json_decode((string)$row['tags_json'],true);
@@ -167,24 +171,44 @@ final class PLDR_REST {
             }
             $row['tags']=$tags;unset($row['tags_json']);
         }unset($row);
-        return rest_ensure_response(array('items'=>$rows,'limit'=>$limit,'offset'=>$offset,'has_more'=>$has_more,'next_offset'=>$has_more?$offset+$limit:null));
+        $last=$rows?$rows[count($rows)-1]:null;
+        $next=$has_more&&is_array($last)?self::encode_reading_items_cursor((int)$last['page_number'],(int)$last['id'],$context):null;
+        return rest_ensure_response(array('items'=>$rows,'limit'=>$limit,'has_more'=>$has_more,'next_cursor'=>$next,'cursor_supported'=>true));
     }
+
+    private static function encode_reading_items_cursor(int $page,int $id,string $context):string {
+        $json=wp_json_encode(array('p'=>$page,'i'=>$id,'c'=>$context));if(!is_string($json))return '';
+        $payload=rtrim(strtr(base64_encode($json),'+/','-_'),'=');return $payload.'.'.hash_hmac('sha256',$payload,wp_salt('auth'));
+    }
+
+    private static function decode_reading_items_cursor(string $token,string $context) {
+        $token=trim($token);if(''===$token)return array('page'=>0,'id'=>0);
+        if(strlen($token)>600||1!==substr_count($token,'.'))return PLDR_Core::machine_error('pldr_items_cursor','Private reading-item cursor is malformed.',400);
+        [$payload,$sig]=explode('.',$token,2);$expected=hash_hmac('sha256',$payload,wp_salt('auth'));if(!hash_equals($expected,$sig))return PLDR_Core::machine_error('pldr_items_cursor','Private reading-item cursor signature is invalid.',400);
+        $padded=$payload.str_repeat('=',(4-strlen($payload)%4)%4);$raw=base64_decode(strtr($padded,'-_','+/'),true);$decoded=is_string($raw)?json_decode($raw,true):null;
+        if(!is_array($decoded)||!isset($decoded['p'],$decoded['i'],$decoded['c'])||!hash_equals($context,(string)$decoded['c'])||absint($decoded['i'])<1)return PLDR_Core::machine_error('pldr_items_cursor','Private reading-item cursor does not match this user/edition or is invalid.',400);
+        return array('page'=>absint($decoded['p']),'id'=>absint($decoded['i']));
+    }
+
     public static function add_reading_item(WP_REST_Request $request) { return self::idempotent($request,'reading-item',static fn()=>PLDR_Reading::add_item(absint($request['edition_id']),$request->get_json_params()?:$request->get_params())); }
 
-    private static function delete_reading_item_owned(int $item_id) {
+    private static function delete_reading_item_owned(int $item_id, int $expected_version) {
         global $wpdb;
         $user_id=get_current_user_id();
         if(!$user_id)return PLDR_Core::machine_error('pldr_item_login','Log in to delete a private reading item.',401);
         $wpdb->last_error='';
-        $row=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('reading_items').' WHERE id=%d AND user_id=%d',$item_id,$user_id),ARRAY_A);
+        $row=$wpdb->get_row($wpdb->prepare('SELECT id,version FROM '.PLDR_Core::table('reading_items').' WHERE id=%d AND user_id=%d',$item_id,$user_id),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_item_read','Private reading-item state could not be read reliably.',503,array('degraded'=>true));
         if(!$row)return PLDR_Core::machine_error('pldr_item_missing','Private reading item was not found.',404);
-        $deleted=$wpdb->delete(PLDR_Core::table('reading_items'),array('id'=>$item_id,'user_id'=>$user_id),array('%d','%d'));
-        if(1!==$deleted)return PLDR_Core::machine_error('pldr_item_delete','Private reading item could not be deleted.',500);
+        if($expected_version<1)return PLDR_Core::machine_error('pldr_item_precondition','Deleting a private reading item requires the exact expected item version.',428,array('current_version'=>(int)$row['version']));
+        if((int)$row['version']!==$expected_version)return PLDR_Core::machine_error('pldr_item_conflict','Private reading item changed; refresh before deleting.',409,array('current_version'=>(int)$row['version']));
+        $deleted=$wpdb->query($wpdb->prepare('DELETE FROM '.PLDR_Core::table('reading_items').' WHERE id=%d AND user_id=%d AND version=%d',$item_id,$user_id,$expected_version));
+        if(false===$deleted)return PLDR_Core::machine_error('pldr_item_delete','Private reading item could not be deleted.',500);
+        if(1!==$deleted)return PLDR_Core::machine_error('pldr_item_conflict','Private reading item changed concurrently; refresh before deleting.',409);
         return array('deleted'=>true,'id'=>$item_id);
     }
 
-    public static function delete_reading_item(WP_REST_Request $request) { return self::idempotent($request,'reading-item-delete',static fn()=>self::delete_reading_item_owned(absint($request['id']))); }
+    public static function delete_reading_item(WP_REST_Request $request) { return self::idempotent($request,'reading-item-delete',static fn()=>self::delete_reading_item_owned(absint($request['id']),absint($request['expected_version']))); }
     public static function citation(WP_REST_Request $request) { global $wpdb;$wpdb->last_error='';$edition=PLDR_Core::edition(absint($request['edition']));if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_edition_read','Citation edition state could not be read reliably.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$wpdb->last_error='';$allowed=PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id());if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_access_read','Citation authorization state could not be verified reliably.',503,array('degraded'=>true));if(!$allowed)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$page=absint($request['page']);if($page>(int)$edition['pages'])return PLDR_Core::machine_error('pldr_citation_page','Citation page is outside this document edition.',400,array('pages'=>(int)$edition['pages']));$style=sanitize_key((string)($request['style']?:'sabri'));return rest_ensure_response(array('citation'=>PLDR_Reader::citation($edition,$page,$style),'style'=>$style,'page'=>$page)); }
     public static function download_session(WP_REST_Request $request) {
         return self::idempotent($request,'download-session',static function() use($request){
@@ -198,7 +222,7 @@ final class PLDR_REST {
     }
     public static function rights_case(WP_REST_Request $request) { global $wpdb;$doc=PLDR_Core::document_by_public_id(sanitize_text_field((string)$request['document_id']));if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_case_document_read','Rights-report document state could not be read reliably.',503,array('degraded'=>true));if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);return self::idempotent($request,'rights-case',static fn()=>PLDR_Rights::file_case((int)$doc['id'],(string)$request['reason'],(array)($request['evidence']?:array()))); }
     public static function rights_decision(WP_REST_Request $request) { return self::idempotent($request,'rights-decision',static fn()=>PLDR_Rights::decide(absint($request['id']),(string)$request['decision'],(string)$request['note'],0,absint($request['expected_version']))); }
-    public static function rights_appeal(WP_REST_Request $request) { return self::idempotent($request,'rights-appeal',static fn()=>PLDR_Rights::appeal(absint($request['id']),(string)$request['reason'],(array)($request['evidence']?:array()))); }
+    public static function rights_appeal(WP_REST_Request $request) { return self::idempotent($request,'rights-appeal',static fn()=>PLDR_Rights::appeal(absint($request['id']),(string)$request['reason'],(array)($request['evidence']?:array()),0,absint($request['expected_version']))); }
     public static function book_pack(WP_REST_Request $request) { return self::idempotent($request,'book-pack',static fn()=>PLDR_Book_Packs::register($request->get_json_params()?:$request->get_params())); }
     public static function health(WP_REST_Request $request) { return rest_ensure_response(PLDR_Health::report()); }
     public static function repair(WP_REST_Request $request) { return self::idempotent($request,'repair',static fn()=>PLDR_Health::repair(sanitize_key((string)$request['operation']))); }

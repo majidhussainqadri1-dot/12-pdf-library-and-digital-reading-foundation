@@ -9,11 +9,19 @@ final class PLDR_Ingest {
         if (!$actor_id || !PLDR_Core::authorize('publish', 0, $actor_id)) {
             return PLDR_Core::machine_error('pldr_forbidden', 'You are not authorized to submit File 12 documents.', 403);
         }
-        $existing_doc = null;
+        $existing_doc = null;$current_policy=null;$expected_document_version=0;
         if (!empty($data['document_public_id'])) {
+            $wpdb->last_error='';
             $existing_doc = PLDR_Core::document_by_public_id(sanitize_text_field((string)$data['document_public_id']));
+            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_document_family_read','The target canonical document family could not be read reliably.',503,array('degraded'=>true));
             if (!$existing_doc) return PLDR_Core::machine_error('pldr_document_family_missing','The target canonical document family was not found.',404);
             if (!PLDR_Core::authorize('publish',(int)$existing_doc['id'],$actor_id) && !PLDR_Core::authorize('manage',(int)$existing_doc['id'],$actor_id)) return PLDR_Core::machine_error('pldr_document_family_forbidden','You cannot add an edition to this canonical document family.',403);
+            $expected_document_version=absint($data['expected_document_version']??0);
+            if($expected_document_version<1)return PLDR_Core::machine_error('pldr_document_family_precondition','Adding an edition to an existing document family requires the exact expected document version.',428,array('current_version'=>(int)$existing_doc['version']));
+            if((int)$existing_doc['version']!==$expected_document_version)return PLDR_Core::machine_error('pldr_document_family_conflict','The canonical document family changed; refresh before adding an edition.',409,array('current_version'=>(int)$existing_doc['version']));
+            $wpdb->last_error='';$current_policy=PLDR_Core::policy((int)$existing_doc['id']);
+            if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_document_family_policy_read','The current document access policy could not be read reliably.',503,array('degraded'=>true));
+            if(!$current_policy)return PLDR_Core::machine_error('pldr_document_family_policy_missing','The existing document family has no current access policy.',503,array('degraded'=>true));
         }
 
         $required = array('title', 'document_type', 'category', 'language', 'author_name', 'source_name', 'rights_basis', 'access_mode');
@@ -48,6 +56,10 @@ final class PLDR_Ingest {
         if (!in_array($access_mode, $allowed_access, true)) {
             return PLDR_Core::machine_error('pldr_access_mode', 'Invalid access policy audience.', 400);
         }
+        try{
+            $requested_rights_expires=self::date_or_null($data['rights_expires_at']??'','rights_expires_at');
+            $requested_embargo=self::date_or_null($data['embargo_until']??'','embargo_until');
+        }catch(InvalidArgumentException $e){return PLDR_Core::machine_error('pldr_ingest_date',$e->getMessage(),400);}
 
         if (empty($files['pdf']['tmp_name']) || !is_uploaded_file($files['pdf']['tmp_name'])) {
             return PLDR_Core::machine_error('pldr_pdf_missing', 'A verified HTTP-uploaded PDF is required.', 400);
@@ -84,6 +96,13 @@ final class PLDR_Ingest {
         if (is_wp_error($scan)) {
             return $scan;
         }
+        $edition_status = self::publish_status($actor_id, $scan, $rights_basis);
+        if($existing_doc&&'published'!==$edition_status){
+            $requested_entitlement=sanitize_text_field((string)($data['entitlement_key']??$current_policy['entitlement_key']));
+            $canonical_changed=(string)$existing_doc['title']!==sanitize_text_field((string)$data['title'])||(string)$existing_doc['document_type']!==$type||(string)$existing_doc['category']!==$category||(string)$existing_doc['language']!==sanitize_text_field((string)$data['language']);
+            $policy_changed=(string)$current_policy['audience']!==$access_mode||(string)$current_policy['entitlement_key']!==$requested_entitlement||(int)$current_policy['download_allowed']!==(empty($data['download_allowed'])?0:1)||(int)$current_policy['print_allowed']!==(empty($data['print_allowed'])?0:1)||(int)$current_policy['offline_allowed']!==(empty($data['offline_allowed'])?0:1)||(string)($current_policy['embargo_until']??'')!==(string)($requested_embargo??'');
+            if($canonical_changed||$policy_changed)return PLDR_Core::machine_error('pldr_pending_edition_canonical_change','A pending edition cannot silently change the live document family or access policy. Keep canonical fields unchanged, or publish through the governed approval/policy workflow.',409,array('canonical_changed'=>$canonical_changed,'policy_changed'=>$policy_changed));
+        }
 
         $allocation = PLDR_Storage::allocate('pldr');
         if (!empty($allocation['error'])) {
@@ -109,8 +128,7 @@ final class PLDR_Ingest {
         $subjects = PLDR_Core::sanitize_json_list($data['subjects'] ?? array());
         $collections = PLDR_Core::sanitize_json_list($data['collections'] ?? array());
         $public_id = $existing_doc ? (string)$existing_doc['public_id'] : PLDR_Core::uuid();
-        $edition_status = self::publish_status($actor_id, $scan, $rights_basis);
-        $document_status = $existing_doc ? (string)$existing_doc['status'] : $edition_status;
+        $document_status = $existing_doc ? ('published'===$edition_status?'published':(string)$existing_doc['status']) : $edition_status;
         $object_id = 0;
         $document_id = $existing_doc ? (int)$existing_doc['id'] : 0;
         $edition_id = 0;
@@ -148,12 +166,12 @@ final class PLDR_Ingest {
                 ));
                 if(false===$ok) throw new RuntimeException('Document record could not be saved.');
                 $document_id=(int)$wpdb->insert_id;
-            } else {
-                $ok=$wpdb->update(PLDR_Core::table('documents'),array('title'=>$title,'slug'=>sanitize_title((string)($data['slug']??$title)),'document_type'=>$type,'category'=>$category,'language'=>$language,'subjects_json'=>wp_json_encode($subjects),'collections_json'=>wp_json_encode($collections),'search_text'=>$search_text,'access_mode'=>$access_mode,'updated_at'=>PLDR_Core::now()),array('id'=>$document_id));
-                if(false===$ok) throw new RuntimeException('Canonical document family metadata could not be updated.');
+            } elseif('published'===$edition_status) {
+                $ok=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET title=%s,slug=%s,document_type=%s,category=%s,language=%s,subjects_json=%s,collections_json=%s,search_text=%s,access_mode=%s,status=%s,version=version+1,updated_at=%s WHERE id=%d AND version=%d',$title,sanitize_title((string)($data['slug']??$title)),$type,$category,$language,wp_json_encode($subjects),wp_json_encode($collections),$search_text,$access_mode,'published',PLDR_Core::now(),$document_id,$expected_document_version));
+                if(1!==$ok) throw new RuntimeException('Canonical document family changed concurrently; the edition ingest was rolled back.');
             }
 
-            $expires = self::date_or_null($data['rights_expires_at'] ?? '');
+            $expires = $requested_rights_expires;
             $year = absint($data['publication_year'] ?? 0);
             if ($year && ($year < 1000 || $year > ((int) gmdate('Y') + 1))) {
                 throw new RuntimeException('Publication year is outside the accepted range.');
@@ -163,6 +181,19 @@ final class PLDR_Ingest {
                 throw new RuntimeException('A valid positive page count is required.');
             }
             $isbn = preg_replace('/[^0-9Xx-]/', '', (string) ($data['isbn'] ?? '')) ?: '';
+            $supersedes=null;
+            if($existing_doc){
+                if(!empty($data['supersedes_edition_id'])){
+                    $wpdb->last_error='';$supersedes_row=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('editions').' WHERE id=%d AND document_id=%d',absint($data['supersedes_edition_id']),$document_id),ARRAY_A);
+                    if(''!==(string)$wpdb->last_error)throw new RuntimeException('Superseded-edition lineage could not be verified reliably.');
+                    if(!$supersedes_row)throw new RuntimeException('The supplied superseded edition does not belong to this canonical document family.');
+                    $supersedes=(int)$supersedes_row['id'];
+                }else{
+                    $wpdb->last_error='';$previous=PLDR_Core::current_edition($document_id);
+                    if(''!==(string)$wpdb->last_error)throw new RuntimeException('Current edition lineage could not be read reliably.');
+                    $supersedes=$previous?(int)$previous['id']:null;
+                }
+            }
             $ok = $wpdb->insert(PLDR_Core::table('editions'), array(
                 'document_id' => $document_id,
                 'edition_label' => sanitize_text_field((string) ($data['edition_label'] ?? '')),
@@ -182,7 +213,7 @@ final class PLDR_Ingest {
                 'sha256' => $sha256,
                 'object_id' => $object_id,
                 'status' => $edition_status,
-                'supersedes_edition_id' => !empty($data['supersedes_edition_id']) ? absint($data['supersedes_edition_id']) : ($existing_doc && ($previous=PLDR_Core::current_edition($document_id)) ? (int)$previous['id'] : null),
+                'supersedes_edition_id' => $supersedes,
                 'version' => 1,
                 'created_at' => PLDR_Core::now(),
                 'updated_at' => PLDR_Core::now(),
@@ -190,25 +221,26 @@ final class PLDR_Ingest {
             if (false === $ok) throw new RuntimeException('Edition record could not be saved.');
             $edition_id = (int) $wpdb->insert_id;
 
-            $ok = $wpdb->insert(PLDR_Core::table('access_policies'), array(
-                'document_id' => $document_id,
-                'audience' => $access_mode,
-                'entitlement_key' => sanitize_text_field((string) ($data['entitlement_key'] ?? '')),
-                'download_allowed' => empty($data['download_allowed']) ? 0 : 1,
-                'print_allowed' => empty($data['print_allowed']) ? 0 : 1,
-                'offline_allowed' => empty($data['offline_allowed']) ? 0 : 1,
-                'embargo_until' => self::date_or_null($data['embargo_until'] ?? ''),
-                'version' => $existing_doc ? ((int)(PLDR_Core::policy($document_id)['version'] ?? 0) + 1) : 1,
-                'created_at' => PLDR_Core::now(),
-                'updated_at' => PLDR_Core::now(),
-            ));
-            if (false === $ok) throw new RuntimeException('Access policy could not be saved.');
+            if(!$existing_doc||'published'===$edition_status){
+                $policy_version=$existing_doc?((int)$current_policy['version']+1):1;
+                $ok = $wpdb->insert(PLDR_Core::table('access_policies'), array(
+                    'document_id' => $document_id,
+                    'audience' => $access_mode,
+                    'entitlement_key' => sanitize_text_field((string) ($data['entitlement_key'] ?? '')),
+                    'download_allowed' => empty($data['download_allowed']) ? 0 : 1,
+                    'print_allowed' => empty($data['print_allowed']) ? 0 : 1,
+                    'offline_allowed' => empty($data['offline_allowed']) ? 0 : 1,
+                    'embargo_until' => $requested_embargo,
+                    'version' => $policy_version,
+                    'created_at' => PLDR_Core::now(),
+                    'updated_at' => PLDR_Core::now(),
+                ));
+                if (false === $ok) throw new RuntimeException('Access policy could not be saved.');
+            }
 
             if ($existing_doc && 'published' === $edition_status) {
                 $superseded=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,updated_at=%s WHERE document_id=%d AND id<>%d AND status=%s','superseded',PLDR_Core::now(),$document_id,$edition_id,'published'));
                 if(false===$superseded)throw new RuntimeException('Existing published editions could not be superseded.');
-                $published=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d','published',PLDR_Core::now(),$document_id));
-                if(false===$published)throw new RuntimeException('Canonical document publication state could not be updated.');
                 $document_status='published';
             }
 
@@ -235,6 +267,7 @@ final class PLDR_Ingest {
             if ('published' === $edition_status) {
                 $published_event=PLDR_Core::emit('PDFDocumentPublished.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id));
                 if(is_wp_error($published_event))throw new RuntimeException('Reliable publication event could not be persisted atomically.');
+                if($existing_doc&&PLDR_Access::revoke_document($document_id,'edition-publication-change')<0)throw new RuntimeException('Prior delivery grants could not be revoked atomically for the newly published edition.');
             }
             if(false===$wpdb->query('COMMIT'))throw new RuntimeException('PDF ingest transaction could not be committed atomically.');
         } catch (Throwable $e) {
@@ -326,15 +359,18 @@ final class PLDR_Ingest {
         global $wpdb;
         $isbn = preg_replace('/[^0-9Xx]/', '', (string) ($data['isbn'] ?? '')) ?: '';
         if ($isbn) {
+            $wpdb->last_error='';
             $row = $wpdb->get_row($wpdb->prepare(
                 'SELECT e.id,d.public_id,d.title FROM ' . PLDR_Core::table('editions') . ' e INNER JOIN ' . PLDR_Core::table('documents') . ' d ON d.id=e.document_id WHERE REPLACE(e.isbn,\'-\',\'\')=%s LIMIT 1',
                 strtoupper($isbn)
             ), ARRAY_A);
+            if(''!==(string)$wpdb->last_error)return null;
             if ($row) return $row;
         }
         $needle = PLDR_Core::normalize_search((string) $data['title'] . ' ' . (string) $data['author_name']);
         $needle_length = function_exists('mb_strlen') ? mb_strlen($needle, 'UTF-8') : strlen($needle);
         if ($needle_length < 6) return null;
+        $wpdb->last_error='';
         $row = $wpdb->get_row($wpdb->prepare(
             'SELECT public_id,title FROM ' . PLDR_Core::table('documents') . ' WHERE search_text LIKE %s LIMIT 1',
             '%' . $wpdb->esc_like($needle) . '%'
@@ -369,22 +405,24 @@ final class PLDR_Ingest {
         global $wpdb;
         $actor_id=$actor_id?:get_current_user_id();
         if(!PLDR_Core::authorize('repair',$document_id,$actor_id)&&!PLDR_Core::authorize('rights',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_rescan_forbidden','Document rescan authority is required.',403);
-        $edition=PLDR_Core::current_edition($document_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_edition_read','Current edition state could not be read reliably for rescan.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_rescan_edition','Current edition is missing.',404);
-        $object=PLDR_Core::object((int)$edition['object_id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_object_read','Document object state could not be read reliably for rescan.',503,array('degraded'=>true));if(!$object||'available'!==$object['object_status'])return PLDR_Core::machine_error('pldr_rescan_object','Document object is unavailable.',409);
+        $wpdb->last_error='';$edition=PLDR_Core::current_edition($document_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_edition_read','Current edition state could not be read reliably for rescan.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_rescan_edition','Current edition is missing.',404);
+        $wpdb->last_error='';$object=PLDR_Core::object((int)$edition['object_id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_object_read','Document object state could not be read reliably for rescan.',503,array('degraded'=>true));if(!$object||'available'!==$object['object_status'])return PLDR_Core::machine_error('pldr_rescan_object','Document object is unavailable.',409);
         $path=PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);if(is_wp_error($path))return $path;
         $plain=PLDR_Storage::temp('rescan');if(is_wp_error($plain))return $plain;$error='';
         if(!PLDR_Crypto::decrypt_to_file($path,$plain,$error)){PLDR_Storage::delete($plain);return PLDR_Core::machine_error('pldr_rescan_decrypt',$error?:'Document could not be decrypted for scanning.',500);}
         $scan=self::scan_file($plain,array('filename'=>$object['original_name']));PLDR_Storage::delete($plain);
         if(is_wp_error($scan)){
-            $quarantined=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET scan_status=%s,object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s','quarantined','quarantined',PLDR_Core::now(),(int)$object['id'],'available'));
-            if(1!==$quarantined)return PLDR_Core::machine_error('pldr_rescan_quarantine_reconcile','Scanner failure occurred but object quarantine could not be persisted reliably; reconciliation is required.',503,array('scanner_error'=>$scan->get_error_code()));
-            if(PLDR_Access::revoke_document($document_id,'rescan-quarantine')<0)return PLDR_Core::machine_error('pldr_rescan_revoke_reconcile','Object was quarantined after rescan failure but delivery grants could not be revoked; reconciliation is required.',503,array('committed'=>true));
+            if(false===$wpdb->query('START TRANSACTION'))return PLDR_Core::machine_error('pldr_rescan_quarantine_transaction','Scanner failure occurred but the quarantine transaction could not be started.',500);
+            $quarantined=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET scan_status=%s,object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s AND storage_name=%s AND key_id=%s AND sha256=%s AND encrypted_sha256=%s','quarantined','quarantined',PLDR_Core::now(),(int)$object['id'],'available',(string)$object['storage_name'],(string)$object['key_id'],(string)$object['sha256'],(string)$object['encrypted_sha256']));
+            if(1!==$quarantined){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_rescan_quarantine_reconcile','Scanner failure occurred but the exact sampled object could not be quarantined atomically; reconciliation is required.',503,array('scanner_error'=>$scan->get_error_code()));}
+            if(PLDR_Access::revoke_document($document_id,'rescan-quarantine')<0){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_rescan_revoke_atomic','Object quarantine was rolled back because delivery grants could not be revoked atomically.',503,array('committed'=>false));}
+            if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_rescan_quarantine_commit','Object quarantine and grant revocation could not be committed atomically.',500);}
             return $scan;
         }
         $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET scan_status=%s,verified_at=%s WHERE id=%d AND object_status=%s',$scan['status'],PLDR_Core::now(),(int)$object['id'],'available'));
         if(1!==$updated)return PLDR_Core::machine_error('pldr_rescan_store','Verified rescan state could not be persisted reliably.',500);
         if('clean'===$scan['status']){
-            $doc=PLDR_Core::document($document_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_document_read','Document state could not be read reliably after clean rescan.',503,array('degraded'=>true));
+            $wpdb->last_error='';$doc=PLDR_Core::document($document_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_document_read','Document state could not be read reliably after clean rescan.',503,array('degraded'=>true));
             if($doc&&'scan'===$doc['status']){
                 $transitioned=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d AND status=%s AND version=%d','rights_review',PLDR_Core::now(),$document_id,'scan',(int)$doc['version']));
                 if(1!==$transitioned)return PLDR_Core::machine_error('pldr_rescan_document_conflict','Rescan was stored but document state changed concurrently before rights review transition.',409,array('committed_scan'=>true));
@@ -394,10 +432,13 @@ final class PLDR_Ingest {
         return array('document_id'=>$document_id,'scan'=>$scan);
     }
 
-    private static function date_or_null($value): ?string {
-        if (!$value) return null;
-        $timestamp = strtotime((string) $value);
-        return $timestamp ? gmdate('Y-m-d H:i:s', $timestamp) : null;
+    private static function date_or_null($value,string $field='date'): ?string {
+        if(null===$value||''===trim((string)$value))return null;
+        $raw=trim((string)$value);
+        if(!preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?(?:Z|[+\-]\d{2}:\d{2})?)?$/',$raw))throw new InvalidArgumentException($field.' must be an explicit ISO-style date/time.');
+        $timestamp=strtotime($raw);
+        if(false===$timestamp)throw new InvalidArgumentException($field.' could not be parsed safely.');
+        return gmdate('Y-m-d H:i:s',$timestamp);
     }
 
     private static function store_cover(int $edition_id, array $cover, string $language, int $actor_id) {

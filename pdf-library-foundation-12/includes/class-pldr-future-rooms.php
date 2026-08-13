@@ -45,6 +45,18 @@ final class PLDR_Future_Rooms {
             if(false===$pending)return PLDR_Core::machine_error('pldr_room_pending_store','Reading-room provider state could not be persisted; reconciliation is required.',500,array('room_key'=>$room_key));
             return PLDR_Core::machine_error('pldr_room_provider','No approved reading-room provider accepted the request; the local context remains pending.',503,array('room_key'=>$room_key,'degraded'=>true));
         }
+        $wpdb->last_error='';
+        $still_allowed=PLDR_Access::can_access_edition($edition_id,'read',$uid);
+        $access_read_failed=''!==(string)$wpdb->last_error;
+        if($access_read_failed||!$still_allowed){
+            $reason=$access_read_failed?'post-provider-access-read-failed':'post-provider-access-revoked';
+            $state=$wpdb->update(PLDR_Core::table('room_contexts'),array('status'=>'provider-error','updated_at'=>PLDR_Core::now()),array('room_key'=>$room_key,'created_by'=>$uid,'status'=>'pending-provider'));
+            if(false===$state)PLDR_Core::audit('room_context',$context_id,'post_provider_access_state_persist_failed',array('room_key'=>$room_key,'reason'=>$reason),$uid);
+            $compensation_failed=false;
+            try{do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,$reason);}catch(Throwable $e){$compensation_failed=true;PLDR_Core::audit('room_context',$context_id,'provider_compensation_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_ref'=>$provider_ref,'reason'=>$reason),$uid);}
+            if($access_read_failed)return PLDR_Core::machine_error('pldr_room_access_recheck','Reading-room access could not be revalidated after the provider call; provider compensation was requested and activation was denied.',503,array('room_key'=>$room_key,'degraded'=>true,'compensation_failed'=>$compensation_failed));
+            return PLDR_Core::machine_error('pldr_room_access_revoked','Document access changed while the reading room was being created; provider compensation was requested and activation was denied.',403,array('room_key'=>$room_key,'compensation_failed'=>$compensation_failed));
+        }
         if(false===$wpdb->query('START TRANSACTION')){
             try{do_action('pldr_reading_room_provider_compensate',$provider_ref,$uid,$context,'local-transaction-start-failed');}catch(Throwable $e){PLDR_Core::audit('room_context',$context_id,'provider_compensation_failed',array('edition_id'=>$edition_id,'room_key'=>$room_key,'provider_ref'=>$provider_ref),$uid);}
             return PLDR_Core::machine_error('pldr_room_transaction','Reading-room finalization transaction could not be started; provider compensation was requested.',500,array('room_key'=>$room_key));

@@ -158,6 +158,16 @@ final class PLDR_Privacy {
             });
         }
 
+        $idempotency_exists=self::table_exists('idempotency');
+        if(self::table_check_failed())return self::export_failure($data,'idempotency_table',$user_id);
+        if($idempotency_exists){
+            $table=PLDR_Core::table('idempotency');$wpdb->last_error='';
+            $rows=$wpdb->get_results($wpdb->prepare("SELECT route,key_hash,response_json,status_code,expires_at,created_at FROM {$table} WHERE actor_id=%d ORDER BY created_at ASC,route ASC LIMIT %d OFFSET %d",$user_id,$limit,$offset),ARRAY_A);
+            if(''!==(string)$wpdb->last_error)return self::export_failure($data,'idempotency',$user_id);
+            $rows=is_array($rows)?$rows:array();$counts[]=count($rows);
+            foreach($rows as $idx=>$row){$data[]=array('group_id'=>'pldr-idempotency','group_label'=>__('PDF Library mutation replay records','pdf-library-digital-reading'),'item_id'=>'pldr-idempotency-'.sanitize_key((string)$page.'-'.(string)$idx.'-'.substr((string)$row['key_hash'],0,12)),'data'=>array(array('name'=>'Route','value'=>(string)$row['route']),array('name'=>'Request key hash','value'=>(string)$row['key_hash']),array('name'=>'Stored response','value'=>(string)$row['response_json']),array('name'=>'Status code','value'=>(int)$row['status_code']),array('name'=>'Expires','value'=>(string)$row['expires_at']),array('name'=>'Created','value'=>(string)$row['created_at'])));}
+        }
+
         $shelf_items_exists=self::table_exists('shelf_items');
         if(self::table_check_failed())return self::export_failure($data,'shelf_items_table',$user_id);
         $shelves_exists=self::table_exists('shelves');
@@ -253,6 +263,7 @@ final class PLDR_Privacy {
             array('reading_events','user_id','id'),
             array('session_handoffs','user_id','direct'),
             array('room_contexts','created_by','id'),
+            array('idempotency','actor_id','direct'),
         ) as $spec) {
             $result = 'id' === $spec[2]
                 ? self::erase_id_batch($spec[0], $spec[1], $user_id)
@@ -310,7 +321,7 @@ final class PLDR_Privacy {
         $remaining = 0;
         foreach (array(
             array('reading_items','user_id'), array('reading_state','user_id'), array('access_tokens','user_id'), array('future_prefs','user_id'), array('shelves','user_id'),
-            array('reading_events','user_id'), array('session_handoffs','user_id'), array('room_contexts','created_by')
+            array('reading_events','user_id'), array('session_handoffs','user_id'), array('room_contexts','created_by'), array('idempotency','actor_id')
         ) as $spec) {
             $exists=self::table_exists($spec[0]);
             if(self::table_check_failed()){$errors[]=$spec[0];continue;}

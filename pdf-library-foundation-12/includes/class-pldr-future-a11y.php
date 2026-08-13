@@ -34,7 +34,7 @@ final class PLDR_Future_A11y {
         if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_a11y_derivative_read','Accessibility derivative evidence could not be read reliably; no score was projected.',503,array('degraded'=>true)));
         if($thumbs>0)$score+=5;else$findings[]='Page preview derivatives are unavailable.';
         $provider='heuristic';$provider_failure=false;$provider_input_total=0;
-        if($can_refresh){
+        if($refresh){
             try {$external=apply_filters('pldr_accessibility_inspect',null,$edition_id,$edition);} catch (Throwable $e) {
                 $external=null;$provider_failure=true;$findings[]='External accessibility inspection provider failed; local heuristic assessment remains available.';
                 PLDR_Core::audit('edition',$edition_id,'accessibility_provider_failed',array('document_id'=>$document_id,'error'=>self::limit($e->getMessage(),500)));
@@ -48,7 +48,7 @@ final class PLDR_Future_A11y {
         $findings=array_values(array_unique(array_slice($findings,0,self::PROVIDER_FINDINGS_LIMIT+10)));
         $status=$score>=90?'excellent':($score>=75?'good':($score>=50?'partial':'needs-remediation'));
         $report=array('edition_id'=>$edition_id,'score'=>round($score,2),'status'=>$status,'findings'=>$findings,'provider'=>$provider,'provider_failure'=>$provider_failure,'provider_findings_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT,'verified'=>false,'verified_at'=>null,'public_badge_allowed'=>false,'ocr_pages_assessed'=>$ocr_pages,'ocr_average_quality'=>round($ocr_avg,2),'persisted'=>false);
-        if(!$can_refresh)return $report;
+        if(!$refresh)return $report;
         $finding_json=wp_json_encode($findings);if(!is_string($finding_json))return array('error'=>PLDR_Core::machine_error('pldr_a11y_encode','Accessibility assessment could not be encoded.',500));
         $stored=$wpdb->replace(PLDR_Core::table('a11y_audits'),array('edition_id'=>$edition_id,'score'=>$score,'status'=>$status,'findings_json'=>$finding_json,'provider'=>$provider,'verified_by'=>0,'verified_at'=>null,'updated_at'=>PLDR_Core::now()));
         if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_a11y_store','Accessibility assessment could not be stored.',500));
