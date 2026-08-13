@@ -1,34 +1,33 @@
-# File 12 Status — R22 Final Twenty-Round Review Candidate — 1.1.0-rc.1
+# File 12 Status — R23 Final Twenty-Round Review Candidate — 1.1.0-rc.2
 
 | Gate | Status |
 |---|---|
-| Governing source | Central Master Plan v3.0 + File 12 Future-24 amended plan |
-| R22 baseline | `89cb5cdd6fbcb21b9e4f7e6947ce032c646212b3` — exact green R21 head |
-| R22 numbered review | **20/20 complete** under complete-review → post-review batch-fix → retest discipline |
-| First-ten defect rounds | **2, 3, 4, 6, 7** |
-| Final defect rounds | **2, 3, 4, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20** |
-| Final clean rounds | **1, 5, 8, 9, 10** |
-| R22 review record | `docs/TWENTY-ROUND-REVIEW-2026-08-13-R22.md` |
-| R22 permanent regression | `tests/test-twenty-round-review-r22.php` |
-| Exact final R22 automated QA | **Pending exact-head GitHub Actions; report GREEN only from the final unchanged branch HEAD** |
-| Software candidate | `1.1.0-rc.1` |
+| Governing source | Central Master Plan v3.0 + File 12 PDF Library/Digital Reading plan + approved Future-24 expansion |
+| R23 baseline | `f65f86144bbdb6a851e33e9087cb17774aaf9f98` — exact green R22 candidate |
+| R23 numbered review | **20/20 complete** under complete-review → post-review batch-fix → retest discipline |
+| First-ten defect rounds | **1, 2, 3, 4, 6** |
+| Final defect rounds | **1, 2, 3, 4, 6, 13, 15, 19, 20** |
+| Final clean rounds | **5, 7, 8, 9, 10, 11, 12, 14, 16, 17, 18** |
+| R23 review record | `docs/TWENTY-ROUND-REVIEW-2026-08-13-R23.md` |
+| R23 permanent regression | `tests/test-twenty-round-review-r23.php` |
+| Software candidate | `1.1.0-rc.2` |
 | Repository DB contract | `1.1.0` |
-| Forward schema-correction revision | `2026-08-13-r20-17`, physically revalidated rather than marker-only |
+| Exact final R23 automated QA | **Pending exact-head GitHub Actions; report GREEN only from the final unchanged branch HEAD** |
 | Hostinger staging | **Not verified by repository evidence** |
 | Live deployed version | **Unverified** |
 | Deployed DB/schema version | **Unverified** |
 | Migration state on deployed site | **Unverified** |
 | Operational/live verification | **Not claimed** |
 
-## R22 final repository review result
+## R23 final repository review result
 
-R22 performed twenty fresh numbered reviews from the exact green R21 baseline. Every round was completed in full before that round's complete defect ledger was corrected; no mid-review patching was used. The first-ten defect checkpoint is **2, 3, 4, 6, 7**. The final defect rounds are **2, 3, 4, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20**; the clean rounds are **1, 5, 8, 9, 10**.
+R23 performed twenty fresh numbered reviews from the exact green R22 baseline. Every numbered review was completed in full before that round's complete defect ledger was corrected; no mid-review patching was used.
 
-R22 hardened protected REST/Future mutation preauthorization and replay cleanup, Patient Case provider privacy gates, cover malware scanning, crypto temporary-file cleanup and permissions, rights appeals, reading-progress optimistic concurrency, legacy rescan quarantine, complete outbox event contracts, generic Future/IIIF unavailable states, offline grant ordering, bounded Smart Shelves with item enumeration, provider error minimization, accessibility/reduced-motion/error recovery, canonical operational repairs and cleanup, plus final cross-cutting denial/exception idempotency safety.
+Principal hardening: governed `/library/manage/` routing; safe database/schema diagnostics; strict signed-delivery HTTP method and suffix-range behavior; fail-closed cover malware state; expired-rights restore protection; transient 5xx idempotency retry safety; offline-vault purge on login/logout surfaces; bounded catalog scan work; and release identity/regression traceability.
 
 ## Exact-head evidence rule
 
-This status intentionally does not claim an automated-green final HEAD before that exact run exists. The branch HEAD produced by the final R22 source/review/test/status commit must run the complete quality gate unchanged. If that exact run is green, its head SHA, run ID and deterministic artifact may be reported externally without another repository commit; otherwise R22 reopens and the failed gate must be corrected/retested.
+The final branch HEAD must run the complete canonical quality gate unchanged. Only that exact run may establish Automated-QA Green and the deterministic package digest. If the exact-head run fails, R23 reopens and the failure must be corrected and retested before any green claim.
 
 ## Production-truth boundary
 
