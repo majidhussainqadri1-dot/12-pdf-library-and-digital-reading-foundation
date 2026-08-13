@@ -239,7 +239,7 @@ final class PLDR_Core {
     public static function current_edition(int $document_id): ?array {
         global $wpdb;
         $wpdb->last_error='';
-        $row = $wpdb->get_row($wpdb->prepare('SELECT e.* FROM '.self::table('editions').' e WHERE e.document_id=%d AND e.status=%s ORDER BY e.id DESC LIMIT 1',$document_id,'published'),ARRAY_A);
+        $row=$wpdb->get_row($wpdb->prepare('SELECT e.* FROM '.self::table('editions').' e WHERE e.document_id=%d AND e.status=%s ORDER BY e.id DESC LIMIT 1',$document_id,'published'),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return null;
         if(!$row){
             $wpdb->last_error='';
@@ -436,38 +436,8 @@ final class PLDR_Core {
         global $wpdb;
         if(''===$key)return true;
         [$route,$hash]=self::idempotency_identity($route,$key);
-        $deleted=$wpdb->delete(self::table('idempotency'),array('actor_id'=>$actor_id,'route'=>$route,'key_hash'=>$hash,'status_code'=>0),array('%d','%s','%s','%d'));
+        $deleted=$wpdb->query($wpdb->prepare('DELETE FROM '.self::table('idempotency').' WHERE actor_id=%d AND route=%s AND key_hash=%s AND status_code=0',$actor_id,$route,$hash));
         return false!==$deleted;
-    }
-
-    public static function idempotency_lookup(string $route, string $key, int $actor_id): ?array {
-        global $wpdb;
-        if ('' === $key) return null;
-        [$route,$hash]=self::idempotency_identity($route,$key);
-        $row = $wpdb->get_row($wpdb->prepare('SELECT response_json,status_code FROM ' . self::table('idempotency') . ' WHERE actor_id=%d AND route=%s AND key_hash=%s AND expires_at>%s AND status_code>0 LIMIT 1',$actor_id,$route,$hash,self::now()), ARRAY_A);
-        if (!$row) return null;
-        $stored=json_decode((string)$row['response_json'],true);
-        $body=is_array($stored)&&array_key_exists('response',$stored)?$stored['response']:$stored;
-        return array('body' => $body, 'status' => (int) $row['status_code']);
-    }
-
-    public static function idempotency_store(string $route, string $key, int $actor_id, $body, int $status = 200): bool {
-        global $wpdb;
-        if ('' === $key) return true;
-        [$route,$hash]=self::idempotency_identity($route,$key);
-        $json=wp_json_encode($body);
-        if(false===$json)return false;
-        $expires = gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS);
-        $stored=$wpdb->replace(self::table('idempotency'),array(
-            'actor_id' => $actor_id,
-            'route' => $route,
-            'key_hash' => $hash,
-            'response_json' => $json,
-            'status_code' => max(100,min(599,$status)),
-            'expires_at' => $expires,
-            'created_at' => self::now(),
-        ),array('%d','%s','%s','%s','%d','%s','%s'));
-        return false!==$stored;
     }
 
     public static function route_url(string $route, array $args = array()): string {
@@ -475,6 +445,7 @@ final class PLDR_Core {
         if ('document' === $route && !empty($args['id'])) return home_url('/library/document/' . rawurlencode((string) $args['id']) . '/' . rawurlencode((string) ($args['slug'] ?? 'document')) . '/');
         if ('read' === $route && !empty($args['id'])) return home_url('/library/read/' . rawurlencode((string) $args['id']) . '/');
         if ('reading' === $route) return home_url('/account/reading/');
+        if ('manage' === $route) return home_url('/library/manage/');
         return $base;
     }
 }
