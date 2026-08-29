@@ -1,24 +1,54 @@
 # File 12 — PDF Library and Digital Reading
 
-This branch contains the **new-plan implementation candidate** for Sabri Social Homeopathy Platform File 12. It supersedes the earlier 0.2.0 corrective candidate as the forward source candidate while preserving the earlier Git history and provenance.
+This branch contains the **File 12 Future Digital Reading Intelligence 24 candidate** for the Sabri Social Homeopathy Platform. It is built on the plan-complete `1.0.0-rc.1` candidate and adds the Founder-approved 24 advanced PDF-library and scholarly-reading enhancements without transferring canonical ownership from companion files.
 
 ## Candidate identity
 
-- Software: `1.0.0-rc.1`
-- Database schema: `1.0.0`
-- Contract: `1.0.0`
+- Software: `1.1.0-rc.1`
+- Database schema: `1.1.0`
+- Contract: `1.1.0`
+- Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
 - Canonical install folder: `pdf-library-foundation-12/`
 - WordPress slug/text domain: `pdf-library-digital-reading`
 - PHP namespace prefix: `PLDR_`
 
-## Implemented plan scope
+## Core plan scope
 
-The candidate implements the File 12 catalog and bibliographic domain, private encrypted objects, governed ingest, malware/OCR adapter gates, edition/hash dedupe, audience/access policy, short-lived bound delivery grants, authenticated HTTP Range delivery, a responsive accessible reader, progress/bookmarks/private notes/highlight notes, citations, lawful OCR search, rights/takedown/appeal lifecycle, preservation/integrity checks, versioned Book Content Packs, reliable outbox integration, privacy export/erasure, safe repair, legacy File 12 migration, and the rights-aware download manager.
+The candidate retains File 12 canonical catalog/bibliographic ownership, private encrypted PDF objects, governed ingest, malware/OCR provider gates, editions and dedupe, versioned audience/access policy, short-lived bound delivery grants, authenticated HTTP Range delivery, the responsive accessible reader, private progress/bookmarks/notes/highlights, citations, lawful OCR search, rights/takedown/appeal lifecycle, preservation/integrity, versioned Book Content Packs, outbox integration, privacy export/erasure, safe repair, legacy migration, and rights-aware download manager.
 
-The implementation consumes File 00 identity/entitlement authority and integrates through versioned hooks with Files 01, 05, 06, 16, 19, 20, 21 and 25 without creating parallel ownership.
+## Future Digital Reading Intelligence 24
+
+1. Advanced Reflow Reading Mode.
+2. Read Aloud / Text-to-Speech Reader.
+3. Smart Table of Contents & Outline Recovery.
+4. Edition Comparison Laboratory.
+5. Precise Scholarly Anchors.
+6. Citation Export Center.
+7. Global Bibliographic Authority Enrichment.
+8. OCR Quality Laboratory.
+9. Portable W3C-style Annotation import/export boundary.
+10. IIIF Presentation interoperability.
+11. Inside-Book Search Heatmap.
+12. Encrypted Offline Reading Vault.
+13. Ultra-Low-Bandwidth / text-first mode.
+14. Multiple Reading Layouts.
+15. Personal Smart Shelves.
+16. Private Reading Insights — non-gamified.
+17. Cross-Device Reading Session Handoff.
+18. Accessibility Quality Inspector.
+19. Scholarly Reading Rooms through companion communication contracts.
+20. Knowledge Context Sidebar through canonical knowledge/learning providers.
+21. AI-Ready Corpus Manifest with entitlement and corpus allowlist gates.
+22. Translation & Transliteration derived overlay.
+23. Digital Preservation Laboratory.
+24. Visual Duplicate & Scan-Fingerprint Detection with no automatic edition merge.
+
+## Ownership boundary
+
+File 12 owns document/edition/reader state and the new advanced reading metadata that belongs to those documents. File 00 remains identity/entitlement authority; File 05 owns courses/lessons; File 06 owns canonical encyclopedia truth; File 16 owns AI output; communication/discussion remains with its native owner; File 20 owns global shell/navigation; File 25 owns global visual-system presentation. Context/room/AI features use adapters and manifests rather than duplicate backends.
 
 ## Truthful release boundary
 
-This repository candidate is **not automatically a live-site claim**. Production completion requires Hostinger staging evidence for fresh install and supported upgrade/migration, real key backup/restore/decrypt, an actual malware scanner, storage placement, large-file/range/weak-connection behavior, roles/IDOR/privacy/rights workflows, companion integrations, responsive/RTL/accessibility/browser checks, deterministic package verification, backup/rollback rehearsal, Founder acceptance, deployment, and live re-test.
+This repository candidate is **not automatically a live-site claim**. Production completion still requires Hostinger staging evidence for fresh install and supported upgrade/migration, real key backup/restore/decrypt, malware/OCR and optional authority/translation providers, private storage, large-file/range/weak-connection/offline-vault behavior, roles/IDOR/privacy/rights workflows, companion integrations, responsive/RTL/accessibility/browser testing, deterministic package verification, backup/rollback rehearsal, Founder acceptance, deployment, and live re-test/parity.
 
-See `docs/STAGING-ACCEPTANCE.md` and `STATUS.md`.
+See `docs/FUTURE-24.md`, `docs/STAGING-ACCEPTANCE.md`, `docs/TRACEABILITY.md`, and `STATUS.md`.

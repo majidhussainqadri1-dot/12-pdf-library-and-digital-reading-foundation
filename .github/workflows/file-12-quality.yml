@@ -1,4 +1,4 @@
-name: File 12 New-Plan Quality Gate
+name: File 12 Future-24 Quality Gate
 
 on:
   pull_request:
@@ -26,8 +26,46 @@ jobs:
         run: find pdf-library-foundation-12 tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Authenticated crypto/range/tamper test
         run: php -d zend.assertions=1 -d assert.exception=1 tests/test-crypto.php
-      - name: New-plan contract scan
+      - name: Core governing-plan contract scan
         run: php tests/test-plan-contract.php
+      - name: Future Digital Reading Intelligence 24 contract scan
+        run: php tests/test-future-24-contract.php
+      - name: First fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review.php
+      - name: Second fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r2.php
+      - name: Third fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r3.php
+      - name: Fourth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r4.php
+      - name: Fifth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r5.php
+      - name: Sixth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r6.php
+      - name: Seventh fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r7.php
+      - name: Eighth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r8.php
+      - name: Ninth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r9.php
+      - name: Tenth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r10.php
+      - name: Eleventh fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r11.php
+      - name: Twelfth fresh ten-round corrective-review regressions
+        run: php tests/test-ten-round-review-r12.php
+      - name: Thirteenth fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r13.php
+      - name: Fourteenth fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r14.php
+      - name: Fifteenth fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r15.php
+      - name: Sixteenth fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r16.php
+      - name: Seventeenth fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r17.php
+      - name: Eighteenth fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r18.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
@@ -42,21 +80,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: JavaScript syntax
-        run: node --check pdf-library-foundation-12/assets/reader.js
-      - name: Verify committed checksums
-        run: sha256sum --check CHECKSUMS.sha256
-      - name: Build deterministic install ZIP
+      - name: JavaScript syntax — core and Future-24
+        run: find pdf-library-foundation-12/assets -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Exact candidate version markers
+        run: |
+          grep -F "Version: 1.1.0-rc.1" pdf-library-foundation-12/pdf-library-digital-reading.php
+          grep -F "define('PLDR_DB_VERSION', '1.1.0')" pdf-library-foundation-12/pdf-library-digital-reading.php
+          grep -F "F12-FUT-024" pdf-library-foundation-12/includes/class-pldr-future.php
+      - name: Build deterministic install ZIP and source checksums
         run: |
           rm -rf build dist
           mkdir -p build dist
+          LC_ALL=C find pdf-library-foundation-12 -type f -print0 | sort -z | xargs -0 -n1 sha256sum > dist/SOURCE-SHA256SUMS
           cp -a pdf-library-foundation-12 build/
           find build/pdf-library-foundation-12 -exec touch -t 202601010000 {} +
-          (cd build && find pdf-library-foundation-12 -type f -print | LC_ALL=C sort | zip -X -q ../dist/12-pdf-library-and-digital-reading-1.0.0-rc.1.zip -@)
-          sha256sum dist/12-pdf-library-and-digital-reading-1.0.0-rc.1.zip | tee dist/SHA256SUMS
-          unzip -t dist/12-pdf-library-and-digital-reading-1.0.0-rc.1.zip
+          (cd build && find pdf-library-foundation-12 -type f -print | LC_ALL=C sort | zip -X -q ../dist/12-pdf-library-and-digital-reading-1.1.0-rc.1.zip -@)
+          sha256sum dist/12-pdf-library-and-digital-reading-1.1.0-rc.1.zip | tee dist/SHA256SUMS
+          unzip -t dist/12-pdf-library-and-digital-reading-1.1.0-rc.1.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: file-12-pdf-library-1.0.0-rc.1
+          name: file-12-pdf-library-1.1.0-rc.1
           path: dist/
           if-no-files-found: error

@@ -3,6 +3,9 @@
 defined('ABSPATH') || exit;
 
 final class PLDR_Schema {
+    private const MIGRATION_LOCK_OPTION = 'pldr_migration_lock';
+    private const MIGRATION_LOCK_TTL = 300;
+
     public static function activate(): void {
         self::install_caps();
         self::upgrade();
@@ -34,15 +37,51 @@ final class PLDR_Schema {
         }
     }
 
+    private static function acquire_migration_lock(): ?string {
+        global $wpdb;
+        $token = self::uuid_lock_token();
+        $payload = wp_json_encode(array('token'=>$token,'acquired_at'=>time()));
+        if (!is_string($payload) || '' === $payload) return null;
+        if (add_option(self::MIGRATION_LOCK_OPTION, $payload, '', false)) return $payload;
+
+        $wpdb->last_error='';
+        $row = $wpdb->get_var($wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name=%s LIMIT 1",
+            self::MIGRATION_LOCK_OPTION
+        ));
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'migration_lock_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return null;}
+        if (!is_string($row) || '' === $row) return null;
+        $decoded = json_decode($row, true);
+        $acquired_at = is_array($decoded) ? absint($decoded['acquired_at'] ?? 0) : absint($row);
+        if ($acquired_at && (time() - $acquired_at) < self::MIGRATION_LOCK_TTL) return null;
+
+        $updated = $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->options} SET option_value=%s WHERE option_name=%s AND option_value=%s",
+            $payload, self::MIGRATION_LOCK_OPTION, $row
+        ));
+        if (1 !== $updated) { if(false===$updated||''!==(string)$wpdb->last_error)PLDR_Core::audit('system',0,'migration_lock_takeover_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500))); return null; }
+        wp_cache_delete(self::MIGRATION_LOCK_OPTION, 'options');
+        return $payload;
+    }
+
+    private static function release_migration_lock(string $payload): void {
+        global $wpdb;
+        $released=$wpdb->query($wpdb->prepare(
+            "DELETE FROM {$wpdb->options} WHERE option_name=%s AND option_value=%s",
+            self::MIGRATION_LOCK_OPTION, $payload
+        ));
+        if(false===$released)PLDR_Core::audit('system',0,'migration_lock_release_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
+        wp_cache_delete(self::MIGRATION_LOCK_OPTION, 'options');
+    }
+
+    private static function uuid_lock_token(): string {
+        return function_exists('wp_generate_uuid4') ? wp_generate_uuid4() : PLDR_Core::uuid();
+    }
+
     public static function upgrade(): bool {
         global $wpdb;
-        if (!add_option('pldr_migration_lock', (string) time(), '', false)) {
-            $lock = absint(get_option('pldr_migration_lock', 0));
-            if ($lock && (time() - $lock) < 300) {
-                return false;
-            }
-            update_option('pldr_migration_lock', (string) time(), false);
-        }
+        $lock_payload = self::acquire_migration_lock();
+        if (null === $lock_payload) return false;
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         $charset = $wpdb->get_charset_collate();
@@ -314,15 +353,54 @@ final class PLDR_Schema {
         ) $charset;";
 
         foreach ($sql as $statement) dbDelta($statement);
-        $required_tables=array('documents','editions','objects','access_policies','reading_state','reading_items','rights_cases','derivatives','ocr_text','access_tokens','outbox','audit','book_packs','idempotency');
-        $missing=array();
-        foreach($required_tables as $suffix){$table=PLDR_Core::table($suffix);if($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table))!==$table)$missing[]=$suffix;}
-        if($missing){update_option('pldr_schema_error',array('missing'=>$missing,'last_error'=>(string)$wpdb->last_error,'at'=>PLDR_Core::now()),false);delete_option('pldr_migration_lock');return false;}
+        $required_schema = array(
+            'documents'=>array('columns'=>array('id','public_id','status','access_mode','version','updated_at'),'indexes'=>array('PRIMARY','public_id','status_type')),
+            'editions'=>array('columns'=>array('id','document_id','pages','sha256','object_id','status','version'),'indexes'=>array('PRIMARY','document_id','sha256')),
+            'objects'=>array('columns'=>array('id','storage_name','sha256','encrypted_sha256','key_id','scan_status','object_status'),'indexes'=>array('PRIMARY','storage_name','object_status')),
+            'access_policies'=>array('columns'=>array('id','document_id','audience','entitlement_key','download_allowed','offline_allowed','version'),'indexes'=>array('PRIMARY','document_version')),
+            'reading_state'=>array('columns'=>array('user_id','edition_id','last_page','percent','edition_version'),'indexes'=>array('PRIMARY','edition_id')),
+            'reading_items'=>array('columns'=>array('id','user_id','edition_id','item_type','page_number','version'),'indexes'=>array('PRIMARY','user_edition')),
+            'rights_cases'=>array('columns'=>array('id','case_key','document_id','reporter_id','state','version'),'indexes'=>array('PRIMARY','case_key','document_state')),
+            'derivatives'=>array('columns'=>array('id','edition_id','derivative_type','page_number','object_id','status'),'indexes'=>array('PRIMARY','edition_type_page')),
+            'ocr_text'=>array('columns'=>array('edition_id','page_number','quality_score','text_content','normalized_text'),'indexes'=>array('PRIMARY')),
+            'access_tokens'=>array('columns'=>array('id','token_hash','user_id','edition_id','object_id','operation','expires_at','revoked_at','used_count','max_uses'),'indexes'=>array('PRIMARY','token_hash','edition_operation')),
+            'outbox'=>array('columns'=>array('id','event_id','event_name','status','attempts','available_at','sent_at'),'indexes'=>array('PRIMARY','event_id','dispatch')),
+            'audit'=>array('columns'=>array('id','trace_id','object_type','object_id','action','actor_id','created_at'),'indexes'=>array('PRIMARY','object_lookup')),
+            'book_packs'=>array('columns'=>array('id','pack_key','pack_version','manifest_sha256','status'),'indexes'=>array('PRIMARY','pack_version')),
+            'idempotency'=>array('columns'=>array('actor_id','route','key_hash','response_json','status_code','expires_at'),'indexes'=>array('PRIMARY','expires_at')),
+        );
+        $missing_tables=array();$missing_columns=array();$missing_indexes=array();$read_errors=array();
+        foreach($required_schema as $suffix=>$spec){
+            $table=PLDR_Core::table($suffix);$wpdb->last_error='';
+            $exists=$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table));
+            if(''!==(string)$wpdb->last_error){$read_errors[]=$suffix.'.table';continue;}
+            if($exists!==$table){$missing_tables[]=$suffix;continue;}
+            $safe='`'.str_replace('`','',$table).'`';$wpdb->last_error='';
+            $columns=$wpdb->get_col("SHOW COLUMNS FROM {$safe}");
+            if(''!==(string)$wpdb->last_error){$read_errors[]=$suffix.'.columns';continue;}
+            $wpdb->last_error='';$indexes=$wpdb->get_col("SHOW INDEX FROM {$safe}",2);
+            if(''!==(string)$wpdb->last_error){$read_errors[]=$suffix.'.indexes';continue;}
+            $columns=is_array($columns)?$columns:array();$indexes=is_array($indexes)?$indexes:array();
+            foreach($spec['columns'] as $column)if(!in_array($column,$columns,true))$missing_columns[]=$suffix.'.'.$column;
+            foreach($spec['indexes'] as $index)if(!in_array($index,$indexes,true))$missing_indexes[]=$suffix.'.'.$index;
+        }
+        if($read_errors||$missing_tables||$missing_columns||$missing_indexes){
+            update_option('pldr_schema_error',array(
+                'read_errors'=>$read_errors,
+                'missing_tables'=>$missing_tables,
+                'missing_columns'=>$missing_columns,
+                'missing_indexes'=>$missing_indexes,
+                'last_error'=>(string)$wpdb->last_error,
+                'at'=>PLDR_Core::now(),
+            ),false);
+            self::release_migration_lock($lock_payload);
+            return false;
+        }
         delete_option('pldr_schema_error');
 
         update_option('pldr_db_version', PLDR_DB_VERSION, false);
         update_option('pldr_contract_version', PLDR_CONTRACT_VERSION, false);
-        delete_option('pldr_migration_lock');
+        self::release_migration_lock($lock_payload);
 
         if (self::legacy_present()) {
             update_option('pldr_legacy_migration_state', array('status' => 'pending', 'offset' => 0, 'started_at' => PLDR_Core::now()), false);
@@ -347,49 +425,81 @@ final class PLDR_Schema {
 
     private static function legacy_present(): bool {
         global $wpdb;
+        $wpdb->last_error='';
         $count = (int) $wpdb->get_var("SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_type='spl_document'");
+        if(''!==(string)$wpdb->last_error){
+            update_option('pldr_legacy_migration_state',array('status'=>'error','phase'=>'legacy-presence-read','last_error'=>substr((string)$wpdb->last_error,0,500),'updated_at'=>PLDR_Core::now()),false);
+            PLDR_Core::audit('migration',0,'legacy_presence_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));
+            if(!wp_next_scheduled('pldr_legacy_migration'))wp_schedule_single_event(time()+60,'pldr_legacy_migration');
+            return false;
+        }
         return $count > 0;
     }
 
     public static function migrate_legacy_batch(): void {
         $state = (array) get_option('pldr_legacy_migration_state', array());
-        if ('complete' === ($state['status'] ?? '')) {
-            return;
-        }
+        if ('complete' === ($state['status'] ?? '')) return;
         global $wpdb;
         $offset = absint($state['offset'] ?? 0);
+        $wpdb->last_error='';
         $ids = $wpdb->get_col($wpdb->prepare("SELECT ID FROM {$wpdb->posts} WHERE post_type='spl_document' ORDER BY ID ASC LIMIT 25 OFFSET %d", $offset));
+        if(''!==(string)$wpdb->last_error){
+            $state['status']='retry';$state['last_error']='legacy-batch-read';$state['updated_at']=PLDR_Core::now();
+            update_option('pldr_legacy_migration_state',$state,false);
+            PLDR_Core::audit('migration',0,'legacy_batch_read_failed',array('offset'=>$offset,'db_error'=>substr((string)$wpdb->last_error,0,500)));
+            wp_schedule_single_event(time()+60,'pldr_legacy_migration');
+            return;
+        }
+        $ids=is_array($ids)?$ids:array();
         if (!$ids) {
             $state['status'] = 'complete';
             $state['completed_at'] = PLDR_Core::now();
-            update_option('pldr_legacy_migration_state', $state, false);
-            PLDR_Core::emit('PDFLibraryLegacyMigrationCompleted.v1', 'migration', 0, array('source' => 'SPL-0.2.0'));
+            unset($state['last_error']);
+            if(false===$wpdb->query('START TRANSACTION')){
+                PLDR_Core::audit('migration',0,'legacy_completion_transaction_failed',array());
+                return;
+            }
+            if(!update_option('pldr_legacy_migration_state', $state, false)){
+                $confirmed=(array)get_option('pldr_legacy_migration_state',array());
+                if(($confirmed['status']??'')!=='complete'){$wpdb->query('ROLLBACK');wp_cache_delete('pldr_legacy_migration_state','options');PLDR_Core::audit('migration',0,'legacy_completion_state_failed',array());return;}
+            }
+            $event=PLDR_Core::emit('PDFLibraryLegacyMigrationCompleted.v1', 'migration', 0, array('source' => 'SPL-0.2.0'));
+            if(is_wp_error($event)){$wpdb->query('ROLLBACK');wp_cache_delete('pldr_legacy_migration_state','options');PLDR_Core::audit('migration',0,'legacy_completion_event_atomic_rollback',array());return;}
+            if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');wp_cache_delete('pldr_legacy_migration_state','options');PLDR_Core::audit('migration',0,'legacy_completion_commit_failed',array());return;}
             return;
         }
 
+        $failed=false;
         foreach ($ids as $legacy_id) {
-            self::migrate_one_legacy((int) $legacy_id);
+            if(!self::migrate_one_legacy((int)$legacy_id)){$failed=true;break;}
             $offset++;
         }
-        $state['status'] = 'running';
+        $state['status'] = $failed ? 'retry' : 'running';
         $state['offset'] = $offset;
         $state['updated_at'] = PLDR_Core::now();
+        if($failed)$state['last_error']='legacy-item-failed';else unset($state['last_error']);
         update_option('pldr_legacy_migration_state', $state, false);
-        wp_schedule_single_event(time() + 5, 'pldr_legacy_migration');
+        wp_schedule_single_event(time() + ($failed?60:5), 'pldr_legacy_migration');
     }
 
-    private static function migrate_one_legacy(int $legacy_id): void {
+    private static function migrate_one_legacy(int $legacy_id): bool {
         global $wpdb;
+        $wpdb->last_error='';
         $already = $wpdb->get_var($wpdb->prepare(
             'SELECT id FROM ' . PLDR_Core::table('documents') . ' WHERE search_text LIKE %s LIMIT 1',
             '%legacy:' . $legacy_id . '%'
         ));
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('migration',$legacy_id,'legacy_existing_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return false;}
         if ($already) {
-            return;
+            $edition=PLDR_Core::latest_edition((int)$already);
+            if(!$edition){PLDR_Core::audit('migration',$legacy_id,'legacy_existing_edition_missing',array('document_id'=>(int)$already));return false;}
+            if(!self::migrate_legacy_user_data($legacy_id,(int)$edition['id'])||!self::migrate_legacy_reports($legacy_id,(int)$already)){PLDR_Core::audit('migration',$legacy_id,'legacy_existing_reconciliation_failed',array('document_id'=>(int)$already));return false;}
+            return true;
         }
         $post = get_post($legacy_id);
         if (!$post) {
-            return;
+            PLDR_Core::audit('migration',$legacy_id,'legacy_source_post_missing',array());
+            return true;
         }
         $storage = (string) get_post_meta($legacy_id, '_spl_storage_name', true);
         $sha = strtolower((string)get_post_meta($legacy_id,'_spl_sha256',true));
@@ -405,9 +515,9 @@ final class PLDR_Schema {
         $type_terms=get_the_terms($legacy_id,'spl_document_type'); if(is_array($type_terms)&&!empty($type_terms[0]->slug)&&isset(PLDR_Core::DOCUMENT_TYPES[$type_terms[0]->slug])) $legacy_type=$type_terms[0]->slug;
         $cat_terms=get_the_terms($legacy_id,'spl_category'); if(is_array($cat_terms)&&!empty($cat_terms[0]->slug)&&isset(PLDR_Core::CATEGORIES[$cat_terms[0]->slug])) $legacy_category=$cat_terms[0]->slug;
 
-        $wpdb->query('START TRANSACTION');
+        if(false===$wpdb->query('START TRANSACTION')){PLDR_Core::audit('migration',$legacy_id,'legacy_transaction_start_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return false;}
         try {
-            $wpdb->insert(PLDR_Core::table('objects'), array(
+            $object_stored=$wpdb->insert(PLDR_Core::table('objects'), array(
                 'storage_name' => $storage ?: ('legacy-missing-' . $legacy_id),
                 'storage_scope' => 'spl',
                 'original_name' => (string) get_post_meta($legacy_id, '_spl_original_name', true),
@@ -421,11 +531,11 @@ final class PLDR_Schema {
                 'object_status' => $storage ? 'available' : 'quarantined',
                 'created_at' => PLDR_Core::now(),
             ));
-            $object_id = (int) $wpdb->insert_id;
+            if(false===$object_stored||($object_id=(int)$wpdb->insert_id)<1)throw new RuntimeException('Legacy object record could not be stored.');
             $title = (string) $post->post_title;
             $public_id = PLDR_Core::uuid();
             $search = PLDR_Core::normalize_search($title . ' ' . get_post_meta($legacy_id, '_spl_author_name', true)) . ' legacy:' . $legacy_id;
-            $wpdb->insert(PLDR_Core::table('documents'), array(
+            $document_stored=$wpdb->insert(PLDR_Core::table('documents'), array(
                 'public_id' => $public_id,
                 'title' => $title,
                 'slug' => sanitize_title($post->post_name ?: $title),
@@ -442,8 +552,8 @@ final class PLDR_Schema {
                 'created_at' => PLDR_Core::now(),
                 'updated_at' => PLDR_Core::now(),
             ));
-            $document_id = (int) $wpdb->insert_id;
-            $wpdb->insert(PLDR_Core::table('editions'), array(
+            if(false===$document_stored||($document_id=(int)$wpdb->insert_id)<1)throw new RuntimeException('Legacy document record could not be stored.');
+            $edition_stored=$wpdb->insert(PLDR_Core::table('editions'), array(
                 'document_id' => $document_id,
                 'edition_label' => (string) get_post_meta($legacy_id, '_spl_edition', true),
                 'isbn' => (string) get_post_meta($legacy_id, '_spl_isbn', true),
@@ -466,9 +576,9 @@ final class PLDR_Schema {
                 'created_at' => PLDR_Core::now(),
                 'updated_at' => PLDR_Core::now(),
             ));
+            if(false===$edition_stored||($edition_id=(int)$wpdb->insert_id)<1)throw new RuntimeException('Legacy edition record could not be stored.');
             $download = '1' === (string) get_post_meta($legacy_id, '_spl_download_allowed', true) ? 1 : 0;
-            $edition_id = (int)$wpdb->insert_id;
-            $wpdb->insert(PLDR_Core::table('access_policies'), array(
+            $policy_stored=$wpdb->insert(PLDR_Core::table('access_policies'), array(
                 'document_id' => $document_id,
                 'audience' => 'public',
                 'entitlement_key' => '',
@@ -479,32 +589,43 @@ final class PLDR_Schema {
                 'created_at' => PLDR_Core::now(),
                 'updated_at' => PLDR_Core::now(),
             ));
-            $wpdb->query('COMMIT');
-            self::migrate_legacy_user_data($legacy_id,$edition_id);
-            self::migrate_legacy_reports($legacy_id,$document_id);
-            PLDR_Core::emit('PDFLegacyInteractionMigrationRequested.v1','document',$document_id,array('legacy_document_id'=>$legacy_id,'document_public_id'=>$public_id));
+            if(false===$policy_stored)throw new RuntimeException('Legacy access policy could not be stored.');
+            if(!self::migrate_legacy_user_data($legacy_id,$edition_id))throw new RuntimeException('Legacy private reading data could not be reconciled.');
+            if(!self::migrate_legacy_reports($legacy_id,$document_id))throw new RuntimeException('Legacy report data could not be reconciled.');
+            $migration_event=PLDR_Core::emit('PDFLegacyInteractionMigrationRequested.v1','document',$document_id,array('legacy_document_id'=>$legacy_id,'document_public_id'=>$public_id));
+            if(is_wp_error($migration_event))throw new RuntimeException('Legacy migration reliable event could not be persisted atomically.');
+            if(false===$wpdb->query('COMMIT'))throw new RuntimeException('Legacy migration transaction could not be committed.');
             PLDR_Core::audit('document', $document_id, 'legacy_imported', array('legacy_id' => $legacy_id,'edition_id'=>$edition_id));
+            return true;
         } catch (Throwable $e) {
             $wpdb->query('ROLLBACK');
-            PLDR_Core::audit('migration', $legacy_id, 'legacy_import_failed', array('error' => $e->getMessage()));
+            PLDR_Core::audit('migration', $legacy_id, 'legacy_import_failed', array('error' => substr($e->getMessage(),0,500)));
+            return false;
         }
     }
 
-    private static function migrate_legacy_user_data(int $legacy_id,int $edition_id): void {
-        global $wpdb; $table=$wpdb->prefix.'spl_user_data';
-        if($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table))!==$table)return;
-        $rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE document_id=%d ORDER BY id ASC",$legacy_id),ARRAY_A);
+    private static function migrate_legacy_user_data(int $legacy_id,int $edition_id): bool {
+        global $wpdb;$table=$wpdb->prefix.'spl_user_data';
+        $wpdb->last_error='';$exists=$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table));
+        if(''!==(string)$wpdb->last_error)return false;if($exists!==$table)return true;
+        $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE document_id=%d ORDER BY id ASC LIMIT 5001",$legacy_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return false;$rows=is_array($rows)?$rows:array();if(count($rows)>5000)return false;
         foreach($rows as $r){$uid=absint($r['user_id']??0);if(!$uid)continue;$type=(string)($r['data_type']??'');$page=max(1,absint($r['page_number']??$r['progress']??1));
-            if('progress'===$type){$wpdb->replace(PLDR_Core::table('reading_state'),array('user_id'=>$uid,'edition_id'=>$edition_id,'last_page'=>$page,'percent'=>0,'edition_version'=>1,'updated_at'=>(string)($r['updated_at']??PLDR_Core::now())));}
-            elseif(in_array($type,array('bookmark','note'),true)){$wpdb->insert(PLDR_Core::table('reading_items'),array('user_id'=>$uid,'edition_id'=>$edition_id,'item_type'=>$type,'page_number'=>$page,'anchor_text'=>'','note_text'=>(string)($r['note']??''),'tags_json'=>'[]','version'=>1,'created_at'=>(string)($r['updated_at']??PLDR_Core::now()),'updated_at'=>(string)($r['updated_at']??PLDR_Core::now())));}
+            if('progress'===$type){$stored=$wpdb->replace(PLDR_Core::table('reading_state'),array('user_id'=>$uid,'edition_id'=>$edition_id,'last_page'=>$page,'percent'=>0,'edition_version'=>1,'updated_at'=>(string)($r['updated_at']??PLDR_Core::now())));if(false===$stored)return false;}
+            elseif(in_array($type,array('bookmark','note'),true)){$legacy_row=absint($r['id']??0);$tag='legacy-spl-user-data-'.$legacy_row;$wpdb->last_error='';$existing=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('reading_items').' WHERE user_id=%d AND edition_id=%d AND tags_json LIKE %s LIMIT 1',$uid,$edition_id,'%'.$wpdb->esc_like($tag).'%'));if(''!==(string)$wpdb->last_error)return false;if($existing)continue;$stored=$wpdb->insert(PLDR_Core::table('reading_items'),array('user_id'=>$uid,'edition_id'=>$edition_id,'item_type'=>$type,'page_number'=>$page,'anchor_text'=>'','note_text'=>(string)($r['note']??''),'tags_json'=>wp_json_encode(array($tag)),'version'=>1,'created_at'=>(string)($r['updated_at']??PLDR_Core::now()),'updated_at'=>(string)($r['updated_at']??PLDR_Core::now())));if(false===$stored)return false;}
         }
+        return true;
     }
 
-    private static function migrate_legacy_reports(int $legacy_id,int $document_id): void {
-        global $wpdb; $table=$wpdb->prefix.'spl_reports';
-        if($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table))!==$table)return;
-        $rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE document_id=%d ORDER BY id ASC",$legacy_id),ARRAY_A);
-        foreach($rows as $r){$reason=sanitize_key((string)($r['reason']??'other'));$state=in_array((string)($r['status']??''),array('resolved','dismissed'),true)?'closed':'reported';$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>PLDR_Core::uuid(),'document_id'=>$document_id,'reporter_id'=>absint($r['user_id']??0),'parent_case_id'=>null,'state'=>$state,'reason'=>$reason?:'other','evidence_json'=>wp_json_encode(array('legacy_report_id'=>absint($r['id']??0),'details'=>sanitize_textarea_field((string)($r['details']??'')))),'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>(string)($r['created_at']??PLDR_Core::now()),'updated_at'=>(string)($r['updated_at']??PLDR_Core::now()),'closed_at'=>'closed'===$state?(string)($r['updated_at']??PLDR_Core::now()):null));}
+    private static function migrate_legacy_reports(int $legacy_id,int $document_id): bool {
+        global $wpdb;$table=$wpdb->prefix.'spl_reports';
+        $wpdb->last_error='';$exists=$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table));
+        if(''!==(string)$wpdb->last_error)return false;if($exists!==$table)return true;
+        $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE document_id=%d ORDER BY id ASC LIMIT 5001",$legacy_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return false;$rows=is_array($rows)?$rows:array();if(count($rows)>5000)return false;
+        foreach($rows as $r){$legacy_report_id=absint($r['id']??0);$wpdb->last_error='';$existing=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('rights_cases').' WHERE document_id=%d AND evidence_json LIKE %s LIMIT 1',$document_id,'%'.$wpdb->esc_like('"legacy_report_id":'.$legacy_report_id).'%'));if(''!==(string)$wpdb->last_error)return false;if($existing)continue;$reason=sanitize_key((string)($r['reason']??'other'));$state=in_array((string)($r['status']??''),array('resolved','dismissed'),true)?'closed':'reported';$evidence=wp_json_encode(array('legacy_report_id'=>$legacy_report_id,'details'=>sanitize_textarea_field((string)($r['details']??''))));if(!is_string($evidence))return false;$stored=$wpdb->insert(PLDR_Core::table('rights_cases'),array('case_key'=>PLDR_Core::uuid(),'document_id'=>$document_id,'reporter_id'=>absint($r['user_id']??0),'parent_case_id'=>null,'state'=>$state,'reason'=>$reason?:'other','evidence_json'=>$evidence,'decision_note'=>'','assigned_to'=>0,'version'=>1,'created_at'=>(string)($r['created_at']??PLDR_Core::now()),'updated_at'=>(string)($r['updated_at']??PLDR_Core::now()),'closed_at'=>'closed'===$state?(string)($r['updated_at']??PLDR_Core::now()):null));if(false===$stored)return false;}
+        return true;
     }
+
 
 }

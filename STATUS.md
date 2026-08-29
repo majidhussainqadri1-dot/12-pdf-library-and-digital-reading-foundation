@@ -1,30 +1,33 @@
-# File 12 Status — 1.0.0-rc.1
+# File 12 Status — 1.1.0-rc.1 Future Digital Reading Intelligence 24
 
 | Gate | Status |
 |---|---|
-| New central + File 12 plan reconciliation | Complete in candidate scope |
-| Coded | **Candidate complete** |
-| Deterministic package | **GitHub Actions build + ZIP integrity gate green** |
-| Static / automated QA | **GitHub Actions green on the exact candidate HEAD after each source/status change** |
-| PHP compatibility QA | **PHP 8.1 / 8.3 / 8.4 green** |
-| Cryptographic range/tamper QA | **Green** |
-| New-plan contract + secret scan | **Green** |
-| Independent Review/Fix Round 1 | Completed; defects corrected |
-| Independent Review/Fix Round 2 | Completed; defects corrected |
+| New central + File 12 governing plan reconciliation | Complete in candidate scope |
+| Founder-approved Future-24 change request | **Implemented in source candidate** |
+| F12-FUT-001 through F12-FUT-024 | **Present in code/contracts** |
+| Coded | **Candidate complete; exact-head CI must be green before merge** |
+| Deterministic package | Built by GitHub Actions after final source changes |
+| Static / automated QA | Pending the final exact-head run for this Future-24 branch |
+| PHP compatibility QA | PHP 8.1 / 8.3 / 8.4 CI matrix configured |
+| JavaScript syntax QA | Base + all Future-24 reader scripts included in CI |
+| Cryptographic range/tamper QA | Retained from core gate |
+| Future-24 contract regression gate | Added |
+| Independent Review/Fix Round 1 | Future-24 review pending final CI evidence record |
+| Independent Review/Fix Round 2 | Future-24 review pending final CI evidence record |
 | Hostinger staging | **Pending** |
 | Live deployed | **Not claimed** |
 | Operational | **Not claimed** |
 
-## External/runtime acceptance dependencies
+## Future-24 runtime dependencies and degraded modes
 
-The code deliberately fails or degrades safely when required runtime evidence/providers are absent. In particular, public publication requires a **clean malware scan result**; OCR and thumbnails truthfully expose provider-degraded states; encrypted storage/key health is checked; and staging must prove backup/key recovery rather than infer it from configuration.
+The source is intentionally provider-aware. Reflow/read-aloud/search heatmaps can use lawful OCR text already owned by File 12. External bibliographic authority enrichment, translation/transliteration, companion knowledge context, reading-room transport, and advanced preservation/accessibility providers operate through adapters. Missing optional providers must return explicit degraded/unavailable states rather than fabricated content.
 
-The CI artifact is named `file-12-pdf-library-1.0.0-rc.1`; its artifact identifier/digest are runtime evidence produced by the corresponding GitHub Actions run and therefore are not frozen into this source-status file.
+The encrypted offline vault is rights-controlled, local-expiry controlled and logout-purge aware. It does not change an online-only policy into an offline entitlement. AI-ready corpus manifests are deny-by-default and require explicit File 12 corpus allowlisting plus entitlement; File 16 remains the AI-output owner.
 
 ## Legacy continuity
 
-The candidate can read prior `SPL2` encrypted objects, migrates legacy documents in bounded batches, computes authenticated plaintext checksums where keys are available, migrates progress/bookmarks/private notes and legacy reports, leaves historical source data intact, and emits a canonical interaction-migration request for legacy save/reaction/comment reconciliation rather than silently duplicating interaction ownership.
+The candidate retains the 1.0.0-rc.1 migration path for legacy File 12 data/SPL2 objects and adds an idempotent Future-24 schema (`1.1.0`) for preferences, smart shelves, private reading events, session handoff, OCR corrections, bibliographic authority cache, accessibility audits, scholarly room context, preservation records and scan fingerprints.
 
 ## Production-truth boundary
 
-This status does **not** convert repository evidence into Hostinger truth. Fresh install/upgrade/migration, private storage and key recovery, real provider configuration, real-role/browser/accessibility/RTL workflows, backup/restore/rollback, Founder acceptance, production deployment and live re-test/parity remain separate gates.
+This status does **not** convert repository evidence into Hostinger truth. Fresh install/upgrade/migration, private storage and key recovery, real provider configuration, real-role/browser/accessibility/RTL/offline-vault workflows, backup/restore/rollback, Founder acceptance, production deployment and live re-test/parity remain separate gates.

@@ -62,20 +62,25 @@ final class PLDR_Ingest {
             return PLDR_Core::machine_error('pldr_checksum', 'The PDF checksum could not be computed.', 500);
         }
 
+        $wpdb->last_error='';
         $duplicate = $wpdb->get_row($wpdb->prepare(
             'SELECT e.id,e.document_id,d.public_id,d.title FROM ' . PLDR_Core::table('editions') . ' e INNER JOIN ' . PLDR_Core::table('documents') . ' d ON d.id=e.document_id WHERE e.sha256=%s LIMIT 1',
             $sha256
         ), ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_duplicate_read','Duplicate-check state could not be read reliably; ingest was not attempted.',503,array('degraded'=>true));
         if ($duplicate) {
             return PLDR_Core::machine_error('pldr_exact_duplicate', 'This exact PDF object already exists in the canonical library.', 409, array('document_id' => $duplicate['public_id'], 'edition_id' => (int) $duplicate['id']));
         }
 
+        $wpdb->last_error='';
         $similar = self::similar_candidate($data);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_similarity_read','Similarity-check state could not be read reliably; ingest was not attempted.',503,array('degraded'=>true));
         if ($similar && (!$existing_doc || (string)($similar['public_id']??'') !== (string)$existing_doc['public_id']) && empty($data['confirm_distinct_scan'])) {
             return PLDR_Core::machine_error('pldr_metadata_duplicate_candidate', 'A similar document or edition exists. Confirm that this is a distinct scan/edition before ingest.', 409, array('candidate' => $similar));
         }
 
-        $scan = self::scan_file($pdf['tmp_name'], $data);
+        $scan_data=$data;$scan_data['filename']=sanitize_file_name((string)$pdf['name']);
+        $scan = self::scan_file($pdf['tmp_name'], $scan_data);
         if (is_wp_error($scan)) {
             return $scan;
         }
@@ -110,7 +115,7 @@ final class PLDR_Ingest {
         $document_id = $existing_doc ? (int)$existing_doc['id'] : 0;
         $edition_id = 0;
 
-        $wpdb->query('START TRANSACTION');
+        if(false===$wpdb->query('START TRANSACTION')){PLDR_Storage::delete($allocation['path']);return PLDR_Core::machine_error('pldr_ingest_transaction_start','PDF ingest transaction could not be started; committed storage was removed.',500);}
         try {
             $ok = $wpdb->insert(PLDR_Core::table('objects'), array(
                 'storage_name' => $allocation['name'],
@@ -200,13 +205,15 @@ final class PLDR_Ingest {
             if (false === $ok) throw new RuntimeException('Access policy could not be saved.');
 
             if ($existing_doc && 'published' === $edition_status) {
-                $wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,updated_at=%s WHERE document_id=%d AND id<>%d AND status=%s','superseded',PLDR_Core::now(),$document_id,$edition_id,'published'));
-                $wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d','published',PLDR_Core::now(),$document_id));
+                $superseded=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('editions').' SET status=%s,updated_at=%s WHERE document_id=%d AND id<>%d AND status=%s','superseded',PLDR_Core::now(),$document_id,$edition_id,'published'));
+                if(false===$superseded)throw new RuntimeException('Existing published editions could not be superseded.');
+                $published=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d','published',PLDR_Core::now(),$document_id));
+                if(false===$published)throw new RuntimeException('Canonical document publication state could not be updated.');
                 $document_status='published';
             }
 
             if (!empty($data['rights_evidence_ref'])) {
-                $wpdb->insert(PLDR_Core::table('rights_cases'), array(
+                $rights_saved=$wpdb->insert(PLDR_Core::table('rights_cases'), array(
                     'case_key' => PLDR_Core::uuid(),
                     'document_id' => $document_id,
                     'reporter_id' => $actor_id,
@@ -221,8 +228,15 @@ final class PLDR_Ingest {
                     'updated_at' => PLDR_Core::now(),
                     'closed_at' => PLDR_Core::now(),
                 ));
+                if(false===$rights_saved)throw new RuntimeException('Restricted rights-evidence reference could not be recorded.');
             }
-            $wpdb->query('COMMIT');
+            $ingested_event=PLDR_Core::emit('PDFDocumentIngested.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id, 'status' => $edition_status));
+            if(is_wp_error($ingested_event))throw new RuntimeException('Reliable ingest event could not be persisted atomically.');
+            if ('published' === $edition_status) {
+                $published_event=PLDR_Core::emit('PDFDocumentPublished.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id));
+                if(is_wp_error($published_event))throw new RuntimeException('Reliable publication event could not be persisted atomically.');
+            }
+            if(false===$wpdb->query('COMMIT'))throw new RuntimeException('PDF ingest transaction could not be committed atomically.');
         } catch (Throwable $e) {
             $wpdb->query('ROLLBACK');
             PLDR_Storage::delete($allocation['path']);
@@ -230,14 +244,12 @@ final class PLDR_Ingest {
         }
 
         if (!empty($files['cover']['tmp_name']) && is_uploaded_file($files['cover']['tmp_name'])) {
-            self::store_cover($edition_id, $files['cover'], $language, $actor_id);
+            $cover_result=self::store_cover($edition_id, $files['cover'], $language, $actor_id);
+            if(is_wp_error($cover_result))return PLDR_Core::machine_error('pldr_cover_reconcile','PDF ingest was committed but the supplied cover could not be persisted consistently; reconciliation is required.',503,array('committed'=>true,'edition_id'=>$edition_id,'cause'=>$cover_result->get_error_code()));
         }
-        wp_schedule_single_event(time() + 5, 'pldr_generate_derivatives', array($edition_id, 0));
+        $scheduled=wp_schedule_single_event(time() + 5, 'pldr_generate_derivatives', array($edition_id, 0), true);
+        if(is_wp_error($scheduled)||false===$scheduled)return PLDR_Core::machine_error('pldr_derivative_schedule_reconcile','PDF ingest was committed but derivative generation could not be scheduled; reconciliation is required.',503,array('committed'=>true,'edition_id'=>$edition_id));
         PLDR_Core::audit('document', $document_id, 'ingested', array('edition_id' => $edition_id, 'sha256' => $sha256, 'status' => $edition_status, 'document_family_existing'=>(bool)$existing_doc), $actor_id);
-        PLDR_Core::emit('PDFDocumentIngested.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id, 'status' => $edition_status));
-        if ('published' === $edition_status) {
-            PLDR_Core::emit('PDFDocumentPublished.v1', 'document', $document_id, array('document_id' => $public_id, 'edition_id' => $edition_id));
-        }
 
         return array('document_id' => $public_id, 'edition_id' => $edition_id, 'status' => $edition_status, 'sha256' => $sha256, 'similarity_reviewed' => (bool) $similar);
     }
@@ -247,7 +259,9 @@ final class PLDR_Ingest {
             return PLDR_Core::machine_error('pldr_upload_error', 'The PDF upload did not complete successfully.', 400);
         }
         $size = (int) ($pdf['size'] ?? 0);
-        $max = (int) apply_filters('pldr_max_pdf_bytes', min(1024 * MB_IN_BYTES, max(1, wp_max_upload_size())));
+        try{$max=(int)apply_filters('pldr_max_pdf_bytes',min(1024 * MB_IN_BYTES,max(1,wp_max_upload_size())));}
+        catch(Throwable $e){return PLDR_Core::machine_error('pldr_pdf_size_policy','PDF size policy could not be verified; upload was not accepted.',503,array('degraded'=>true,'provider_failure'=>true));}
+        $max=max(1024,min(1024*MB_IN_BYTES,$max));
         if ($size < 32 || $size > $max) {
             return PLDR_Core::machine_error('pldr_pdf_size', 'The PDF is empty or exceeds the governed File 12 size limit.', 413, array('max_bytes' => $max));
         }
@@ -267,6 +281,10 @@ final class PLDR_Ingest {
         if (!is_string($tail) || false === strpos($tail, '%%EOF')) {
             return PLDR_Core::machine_error('pldr_pdf_eof', 'The PDF end marker is missing; the file may be truncated or polyglot.', 400);
         }
+        $eof=strrpos($tail,'%%EOF');
+        $after=false===$eof?'':substr($tail,$eof+5);
+        if(''!==trim((string)$after," 	
+ "))return PLDR_Core::machine_error('pldr_pdf_trailing_payload','Unexpected bytes follow the final PDF EOF marker; the object is rejected as a possible appended polyglot.',400);
         if (self::stream_contains($path, '/Encrypt')) {
             return PLDR_Core::machine_error('pldr_pdf_password', 'Password/encrypted source PDFs require controlled preprocessing and are not accepted directly.', 400);
         }
@@ -285,14 +303,17 @@ final class PLDR_Ingest {
     }
 
     private static function scan_file(string $path, array $data) {
-        $result = apply_filters('pldr_malware_scan', null, $path, array('filename' => basename((string) ($data['filename'] ?? 'document.pdf')), 'sha256' => hash_file('sha256', $path)));
+        try{$result=apply_filters('pldr_malware_scan',null,$path,array('filename'=>basename((string)($data['filename']??'document.pdf')),'sha256'=>hash_file('sha256',$path)));}
+        catch(Throwable $e){return PLDR_Core::machine_error('pldr_scanner_provider_failed','Malware scanner provider failed; ingest is fail-closed.',503,array('degraded'=>true,'provider_failure'=>true));}
         if (is_array($result) && isset($result['status'])) {
             $status = sanitize_key((string) $result['status']);
             if ('infected' === $status || 'quarantined' === $status) {
                 return PLDR_Core::machine_error('pldr_malware', 'The uploaded PDF failed the malware-safety gate.', 422);
             }
             if ('clean' === $status) {
-                return array('status' => 'clean', 'provider' => sanitize_text_field((string) ($result['provider'] ?? 'adapter')));
+                $provider=trim(sanitize_text_field((string)($result['provider']??'')));
+                if(''===$provider)return PLDR_Core::machine_error('pldr_scanner_provenance','Malware scanner returned a clean result without provider provenance; ingest is fail-closed.',503,array('degraded'=>true,'provider_failure'=>true));
+                return array('status' => 'clean', 'provider' => $provider);
             }
         }
         if (defined('PLDR_REQUIRE_MALWARE_SCANNER') && PLDR_REQUIRE_MALWARE_SCANNER) {
@@ -346,20 +367,29 @@ final class PLDR_Ingest {
 
     public static function rescan_document(int $document_id, int $actor_id = 0) {
         global $wpdb;
-        $actor_id = $actor_id ?: get_current_user_id();
-        if (!PLDR_Core::authorize('repair', $document_id, $actor_id) && !PLDR_Core::authorize('rights', $document_id, $actor_id)) return PLDR_Core::machine_error('pldr_rescan_forbidden','Document rescan authority is required.',403);
-        $edition = PLDR_Core::current_edition($document_id);
-        if (!$edition) return PLDR_Core::machine_error('pldr_rescan_edition','Current edition is missing.',404);
-        $object = PLDR_Core::object((int)$edition['object_id']);
-        if (!$object || 'available' !== $object['object_status']) return PLDR_Core::machine_error('pldr_rescan_object','Document object is unavailable.',409);
-        $path = PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);
-        if (is_wp_error($path)) return $path;
-        $plain = PLDR_Storage::temp('rescan'); if (is_wp_error($plain)) return $plain;
-        $error=''; if(!PLDR_Crypto::decrypt_to_file($path,$plain,$error)){PLDR_Storage::delete($plain);return PLDR_Core::machine_error('pldr_rescan_decrypt',$error ?: 'Document could not be decrypted for scanning.',500);}
-        $scan=self::scan_file($plain,array('filename'=>$object['original_name'])); PLDR_Storage::delete($plain);
-        if(is_wp_error($scan)) { $wpdb->update(PLDR_Core::table('objects'),array('scan_status'=>'quarantined','object_status'=>'quarantined'),array('id'=>(int)$object['id'])); return $scan; }
-        $wpdb->update(PLDR_Core::table('objects'),array('scan_status'=>$scan['status'],'verified_at'=>PLDR_Core::now()),array('id'=>(int)$object['id']));
-        if('clean'===$scan['status']) { $doc=PLDR_Core::document($document_id); if($doc && 'scan'===$doc['status']) $wpdb->update(PLDR_Core::table('documents'),array('status'=>'rights_review','version'=>(int)$doc['version']+1,'updated_at'=>PLDR_Core::now()),array('id'=>$document_id)); }
+        $actor_id=$actor_id?:get_current_user_id();
+        if(!PLDR_Core::authorize('repair',$document_id,$actor_id)&&!PLDR_Core::authorize('rights',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_rescan_forbidden','Document rescan authority is required.',403);
+        $edition=PLDR_Core::current_edition($document_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_edition_read','Current edition state could not be read reliably for rescan.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_rescan_edition','Current edition is missing.',404);
+        $object=PLDR_Core::object((int)$edition['object_id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_object_read','Document object state could not be read reliably for rescan.',503,array('degraded'=>true));if(!$object||'available'!==$object['object_status'])return PLDR_Core::machine_error('pldr_rescan_object','Document object is unavailable.',409);
+        $path=PLDR_Storage::path((string)$object['storage_name'],(string)$object['storage_scope']);if(is_wp_error($path))return $path;
+        $plain=PLDR_Storage::temp('rescan');if(is_wp_error($plain))return $plain;$error='';
+        if(!PLDR_Crypto::decrypt_to_file($path,$plain,$error)){PLDR_Storage::delete($plain);return PLDR_Core::machine_error('pldr_rescan_decrypt',$error?:'Document could not be decrypted for scanning.',500);}
+        $scan=self::scan_file($plain,array('filename'=>$object['original_name']));PLDR_Storage::delete($plain);
+        if(is_wp_error($scan)){
+            $quarantined=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET scan_status=%s,object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s','quarantined','quarantined',PLDR_Core::now(),(int)$object['id'],'available'));
+            if(1!==$quarantined)return PLDR_Core::machine_error('pldr_rescan_quarantine_reconcile','Scanner failure occurred but object quarantine could not be persisted reliably; reconciliation is required.',503,array('scanner_error'=>$scan->get_error_code()));
+            if(PLDR_Access::revoke_document($document_id,'rescan-quarantine')<0)return PLDR_Core::machine_error('pldr_rescan_revoke_reconcile','Object was quarantined after rescan failure but delivery grants could not be revoked; reconciliation is required.',503,array('committed'=>true));
+            return $scan;
+        }
+        $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET scan_status=%s,verified_at=%s WHERE id=%d AND object_status=%s',$scan['status'],PLDR_Core::now(),(int)$object['id'],'available'));
+        if(1!==$updated)return PLDR_Core::machine_error('pldr_rescan_store','Verified rescan state could not be persisted reliably.',500);
+        if('clean'===$scan['status']){
+            $doc=PLDR_Core::document($document_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_document_read','Document state could not be read reliably after clean rescan.',503,array('degraded'=>true));
+            if($doc&&'scan'===$doc['status']){
+                $transitioned=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('documents').' SET status=%s,version=version+1,updated_at=%s WHERE id=%d AND status=%s AND version=%d','rights_review',PLDR_Core::now(),$document_id,'scan',(int)$doc['version']));
+                if(1!==$transitioned)return PLDR_Core::machine_error('pldr_rescan_document_conflict','Rescan was stored but document state changed concurrently before rights review transition.',409,array('committed_scan'=>true));
+            }
+        }
         PLDR_Core::audit('document',$document_id,'rescanned',array('scan'=>$scan),$actor_id);
         return array('document_id'=>$document_id,'scan'=>$scan);
     }
@@ -370,30 +400,46 @@ final class PLDR_Ingest {
         return $timestamp ? gmdate('Y-m-d H:i:s', $timestamp) : null;
     }
 
-    private static function store_cover(int $edition_id, array $cover, string $language, int $actor_id): void {
+    private static function store_cover(int $edition_id, array $cover, string $language, int $actor_id) {
         global $wpdb;
-        if (UPLOAD_ERR_OK !== (int) ($cover['error'] ?? UPLOAD_ERR_NO_FILE) || (int) $cover['size'] > 10 * MB_IN_BYTES) return;
+        if (UPLOAD_ERR_OK !== (int) ($cover['error'] ?? UPLOAD_ERR_NO_FILE) || (int) $cover['size'] > 10 * MB_IN_BYTES) return PLDR_Core::machine_error('pldr_cover_upload','The supplied cover upload is invalid or exceeds 10 MB.',400);
         $check = wp_check_filetype_and_ext($cover['tmp_name'], $cover['name'], array('jpg|jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'));
-        if (empty($check['ext']) || empty($check['type'])) return;
+        if (empty($check['ext']) || empty($check['type'])) return PLDR_Core::machine_error('pldr_cover_type','The supplied cover is not an accepted image type.',400);
+        $image=@getimagesize((string)$cover['tmp_name']);
+        if(!is_array($image)||empty($image[0])||empty($image[1]))return PLDR_Core::machine_error('pldr_cover_decode','The supplied cover could not be decoded as a genuine image.',400);
+        $pixels=(int)$image[0]*(int)$image[1];
+        if($pixels<1||$pixels>40000000)return PLDR_Core::machine_error('pldr_cover_dimensions','The supplied cover exceeds the governed decoded-pixel limit.',413,array('max_pixels'=>40000000));
+        $decoded_mime=sanitize_text_field((string)($image['mime']??''));
+        if(''!==$decoded_mime&&$decoded_mime!==(string)$check['type'])return PLDR_Core::machine_error('pldr_cover_mime','The supplied cover extension/type does not match its decoded image format.',400);
         $allocation = PLDR_Storage::allocate('pldr');
-        if (!empty($allocation['error'])) return;
+        if (!empty($allocation['error'])) return $allocation['error'];
         $temp = PLDR_Storage::temp('cover');
-        if (is_wp_error($temp)) return;
-        $crypto = array();
-        $error = '';
-        if (!PLDR_Crypto::encrypt_file($cover['tmp_name'], $temp, $crypto, $error) || !PLDR_Storage::atomic_commit($temp, $allocation['path'])) return;
+        if (is_wp_error($temp)) return $temp;
+        $crypto = array();$error = '';
+        if (!PLDR_Crypto::encrypt_file($cover['tmp_name'], $temp, $crypto, $error) || !PLDR_Storage::atomic_commit($temp, $allocation['path'])) {
+            PLDR_Storage::delete($temp);
+            return PLDR_Core::machine_error('pldr_cover_encrypt','The supplied cover could not be encrypted and committed safely.',500);
+        }
         $sha = hash_file('sha256', $cover['tmp_name']) ?: '';
-        $wpdb->insert(PLDR_Core::table('objects'), array(
-            'storage_name' => $allocation['name'], 'storage_scope' => 'pldr', 'original_name' => sanitize_file_name($cover['name']),
-            'mime_type' => $check['type'], 'byte_size' => (int) $cover['size'], 'sha256' => $sha, 'encrypted_sha256' => $crypto['encrypted_sha256'],
-            'key_id' => $crypto['key_id'], 'format_version' => $crypto['format'], 'scan_status' => 'derived-cover', 'object_status' => 'available', 'created_at' => PLDR_Core::now(), 'verified_at' => PLDR_Core::now(),
-        ));
-        $object_id = (int) $wpdb->insert_id;
-        $wpdb->replace(PLDR_Core::table('derivatives'), array(
-            'edition_id' => $edition_id, 'derivative_type' => 'cover', 'page_number' => 0, 'object_id' => $object_id, 'language' => $language,
-            'quality_score' => 100, 'lawful_basis' => 'publisher-provided', 'status' => 'available', 'source_version' => 1, 'created_at' => PLDR_Core::now(), 'updated_at' => PLDR_Core::now(),
-        ));
+        if(''===$sha){PLDR_Storage::delete($allocation['path']);return PLDR_Core::machine_error('pldr_cover_checksum','The cover checksum could not be computed.',500);}
+        if(false===$wpdb->query('START TRANSACTION')){PLDR_Storage::delete($allocation['path']);return PLDR_Core::machine_error('pldr_cover_transaction','The cover metadata transaction could not be started.',500);}
+        try{
+            $stored=$wpdb->insert(PLDR_Core::table('objects'), array(
+                'storage_name' => $allocation['name'], 'storage_scope' => 'pldr', 'original_name' => sanitize_file_name($cover['name']),
+                'mime_type' => $check['type'], 'byte_size' => (int) $cover['size'], 'sha256' => $sha, 'encrypted_sha256' => $crypto['encrypted_sha256'],
+                'key_id' => $crypto['key_id'], 'format_version' => $crypto['format'], 'scan_status' => 'derived-cover', 'object_status' => 'available', 'created_at' => PLDR_Core::now(), 'verified_at' => PLDR_Core::now(),
+            ));
+            if(false===$stored)throw new RuntimeException('Cover object metadata could not be stored.');
+            $object_id=(int)$wpdb->insert_id;if($object_id<1)throw new RuntimeException('Cover object persistence could not be confirmed.');
+            $linked=$wpdb->replace(PLDR_Core::table('derivatives'), array(
+                'edition_id' => $edition_id, 'derivative_type' => 'cover', 'page_number' => 0, 'object_id' => $object_id, 'language' => $language,
+                'quality_score' => 100, 'lawful_basis' => 'publisher-provided', 'status' => 'available', 'source_version' => 1, 'created_at' => PLDR_Core::now(), 'updated_at' => PLDR_Core::now(),
+            ));
+            if(false===$linked)throw new RuntimeException('Cover derivative metadata could not be linked.');
+            if(false===$wpdb->query('COMMIT'))throw new RuntimeException('Cover metadata transaction could not be committed.');
+        }catch(Throwable $e){$wpdb->query('ROLLBACK');PLDR_Storage::delete($allocation['path']);return PLDR_Core::machine_error('pldr_cover_store',$e->getMessage(),500);}
         PLDR_Core::audit('edition', $edition_id, 'cover_stored', array('object_id' => $object_id), $actor_id);
+        return array('object_id'=>$object_id,'stored'=>true);
     }
 
     public static function generate_derivatives(int $edition_id, int $cursor = 0): void {
@@ -431,83 +477,85 @@ final class PLDR_Ingest {
 
     private static function generate_thumbnail_batch(array $edition, string $plain, int $cursor): void {
         global $wpdb;
-        $batch = 12;
-        $pages = max(1, (int) $edition['pages']);
-        $end = min($pages, $cursor + $batch);
-        for ($page = $cursor; $page < $end; $page++) {
-            try {
-                $image = new Imagick();
-                $image->setResolution(90, 90);
-                $image->readImage($plain . '[' . $page . ']');
-                $image->setImageFormat('jpeg');
-                $image->setImageCompressionQuality(72);
-                $image->thumbnailImage(180, 240, true, true);
-                $tmp = PLDR_Storage::temp('thumb');
-                if (is_wp_error($tmp)) break;
-                $image->writeImage($tmp);
-                $image->clear();
-                $allocation = PLDR_Storage::allocate('pldr');
-                if (!empty($allocation['error'])) { PLDR_Storage::delete($tmp); break; }
-                $encrypted_tmp = PLDR_Storage::temp('thumb-enc');
-                if (is_wp_error($encrypted_tmp)) { PLDR_Storage::delete($tmp); break; }
-                $crypto = array(); $error = '';
-                if (!PLDR_Crypto::encrypt_file($tmp, $encrypted_tmp, $crypto, $error) || !PLDR_Storage::atomic_commit($encrypted_tmp, $allocation['path'])) {
-                    PLDR_Storage::delete($tmp); PLDR_Storage::delete($encrypted_tmp); continue;
+        $batch = 12;$pages=max(1,(int)$edition['pages']);$end=min($pages,$cursor+$batch);
+        for($page=$cursor;$page<$end;$page++){
+            $allocation=null;$committed_path='';$tmp='';
+            try{
+                $image=new Imagick();
+                if(method_exists($image,'setResourceLimit')){
+                    if(defined('Imagick::RESOURCETYPE_MEMORY'))$image->setResourceLimit(Imagick::RESOURCETYPE_MEMORY,128*1024*1024);
+                    if(defined('Imagick::RESOURCETYPE_MAP'))$image->setResourceLimit(Imagick::RESOURCETYPE_MAP,256*1024*1024);
+                    if(defined('Imagick::RESOURCETYPE_DISK'))$image->setResourceLimit(Imagick::RESOURCETYPE_DISK,512*1024*1024);
                 }
-                $sha = hash_file('sha256', $tmp) ?: '';
-                $size = filesize($tmp) ?: 0;
-                PLDR_Storage::delete($tmp);
-                $wpdb->insert(PLDR_Core::table('objects'), array(
-                    'storage_name' => $allocation['name'], 'storage_scope' => 'pldr', 'original_name' => 'page-' . ($page + 1) . '.jpg', 'mime_type' => 'image/jpeg',
-                    'byte_size' => $size, 'sha256' => $sha, 'encrypted_sha256' => $crypto['encrypted_sha256'], 'key_id' => $crypto['key_id'], 'format_version' => $crypto['format'],
-                    'scan_status' => 'derived-preview', 'object_status' => 'available', 'created_at' => PLDR_Core::now(), 'verified_at' => PLDR_Core::now(),
-                ));
-                $object_id = (int) $wpdb->insert_id;
-                $wpdb->replace(PLDR_Core::table('derivatives'), array(
-                    'edition_id' => (int) $edition['id'], 'derivative_type' => 'thumbnail', 'page_number' => $page + 1, 'object_id' => $object_id, 'language' => $edition['language'],
-                    'quality_score' => 85, 'lawful_basis' => 'reader-preview', 'status' => 'available', 'source_version' => (int) $edition['version'], 'created_at' => PLDR_Core::now(), 'updated_at' => PLDR_Core::now(),
-                ));
-            } catch (Throwable $e) {
-                PLDR_Core::audit('edition', (int) $edition['id'], 'thumbnail_failed', array('page' => $page + 1, 'error' => $e->getMessage()));
-            }
+                $image->setResolution(90,90);$image->readImage($plain.'['.$page.']');
+                $image->setImageFormat('jpeg');$image->setImageCompressionQuality(72);$image->thumbnailImage(180,240,true,true);
+                if(method_exists($image,'stripImage'))$image->stripImage();
+                $tmp=PLDR_Storage::temp('thumb');if(is_wp_error($tmp))throw new RuntimeException($tmp->get_error_message());
+                if(!$image->writeImage($tmp))throw new RuntimeException('Thumbnail renderer could not write output.');
+                $image->clear();
+                $allocation=PLDR_Storage::allocate('pldr');if(!empty($allocation['error']))throw new RuntimeException($allocation['error']->get_error_message());
+                $encrypted_tmp=PLDR_Storage::temp('thumb-enc');if(is_wp_error($encrypted_tmp))throw new RuntimeException($encrypted_tmp->get_error_message());
+                $crypto=array();$error='';
+                if(!PLDR_Crypto::encrypt_file($tmp,$encrypted_tmp,$crypto,$error)||!PLDR_Storage::atomic_commit($encrypted_tmp,$allocation['path'])){PLDR_Storage::delete($encrypted_tmp);throw new RuntimeException($error?:'Thumbnail encryption/storage failed.');}
+                $committed_path=$allocation['path'];$sha=hash_file('sha256',$tmp)?:'';$size=filesize($tmp)?:0;PLDR_Storage::delete($tmp);$tmp='';
+                if(''===$sha||$size<1)throw new RuntimeException('Thumbnail checksum/size could not be verified.');
+                if(false===$wpdb->query('START TRANSACTION'))throw new RuntimeException('Thumbnail metadata transaction could not be started.');
+                $stored=$wpdb->insert(PLDR_Core::table('objects'),array('storage_name'=>$allocation['name'],'storage_scope'=>'pldr','original_name'=>'page-'.($page+1).'.jpg','mime_type'=>'image/jpeg','byte_size'=>$size,'sha256'=>$sha,'encrypted_sha256'=>$crypto['encrypted_sha256'],'key_id'=>$crypto['key_id'],'format_version'=>$crypto['format'],'scan_status'=>'derived-preview','object_status'=>'available','created_at'=>PLDR_Core::now(),'verified_at'=>PLDR_Core::now()));
+                if(false===$stored)throw new RuntimeException('Thumbnail object metadata could not be stored.');
+                $object_id=(int)$wpdb->insert_id;if($object_id<1)throw new RuntimeException('Thumbnail object persistence could not be confirmed.');
+                $linked=$wpdb->replace(PLDR_Core::table('derivatives'),array('edition_id'=>(int)$edition['id'],'derivative_type'=>'thumbnail','page_number'=>$page+1,'object_id'=>$object_id,'language'=>$edition['language'],'quality_score'=>85,'lawful_basis'=>'reader-preview','status'=>'available','source_version'=>(int)$edition['version'],'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+                if(false===$linked)throw new RuntimeException('Thumbnail derivative metadata could not be linked.');
+                if(false===$wpdb->query('COMMIT'))throw new RuntimeException('Thumbnail metadata transaction could not be committed.');
+                $committed_path='';
+            }catch(Throwable $e){$wpdb->query('ROLLBACK');if($tmp)PLDR_Storage::delete($tmp);if($committed_path)PLDR_Storage::delete($committed_path);PLDR_Core::audit('edition',(int)$edition['id'],'thumbnail_failed',array('page'=>$page+1,'error'=>substr($e->getMessage(),0,500)));}
         }
-        if ($end < $pages) {
-            wp_schedule_single_event(time() + 10, 'pldr_generate_derivatives', array((int) $edition['id'], $end));
+        if($end<$pages){
+            $scheduled=wp_schedule_single_event(time()+10,'pldr_generate_derivatives',array((int)$edition['id'],$end),true);
+            if(is_wp_error($scheduled)||false===$scheduled)PLDR_Core::audit('edition',(int)$edition['id'],'thumbnail_continuation_schedule_failed',array('cursor'=>$end,'reconciliation_required'=>true));
         }
     }
 
     private static function generate_ocr(array $edition, string $plain): void {
         global $wpdb;
-        $rights = apply_filters('pldr_ocr_allowed', true, $edition);
-        if (!$rights) {
-            $wpdb->replace(PLDR_Core::table('derivatives'), array(
-                'edition_id' => (int) $edition['id'], 'derivative_type' => 'ocr-status', 'page_number' => 0, 'object_id' => 0, 'language' => $edition['language'],
-                'quality_score' => 0, 'lawful_basis' => 'not-authorized', 'status' => 'rights-disabled', 'source_version' => (int) $edition['version'], 'created_at' => PLDR_Core::now(), 'updated_at' => PLDR_Core::now(),
-            ));
+        try{$rights=apply_filters('pldr_ocr_allowed',true,$edition);}
+        catch(Throwable $e){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_rights_provider_failed',array('provider_failure'=>true));return;}
+        if(!$rights){
+            $stored=$wpdb->replace(PLDR_Core::table('derivatives'),array('edition_id'=>(int)$edition['id'],'derivative_type'=>'ocr-status','page_number'=>0,'object_id'=>0,'language'=>$edition['language'],'quality_score'=>0,'lawful_basis'=>'not-authorized','status'=>'rights-disabled','source_version'=>(int)$edition['version'],'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+            if(false===$stored)PLDR_Core::audit('edition',(int)$edition['id'],'ocr_status_store_failed',array('status'=>'rights-disabled'));
             return;
         }
-        $result = apply_filters('pldr_ocr_extract_text', null, $plain, $edition);
-        if (!is_array($result) || empty($result['pages']) || !is_array($result['pages'])) {
-            $wpdb->replace(PLDR_Core::table('derivatives'), array(
-                'edition_id' => (int) $edition['id'], 'derivative_type' => 'ocr-status', 'page_number' => 0, 'object_id' => 0, 'language' => $edition['language'],
-                'quality_score' => 0, 'lawful_basis' => 'rights-policy', 'status' => 'provider-unavailable', 'source_version' => (int) $edition['version'], 'created_at' => PLDR_Core::now(), 'updated_at' => PLDR_Core::now(),
-            ));
+        try{$result=apply_filters('pldr_ocr_extract_text',null,$plain,$edition);}
+        catch(Throwable $e){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_provider_failed',array('provider_failure'=>true));$result=null;}
+        if(!is_array($result)||empty($result['pages'])||!is_array($result['pages'])){
+            $stored=$wpdb->replace(PLDR_Core::table('derivatives'),array('edition_id'=>(int)$edition['id'],'derivative_type'=>'ocr-status','page_number'=>0,'object_id'=>0,'language'=>$edition['language'],'quality_score'=>0,'lawful_basis'=>'rights-policy','status'=>'provider-unavailable','source_version'=>(int)$edition['version'],'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+            if(false===$stored)PLDR_Core::audit('edition',(int)$edition['id'],'ocr_status_store_failed',array('status'=>'provider-unavailable'));
             return;
         }
-        $quality = max(0, min(100, (float) ($result['quality'] ?? 0)));
-        foreach ($result['pages'] as $page => $text) {
-            $page = absint($page);
-            if ($page < 1 || $page > (int) $edition['pages']) continue;
-            $text = wp_strip_all_tags((string) $text);
-            $wpdb->replace(PLDR_Core::table('ocr_text'), array(
-                'edition_id' => (int) $edition['id'], 'page_number' => $page, 'language' => sanitize_text_field((string) ($result['language'] ?? $edition['language'])),
-                'quality_score' => $quality, 'text_content' => $text, 'normalized_text' => PLDR_Core::normalize_search($text), 'created_at' => PLDR_Core::now(), 'updated_at' => PLDR_Core::now(),
-            ));
+        $provider=trim(sanitize_text_field((string)($result['provider']??'')));
+        if(''===$provider){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_provider_provenance_missing',array('provider_failure'=>true));return;}
+        $language=sanitize_text_field((string)($result['language']??$edition['language']));$quality=max(0,min(100,(float)($result['quality']??0)));
+        $max_pages=min(max(1,(int)$edition['pages']),5000);$stored_pages=0;$total_bytes=0;$truncated=false;
+        foreach($result['pages'] as $page=>$text){
+            if($stored_pages>=$max_pages){$truncated=true;break;}
+            $page=absint($page);if($page<1||$page>(int)$edition['pages'])continue;
+            $text=wp_strip_all_tags((string)$text);
+            if(function_exists('mb_substr'))$text=mb_substr($text,0,1000000,'UTF-8');else $text=substr($text,0,1000000);
+            $total_bytes+=strlen($text);if($total_bytes>50000000){$truncated=true;break;}
+            $row=$wpdb->replace(PLDR_Core::table('ocr_text'),array('edition_id'=>(int)$edition['id'],'page_number'=>$page,'language'=>$language,'quality_score'=>$quality,'text_content'=>$text,'normalized_text'=>PLDR_Core::normalize_search($text),'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+            if(false===$row){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_text_store_failed',array('page'=>$page,'provider'=>$provider));$status=$wpdb->replace(PLDR_Core::table('derivatives'),array('edition_id'=>(int)$edition['id'],'derivative_type'=>'ocr-status','page_number'=>0,'object_id'=>0,'language'=>$language,'quality_score'=>$quality,'lawful_basis'=>'rights-policy','status'=>'storage-failed','source_version'=>(int)$edition['version'],'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));return;}
+            $stored_pages++;
         }
-        $wpdb->replace(PLDR_Core::table('derivatives'), array(
-            'edition_id' => (int) $edition['id'], 'derivative_type' => 'ocr-status', 'page_number' => 0, 'object_id' => 0, 'language' => sanitize_text_field((string) ($result['language'] ?? $edition['language'])),
-            'quality_score' => $quality, 'lawful_basis' => 'rights-policy', 'status' => 'available', 'source_version' => (int) $edition['version'], 'created_at' => PLDR_Core::now(), 'updated_at' => PLDR_Core::now(),
-        ));
-        PLDR_Core::emit('PDFDocumentOCRReady.v1', 'edition', (int) $edition['id'], array('edition_id' => (int) $edition['id'], 'quality' => $quality));
+        if($stored_pages<1){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_empty_after_validation',array('provider'=>$provider));return;}
+        $status_value=$truncated?'partial-truncated':'available';
+        if(false===$wpdb->query('START TRANSACTION')){PLDR_Core::audit('edition',(int)$edition['id'],'ocr_ready_transaction_failed',array('provider'=>$provider,'pages'=>$stored_pages));return;}
+        $status=$wpdb->replace(PLDR_Core::table('derivatives'),array('edition_id'=>(int)$edition['id'],'derivative_type'=>'ocr-status','page_number'=>0,'object_id'=>0,'language'=>$language,'quality_score'=>$quality,'lawful_basis'=>'rights-policy','status'=>$status_value,'source_version'=>(int)$edition['version'],'created_at'=>PLDR_Core::now(),'updated_at'=>PLDR_Core::now()));
+        if(false===$status){$wpdb->query('ROLLBACK');PLDR_Core::audit('edition',(int)$edition['id'],'ocr_status_store_failed',array('status'=>$status_value,'provider'=>$provider));return;}
+        if(!$truncated){
+            $event=PLDR_Core::emit('PDFDocumentOCRReady.v1','edition',(int)$edition['id'],array('edition_id'=>(int)$edition['id'],'quality'=>$quality,'provider'=>$provider,'pages'=>$stored_pages));
+            if(is_wp_error($event)){$wpdb->query('ROLLBACK');PLDR_Core::audit('edition',(int)$edition['id'],'ocr_event_atomic_rollback',array('provider'=>$provider,'pages'=>$stored_pages));return;}
+        }
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');PLDR_Core::audit('edition',(int)$edition['id'],'ocr_ready_commit_failed',array('provider'=>$provider,'pages'=>$stored_pages));return;}
+        PLDR_Core::audit('edition',(int)$edition['id'],'ocr_generated',array('provider'=>$provider,'pages'=>$stored_pages,'truncated'=>$truncated));
     }
+
 }
