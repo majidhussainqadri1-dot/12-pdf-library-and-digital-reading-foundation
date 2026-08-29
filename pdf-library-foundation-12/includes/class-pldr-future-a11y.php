@@ -61,17 +61,17 @@ final class PLDR_Future_A11y {
         $document_id=(int)$edition['document_id'];
         if(!PLDR_Core::authorize('manage',$document_id)&&!PLDR_Core::authorize('rights',$document_id))return PLDR_Core::machine_error('pldr_a11y_verify_forbidden','Accessibility verification authority is required for this document.',403);
         $note=self::limit(sanitize_textarea_field($note),2000);
-        $report=self::inspect($edition_id,true);if(isset($report['error']))return $report['error'];
-        if((float)$report['score']<75)return PLDR_Core::machine_error('pldr_a11y_verify_score','Accessibility status is below the verification threshold.',409);
-        $wpdb->last_error='';
-        $row=$wpdb->get_row($wpdb->prepare('SELECT score,status,findings_json,provider,verified_by,updated_at FROM '.PLDR_Core::table('a11y_audits').' WHERE edition_id=%d',$edition_id),ARRAY_A);
-        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_a11y_verify_read','Fresh accessibility evidence could not be re-read for verification.',503,array('degraded'=>true));
-        if(!$row)return PLDR_Core::machine_error('pldr_a11y_verify_store','Fresh accessibility assessment disappeared before verification.',409);
+        $wpdb->last_error='';$row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('a11y_audits').' WHERE edition_id=%d',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_a11y_verify_read','Stored accessibility evidence could not be read reliably for human verification.',503,array('degraded'=>true));
+        if(!$row)return PLDR_Core::machine_error('pldr_a11y_verify_refresh_required','No stored accessibility assessment exists. Run the governed refresh first, review that result, then verify it.',428);
+        if((int)$row['verified_by']>0)return PLDR_Core::machine_error('pldr_a11y_verify_final','This accessibility assessment is already human-verified. Refresh it before a new verification cycle.',409,array('verified_at'=>$row['verified_at']));
+        $report=self::dto($row);if(isset($report['error'])&&is_wp_error($report['error']))return $report['error'];
+        if((float)$row['score']<75)return PLDR_Core::machine_error('pldr_a11y_verify_score','Accessibility status is below the verification threshold.',409);
         $verified_at=PLDR_Core::now();
         $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('a11y_audits').' SET verified_by=%d,verified_at=%s,updated_at=%s WHERE edition_id=%d AND verified_by=0 AND score=%f AND status=%s AND findings_json=%s AND provider=%s AND updated_at=%s',get_current_user_id(),$verified_at,$verified_at,$edition_id,(float)$row['score'],(string)$row['status'],(string)$row['findings_json'],(string)$row['provider'],(string)$row['updated_at']));
         if(1!==$updated)return PLDR_Core::machine_error('pldr_a11y_verify_conflict','Accessibility assessment changed before verification; refresh and review the new assessment.',409);
-        PLDR_Core::audit('edition',$edition_id,'accessibility_verified',array('document_id'=>$document_id,'note_present'=>''!==trim($note)));
-        $report['verified']=true;$report['verified_at']=$verified_at;$report['public_badge_allowed']=true;return $report;
+        PLDR_Core::audit('edition',$edition_id,'accessibility_verified',array('document_id'=>$document_id,'note_present'=>''!==trim($note),'assessment_updated_at'=>(string)$row['updated_at']));
+        $report['verified']=true;$report['verified_at']=$verified_at;$report['public_badge_allowed']=true;$report['verification_used_stored_assessment']=true;return $report;
     }
 
     private static function dto(array $row):array {
