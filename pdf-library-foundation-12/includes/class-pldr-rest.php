@@ -171,20 +171,23 @@ final class PLDR_REST {
     }
     public static function add_reading_item(WP_REST_Request $request) { return self::idempotent($request,'reading-item',static fn()=>PLDR_Reading::add_item(absint($request['edition_id']),$request->get_json_params()?:$request->get_params())); }
 
-    private static function delete_reading_item_owned(int $item_id) {
+    private static function delete_reading_item_owned(int $item_id,int $expected_version=0) {
         global $wpdb;
         $user_id=get_current_user_id();
         if(!$user_id)return PLDR_Core::machine_error('pldr_item_login','Log in to delete a private reading item.',401);
         $wpdb->last_error='';
-        $row=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.PLDR_Core::table('reading_items').' WHERE id=%d AND user_id=%d',$item_id,$user_id),ARRAY_A);
+        $row=$wpdb->get_row($wpdb->prepare('SELECT id,version FROM '.PLDR_Core::table('reading_items').' WHERE id=%d AND user_id=%d',$item_id,$user_id),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_item_read','Private reading-item state could not be read reliably.',503,array('degraded'=>true));
         if(!$row)return PLDR_Core::machine_error('pldr_item_missing','Private reading item was not found.',404);
-        $deleted=$wpdb->delete(PLDR_Core::table('reading_items'),array('id'=>$item_id,'user_id'=>$user_id),array('%d','%d'));
+        if($expected_version<1)return PLDR_Core::machine_error('pldr_item_precondition','Deleting a private reading item requires its exact expected version.',428,array('current_version'=>(int)$row['version']));
+        if((int)$row['version']!==$expected_version)return PLDR_Core::machine_error('pldr_item_conflict','Private reading item changed; refresh before deleting.',409,array('current_version'=>(int)$row['version']));
+        $deleted=$wpdb->query($wpdb->prepare('DELETE FROM '.PLDR_Core::table('reading_items').' WHERE id=%d AND user_id=%d AND version=%d',$item_id,$user_id,$expected_version));
+        if(0===$deleted)return PLDR_Core::machine_error('pldr_item_conflict','Private reading item changed concurrently; deletion was not performed.',409);
         if(1!==$deleted)return PLDR_Core::machine_error('pldr_item_delete','Private reading item could not be deleted.',500);
-        return array('deleted'=>true,'id'=>$item_id);
+        return array('deleted'=>true,'id'=>$item_id,'deleted_version'=>$expected_version);
     }
 
-    public static function delete_reading_item(WP_REST_Request $request) { return self::idempotent($request,'reading-item-delete',static fn()=>self::delete_reading_item_owned(absint($request['id']))); }
+    public static function delete_reading_item(WP_REST_Request $request) { $body=$request->get_json_params();$body=is_array($body)?$body:$request->get_params();return self::idempotent($request,'reading-item-delete',static fn()=>self::delete_reading_item_owned(absint($request['id']),absint($body['expected_version']??0))); }
     public static function citation(WP_REST_Request $request) { global $wpdb;$wpdb->last_error='';$edition=PLDR_Core::edition(absint($request['edition']));if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_edition_read','Citation edition state could not be read reliably.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$wpdb->last_error='';$allowed=PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id());if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_access_read','Citation authorization state could not be verified reliably.',503,array('degraded'=>true));if(!$allowed)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$page=absint($request['page']);if($page>(int)$edition['pages'])return PLDR_Core::machine_error('pldr_citation_page','Citation page is outside this document edition.',400,array('pages'=>(int)$edition['pages']));$style=sanitize_key((string)($request['style']?:'sabri'));return rest_ensure_response(array('citation'=>PLDR_Reader::citation($edition,$page,$style),'style'=>$style,'page'=>$page)); }
     public static function download_session(WP_REST_Request $request) {
         return self::idempotent($request,'download-session',static function() use($request){
