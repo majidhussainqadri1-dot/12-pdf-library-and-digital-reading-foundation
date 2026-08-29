@@ -55,11 +55,13 @@ $must($shelves,'membership insertion was rolled back','shelf membership add is n
 $must($shelves,'membership removal was rolled back','shelf membership remove is not version-CAS atomic.');
 $must($shelves,'public static function add(int $shelf_id,int $edition_id,int $expected_version=0)','shelf add does not carry expected_version.');
 $must($shelves,'public static function remove_item(int $shelf_id,int $edition_id,int $expected_version=0)','shelf remove-item does not carry expected_version.');
-// Round 14.
+// Round 14. R25 strengthened the keyset from mutable updated_at to immutable created_at while retaining signed continuation.
 $must($reader,'encode_catalog_cursor','signed catalog cursor encoder missing.');
 $must($reader,'decode_catalog_cursor','signed catalog cursor decoder missing.');
 $must($reader,'pldr_catalog_cursor_required','deep legacy traversal is not forced onto the cursor path.');
-$must($reader,'ORDER BY d.updated_at DESC,d.id DESC LIMIT %d','catalog keyset ordering/bound missing.');
+$must($reader,'ORDER BY d.created_at DESC,d.id DESC LIMIT %d','catalog immutable keyset ordering/bound missing.');
+$must($reader,"'c_at'=>$created_at",'catalog immutable cursor boundary missing.');
+$must($reader,'time()-1800','catalog cursor lifetime bound missing.');
 $must($rest,'\'cursor\'=>array(\'sanitize_callback\'=>\'sanitize_text_field\')','catalog REST cursor argument missing.');
 $must($reader,'pldr_catalog_query_long','catalog normalized query length bound missing.');
 // Round 15.
