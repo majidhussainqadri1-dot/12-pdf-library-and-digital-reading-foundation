@@ -57,8 +57,9 @@ final class PLDR_Storage {
         if (is_wp_error($root)) {
             return $root;
         }
-        $name = basename($storage_name);
-        if ('' === $name || '.' === $name || '..' === $name) {
+        $raw=trim($storage_name);
+        $name=basename($raw);
+        if ('' === $name || '.' === $name || '..' === $name || $raw !== $name || false !== strpos($raw, '/') || false !== strpos($raw, '\\') || false !== strpos($raw, "\0")) {
             return new WP_Error('pldr_storage_name', 'Invalid private object name.');
         }
         return trailingslashit($root) . $name;
@@ -110,9 +111,8 @@ final class PLDR_Storage {
         return false;
     }
 
-    public static function delete(string $path): void {
-        if (is_file($path)) {
-            @unlink($path);
-        }
+    public static function delete(string $path): bool {
+        if (!is_file($path)) return true;
+        return @unlink($path);
     }
 }

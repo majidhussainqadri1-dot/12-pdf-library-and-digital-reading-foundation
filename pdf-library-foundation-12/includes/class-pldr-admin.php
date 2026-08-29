@@ -99,9 +99,9 @@ final class PLDR_Health {
             ));
             if(1!==$updated){$wpdb->query('ROLLBACK');PLDR_Storage::delete((string)$allocation['path']);$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Object state changed during key rotation; no stale metadata was committed.','cas_conflict'=>true);continue;}
             if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');PLDR_Storage::delete((string)$allocation['path']);$results[]=array('object_id'=>$object_id,'ok'=>false,'error'=>'Key rotation commit failed.');continue;}
-            PLDR_Storage::delete((string)$old);
-            PLDR_Core::audit('object',$object_id,'key_rotated',array('old_key'=>$object['key_id'],'new_key'=>$meta['key_id'],'plaintext_integrity_verified'=>true,'post_rotation_verified'=>true,'cas_committed'=>true));
-            $results[]=array('object_id'=>$object_id,'ok'=>true,'key_id'=>$meta['key_id'],'plaintext_integrity_verified'=>true,'post_rotation_verified'=>true,'cas_committed'=>true);
+            $old_deleted=PLDR_Storage::delete((string)$old);
+            PLDR_Core::audit('object',$object_id,'key_rotated',array('old_key'=>$object['key_id'],'new_key'=>$meta['key_id'],'plaintext_integrity_verified'=>true,'post_rotation_verified'=>true,'cas_committed'=>true,'old_ciphertext_deleted'=>$old_deleted));
+            $results[]=array('object_id'=>$object_id,'ok'=>$old_deleted,'key_id'=>$meta['key_id'],'plaintext_integrity_verified'=>true,'post_rotation_verified'=>true,'cas_committed'=>true,'old_ciphertext_deleted'=>$old_deleted,'reconciliation_required'=>!$old_deleted);
         }
         return array('operation'=>'rotate-keys','active_key_id'=>$active,'results'=>$results);
     }
