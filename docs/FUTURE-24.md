@@ -3,9 +3,9 @@
 Founder-approved change request for **File 12 — PDF Library and Digital Reading**.
 
 - Change set: `F12-FUT-001` through `F12-FUT-024`
-- Current repository candidate: `1.1.0-rc.3`
+- Current repository candidate: `1.1.0-rc.4`
 - DB/contract: `1.1.0`
-- Change date: 11 August 2026; repository review alignment through R24 on 13 August 2026
+- Change date: 11 August 2026; repository review alignment through R25 on 29 August 2026
 - Governing law: latest Founder instruction > latest consolidated central plan > File 12 plan > verified implementation evidence.
 - Architectural law: one canonical owner per entity/fact; this change may extend File 12 document/reader state but may not duplicate File 00 identity, File 05 learning truth, File 06 encyclopedia truth, File 16 AI output, communication backends, File 20 shell/navigation, or File 25 global visual-system ownership.
 
