@@ -43,7 +43,8 @@ final class PLDR_Rights {
         global $wpdb;
         $reporter_id = $reporter_id ?: get_current_user_id();
         if (!$reporter_id) return PLDR_Core::machine_error('pldr_case_login', 'Log in to file a rights or safety report.', 401);
-        $doc = PLDR_Core::document($document_id);
+        $wpdb->last_error='';$doc = PLDR_Core::document($document_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_case_document_read','Rights-report document state could not be read reliably; the report was not filed.',503,array('degraded'=>true));
         if (!$doc) return PLDR_Core::machine_error('pldr_document_missing', 'Document not found.', 404);
         $allowed = array('copyright','unauthorized-scan','attribution','patient-privacy','medical-safety','misleading-claim','false-credentials','broken-pdf','rights-expired','other');
         $reason = sanitize_key($reason);
