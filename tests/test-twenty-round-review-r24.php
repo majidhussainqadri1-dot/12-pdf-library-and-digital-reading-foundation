@@ -23,11 +23,10 @@ $must($future,"wp_next_scheduled('pldr_future_fingerprint_edition',array(\$editi
 $must($frest,"'/future/derive-text', array('methods'=>'POST','callback'=>array(__CLASS__,'derive_text'),'permission_callback'=>array(__CLASS__,'logged_in'))",'provider-derived mutating POST is no longer authenticated');
 $must($reader,'encode_reading_dashboard_cursor','bounded reading-workspace continuation cursor missing');
 $must($reader,"'Older reading progress'",'reading-workspace continuation control missing');
-$must($main,'Version: 1.1.0-rc.3','R24 release-candidate version marker missing');
-$must($main,"define('PLDR_VERSION', '1.1.0-rc.3')",'R24 runtime release-candidate constant missing');
 $must($main,"define('PLDR_DB_VERSION', '1.1.0')",'R24 unexpectedly drifted the DB schema version');
 $must($main,"define('PLDR_CONTRACT_VERSION', '1.1.0')",'R24 unexpectedly drifted the integration contract version');
 $doc=dirname(__DIR__).'/docs/TWENTY-ROUND-REVIEW-2026-08-13-R24.md';if(!is_file($doc)){fwrite(STDERR,"R24 review record missing.\n");exit(1);} $record=(string)file_get_contents($doc);for($i=1;$i<=20;$i++)$must($record,"## Round {$i}","R24 review record missing Round {$i}");
+$must($record,'1.1.0-rc.3','R24 release identity evidence missing from the immutable R24 review record');
 $must($record,'First-ten defect rounds: 1, 5, 7, 8, 9.','R24 first-ten defect accounting missing');
 $must($record,'Final defect rounds: 1, 5, 7, 8, 9, 14, 15, 16, 17, 18, 19, 20.','R24 final defect accounting missing');
 $must($record,'Final clean rounds: 2, 3, 4, 6, 10, 11, 12, 13.','R24 clean-round accounting missing');
