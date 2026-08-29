@@ -7,7 +7,9 @@ final class PLDR_Access {
     public static function can_access_edition(int $edition_id, string $operation = 'read', int $user_id = 0): bool {
         $edition = PLDR_Core::edition($edition_id);
         if (!$edition) return false;
-        $user_id = $user_id ?: get_current_user_id();
+        // A negative sentinel means an explicitly anonymous/public authorization check.
+        // Zero keeps the historical caller contract of resolving the current user.
+        $user_id = $user_id < 0 ? 0 : ($user_id ?: get_current_user_id());
         if (isset($edition['status']) && 'published' !== $edition['status'] && !PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id) && !PLDR_Core::authorize('rights',(int)$edition['document_id'],$user_id)) return false;
         if (!in_array($edition['document_status'], array('published', 'restricted'), true)) {
             if (!PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id) && !PLDR_Core::authorize('rights', (int) $edition['document_id'], $user_id)) return false;
@@ -238,7 +240,8 @@ final class PLDR_Access {
             self::fail_delivery(403, 'Access grant binding failed.');
         }
         $wpdb->last_error='';
-        $still_allowed=self::can_access_edition((int)$row['edition_id'],(string)$row['operation'],(int)$row['user_id']);
+        $grant_user=(int)$row['user_id']>0?(int)$row['user_id']:-1;
+        $still_allowed=self::can_access_edition((int)$row['edition_id'],(string)$row['operation'],$grant_user);
         if(''!==(string)$wpdb->last_error)self::fail_delivery(503,'Document authorization state is temporarily unavailable.');
         if (!$still_allowed) {
             self::fail_delivery(403, 'Document access is no longer permitted.');
@@ -358,13 +361,13 @@ final class PLDR_Access {
         exit;
     }
 
-    public static function cleanup_tokens(): void {
-        global $wpdb;$batch=500;$continuation=false;
-        $tokens=$wpdb->query($wpdb->prepare("DELETE FROM ".PLDR_Core::table('access_tokens')." WHERE expires_at<%s OR (revoked_at IS NOT NULL AND revoked_at<%s) ORDER BY id ASC LIMIT {$batch}",gmdate('Y-m-d H:i:s',time()-DAY_IN_SECONDS),gmdate('Y-m-d H:i:s',time()-7*DAY_IN_SECONDS)));
-        if(false===$tokens)PLDR_Core::audit('system',0,'access_token_cleanup_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));elseif($tokens===$batch)$continuation=true;
-        $wpdb->last_error='';
-        $idempotency=$wpdb->query($wpdb->prepare("DELETE FROM ".PLDR_Core::table('idempotency')." WHERE expires_at<=%s ORDER BY expires_at ASC LIMIT {$batch}",PLDR_Core::now()));
-        if(false===$idempotency)PLDR_Core::audit('system',0,'idempotency_cleanup_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));elseif($idempotency===$batch)$continuation=true;
-        if($continuation)wp_schedule_single_event(time()+60,'pldr_cleanup_tokens');
+    public static function cleanup_tokens(): array {
+        global $wpdb;$batch=500;$continuation=false;$errors=array();
+        $wpdb->last_error='';$tokens=$wpdb->query($wpdb->prepare("DELETE FROM ".PLDR_Core::table('access_tokens')." WHERE expires_at<%s OR (revoked_at IS NOT NULL AND revoked_at<%s) ORDER BY id ASC LIMIT {$batch}",gmdate('Y-m-d H:i:s',time()-DAY_IN_SECONDS),gmdate('Y-m-d H:i:s',time()-7*DAY_IN_SECONDS)));
+        if(false===$tokens){$errors[]='access_tokens';PLDR_Core::audit('system',0,'access_token_cleanup_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));$tokens=0;}elseif($tokens===$batch)$continuation=true;
+        $wpdb->last_error='';$idempotency=$wpdb->query($wpdb->prepare("DELETE FROM ".PLDR_Core::table('idempotency')." WHERE expires_at<=%s ORDER BY expires_at ASC LIMIT {$batch}",PLDR_Core::now()));
+        if(false===$idempotency){$errors[]='idempotency';PLDR_Core::audit('system',0,'idempotency_cleanup_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));$idempotency=0;}elseif($idempotency===$batch)$continuation=true;
+        $scheduled=false;if($continuation){if(wp_next_scheduled('pldr_cleanup_tokens'))$scheduled=true;else$scheduled=(bool)wp_schedule_single_event(time()+60,'pldr_cleanup_tokens');}
+        return array('ok'=>!$errors,'access_tokens_deleted'=>(int)$tokens,'idempotency_deleted'=>(int)$idempotency,'batch_limit'=>$batch,'continuation_needed'=>$continuation,'continuation_scheduled'=>$scheduled,'errors'=>$errors);
     }
 }

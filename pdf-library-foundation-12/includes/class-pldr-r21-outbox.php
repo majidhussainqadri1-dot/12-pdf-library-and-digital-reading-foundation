@@ -39,44 +39,40 @@ final class PLDR_R21_Outbox {
         }
     }
 
-    public static function dispatch():void {
+    public static function dispatch():array {
         global $wpdb;$now=PLDR_Core::now();$table=PLDR_Core::table('outbox');
-        $wpdb->last_error='';
-        $rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE status IN (%s,%s,%s) AND available_at<=%s ORDER BY id ASC LIMIT 50",'pending','retry','processing',$now),ARRAY_A);
-        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'outbox_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return;}
-        foreach(is_array($rows)?$rows:array() as $row){
-            $lease_until=gmdate('Y-m-d H:i:s',time()+10*MINUTE_IN_SECONDS);
+        $summary=array('ok'=>true,'selected'=>0,'claimed'=>0,'sent'=>0,'retried'=>0,'dead_lettered'=>0,'errors'=>0,'batch_limit'=>50);
+        $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE status IN (%s,%s,%s) AND available_at<=%s ORDER BY id ASC LIMIT 50",'pending','retry','processing',$now),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'outbox_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));$summary['ok']=false;$summary['errors']=1;return $summary;}
+        $rows=is_array($rows)?$rows:array();$summary['selected']=count($rows);
+        foreach($rows as $row){
+            $lease_until=gmdate('Y-m-d H:i:s',time()+10*MINUTE_IN_SECONDS);$wpdb->last_error='';
             $claimed=$wpdb->query($wpdb->prepare("UPDATE {$table} SET status=%s,available_at=%s WHERE id=%d AND status IN (%s,%s,%s) AND available_at<=%s",'processing',$lease_until,(int)$row['id'],'pending','retry','processing',$now));
-            if(1!==$claimed)continue;
+            if(false===$claimed){$summary['ok']=false;$summary['errors']++;PLDR_Core::audit('outbox',(int)$row['id'],'outbox_claim_failed',array('event_id'=>(string)$row['event_id'],'db_error'=>substr((string)$wpdb->last_error,0,500)));continue;}
+            if(1!==$claimed)continue;$summary['claimed']++;
             $event_name=(string)$row['event_name'];
-            if(!isset(self::CONTRACTS[$event_name])){
-                self::dead_letter((int)$row['id'],$lease_until,(int)$row['attempts'],'unknown-event-contract',(string)$row['event_id']);
-                continue;
-            }
+            if(!isset(self::CONTRACTS[$event_name])){if(self::dead_letter((int)$row['id'],$lease_until,(int)$row['attempts'],'unknown-event-contract',(string)$row['event_id']))$summary['dead_lettered']++;else{$summary['ok']=false;$summary['errors']++;}continue;}
             $payload=json_decode((string)$row['payload_json'],true);
-            if(!is_array($payload)||JSON_ERROR_NONE!==json_last_error()){
-                self::dead_letter((int)$row['id'],$lease_until,(int)$row['attempts'],'invalid-payload-json',(string)$row['event_id']);
-                continue;
-            }
+            if(!is_array($payload)||JSON_ERROR_NONE!==json_last_error()){if(self::dead_letter((int)$row['id'],$lease_until,(int)$row['attempts'],'invalid-payload-json',(string)$row['event_id']))$summary['dead_lettered']++;else{$summary['ok']=false;$summary['errors']++;}continue;}
             try{
-                $accepted=apply_filters('pldr_dispatch_event',true,$event_name,$payload,(string)$row['event_id']);
-                if(false===$accepted)throw new RuntimeException('consumer-requested-retry');
-                do_action('sabri_domain_event',$event_name,$payload,(string)$row['event_id'],'file-12');
-                do_action('pldr_event',$event_name,$payload,(string)$row['event_id']);
+                $accepted=apply_filters('pldr_dispatch_event',true,$event_name,$payload,(string)$row['event_id']);if(false===$accepted)throw new RuntimeException('consumer-requested-retry');
+                do_action('sabri_domain_event',$event_name,$payload,(string)$row['event_id'],'file-12');do_action('pldr_event',$event_name,$payload,(string)$row['event_id']);
                 $stored=$wpdb->update($table,array('status'=>'sent','sent_at'=>PLDR_Core::now(),'last_error'=>null),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
-                if(1!==$stored)throw new RuntimeException('lease-state-persist-failed');
+                if(1!==$stored)throw new RuntimeException('lease-state-persist-failed');$summary['sent']++;
             }catch(Throwable $e){
-                $attempts=(int)$row['attempts']+1;$status=$attempts>=8?'dead-letter':'retry';$delay=min(3600,30*(2**min($attempts,6)));
-                $safe_code='consumer-dispatch-failed';
+                $attempts=(int)$row['attempts']+1;$status=$attempts>=8?'dead-letter':'retry';$delay=min(3600,30*(2**min($attempts,6)));$safe_code='consumer-dispatch-failed';
                 $retry=$wpdb->update($table,array('status'=>$status,'attempts'=>$attempts,'available_at'=>gmdate('Y-m-d H:i:s',time()+$delay),'last_error'=>$safe_code),array('id'=>(int)$row['id'],'status'=>'processing','available_at'=>$lease_until));
-                PLDR_Core::audit('outbox',(int)$row['id'],'outbox_dispatch_failed',array('event_id'=>(string)$row['event_id'],'event_name'=>$event_name,'attempts'=>$attempts,'next_state'=>$status,'error_class'=>sanitize_key(get_class($e)),'persisted'=>false!==$retry));
+                $persisted=1===$retry;
+                if($persisted){if('dead-letter'===$status)$summary['dead_lettered']++;else$summary['retried']++;}else{$summary['ok']=false;$summary['errors']++;}
+                PLDR_Core::audit('outbox',(int)$row['id'],'outbox_dispatch_failed',array('event_id'=>(string)$row['event_id'],'event_name'=>$event_name,'attempts'=>$attempts,'next_state'=>$status,'error_class'=>sanitize_key(get_class($e)),'persisted'=>$persisted));
             }
         }
+        return $summary;
     }
 
-    private static function dead_letter(int $id,string $lease_until,int $attempts,string $code,string $event_id):void {
+    private static function dead_letter(int $id,string $lease_until,int $attempts,string $code,string $event_id):bool {
         global $wpdb;$table=PLDR_Core::table('outbox');
         $stored=$wpdb->update($table,array('status'=>'dead-letter','attempts'=>max(8,$attempts+1),'last_error'=>$code),array('id'=>$id,'status'=>'processing','available_at'=>$lease_until));
-        PLDR_Core::audit('outbox',$id,'outbox_dead_lettered',array('event_id'=>$event_id,'reason'=>$code,'persisted'=>1===$stored));
+        $persisted=1===$stored;PLDR_Core::audit('outbox',$id,'outbox_dead_lettered',array('event_id'=>$event_id,'reason'=>$code,'persisted'=>$persisted));return $persisted;
     }
 }
