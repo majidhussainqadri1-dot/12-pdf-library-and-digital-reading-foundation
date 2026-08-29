@@ -21,7 +21,11 @@ final class PLDR_Access {
             if(false===$rights_ts){PLDR_Core::audit('edition',$edition_id,'rights_expiry_invalid',array('document_id'=>(int)$edition['document_id']),$user_id);if(!$curator)return false;}
             elseif($rights_ts<=time()&&!$curator)return false;
         }
-        if (!empty($policy['embargo_until']) && strtotime((string) $policy['embargo_until']) > time() && !PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id)) return false;
+        if(!empty($policy['embargo_until'])){
+            $embargo_raw=(string)$policy['embargo_until'];$embargo_ts=strtotime($embargo_raw);
+            if(false===$embargo_ts){PLDR_Core::audit('edition',$edition_id,'access_embargo_invalid',array('document_id'=>(int)$edition['document_id']),$user_id);if(!PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id)&&!PLDR_Core::authorize('rights',(int)$edition['document_id'],$user_id))return false;}
+            elseif($embargo_ts>time()&&!PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id))return false;
+        }
         if ('download' === $operation && empty($policy['download_allowed'])) return false;
         if ('print' === $operation && empty($policy['print_allowed'])) return false;
         if ('offline' === $operation && empty($policy['offline_allowed'])) return false;
