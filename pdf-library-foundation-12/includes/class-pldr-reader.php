@@ -27,17 +27,17 @@ final class PLDR_Search {
         $batch_size=min(128,max(48,$per_page*3));$target=$logical_offset+$per_page+1;$suggested_limit=max(256,$target*4);$scan_limit_provider_failed=false;
         try{$scan_limit=(int)apply_filters('pldr_search_scan_limit',$suggested_limit,$args,$user_id);}catch(Throwable $e){$scan_limit=$suggested_limit;$scan_limit_provider_failed=true;PLDR_Core::audit('search',0,'catalog_scan_limit_provider_failed',array('provider_failure'=>true),$user_id);}
         $scan_limit=max($batch_size,min(1000,$scan_limit));$raw_scanned=0;$eligible=array();$scan_truncated=false;
-        $after_updated=(string)($cursor['updated_at']??'');$after_id=absint($cursor['id']??0);$page_cursor=array();$exhausted=false;
+        $after_created=(string)($cursor['created_at']??'');$after_id=absint($cursor['id']??0);$page_cursor=array();$exhausted=false;
         while(count($eligible)<$target&&$raw_scanned<$scan_limit){
             $limit=min($batch_size,$scan_limit-$raw_scanned);$loop_where=$where;$params=$base_params;
-            if(''!==$after_updated&&$after_id>0){$loop_where[]='(d.updated_at<%s OR (d.updated_at=%s AND d.id<%d))';$params[]=$after_updated;$params[]=$after_updated;$params[]=$after_id;}
-            $sql='SELECT d.* FROM '.PLDR_Core::table('documents').' d WHERE '.implode(' AND ',$loop_where).' ORDER BY d.updated_at DESC,d.id DESC LIMIT %d';$params[]=$limit;
+            if(''!==$after_created&&$after_id>0){$loop_where[]='(d.created_at<%s OR (d.created_at=%s AND d.id<%d))';$params[]=$after_created;$params[]=$after_created;$params[]=$after_id;}
+            $sql='SELECT d.* FROM '.PLDR_Core::table('documents').' d WHERE '.implode(' AND ',$loop_where).' ORDER BY d.created_at DESC,d.id DESC LIMIT %d';$params[]=$limit;
             $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare($sql,$params),ARRAY_A);
             if(''!==(string)$wpdb->last_error)return array('items'=>array(),'page'=>$page,'per_page'=>$per_page,'has_more'=>false,'error'=>PLDR_Core::machine_error('pldr_catalog_read','PDF Library catalog state could not be read reliably.',503,array('degraded'=>true)),'degraded'=>true,'scan_limit_provider_failed'=>$scan_limit_provider_failed);
             $rows=is_array($rows)?$rows:array();if(!$rows){$exhausted=true;break;}
             $stop=false;
             foreach($rows as $doc){
-                $after_updated=(string)$doc['updated_at'];$after_id=(int)$doc['id'];$raw_scanned++;
+                $after_created=(string)$doc['created_at'];$after_id=(int)$doc['id'];$raw_scanned++;
                 $wpdb->last_error='';$edition=PLDR_Core::current_edition((int)$doc['id']);
                 if(''!==(string)$wpdb->last_error)return array('items'=>array(),'page'=>$page,'per_page'=>$per_page,'has_more'=>false,'error'=>PLDR_Core::machine_error('pldr_catalog_edition_read','PDF Library edition state could not be read reliably during catalog filtering.',503,array('degraded'=>true)),'degraded'=>true);
                 if(!$edition)continue;
@@ -47,7 +47,7 @@ final class PLDR_Search {
                 $wpdb->last_error='';$dto=PLDR_Core::public_document_dto($doc,$edition);
                 if(''!==(string)$wpdb->last_error)return array('items'=>array(),'page'=>$page,'per_page'=>$per_page,'has_more'=>false,'error'=>PLDR_Core::machine_error('pldr_catalog_projection_read','PDF Library access-policy projection could not be read reliably.',503,array('degraded'=>true)),'degraded'=>true);
                 $eligible[]=$dto;
-                if(count($eligible)===$logical_offset+$per_page)$page_cursor=array('updated_at'=>$after_updated,'id'=>$after_id);
+                if(count($eligible)===$logical_offset+$per_page)$page_cursor=array('created_at'=>$after_created,'id'=>$after_id);
                 if(count($eligible)>=$target){$stop=true;break;}
                 if($raw_scanned>=$scan_limit)break;
             }
@@ -56,14 +56,14 @@ final class PLDR_Search {
         }
         if(!$exhausted&&$raw_scanned>=$scan_limit&&count($eligible)<$target)$scan_truncated=true;
         $items=array_slice($eligible,$logical_offset,$per_page);$has_more=count($eligible)>($logical_offset+$per_page)||$scan_truncated;
-        $cursor_point=$page_cursor?:array('updated_at'=>$after_updated,'id'=>$after_id);
+        $cursor_point=$page_cursor?:array('created_at'=>$after_created,'id'=>$after_id);
         $remaining_skip=$scan_truncated?max(0,$logical_offset-count($eligible)):0;
-        $next_cursor=$has_more&&!empty($cursor_point['id'])?self::encode_catalog_cursor((string)$cursor_point['updated_at'],(int)$cursor_point['id'],$cursor_context,$remaining_skip):null;
+        $next_cursor=$has_more&&!empty($cursor_point['id'])?self::encode_catalog_cursor((string)$cursor_point['created_at'],(int)$cursor_point['id'],$cursor_context,$remaining_skip):null;
         return array('items'=>$items,'page'=>$page,'per_page'=>$per_page,'has_more'=>$has_more,'next_cursor'=>$next_cursor,'cursor_supported'=>true,'pagination_mode'=>$cursor_token?'cursor':'legacy-page-compatible','access_filtered_pagination'=>true,'scan_truncated'=>$scan_truncated,'raw_rows_scanned'=>$raw_scanned,'cursor_skip_remaining'=>$remaining_skip,'scan_limit_provider_failed'=>$scan_limit_provider_failed);
     }
 
-    private static function encode_catalog_cursor(string $updated_at,int $id,string $context,int $skip=0):string {
-        $json=wp_json_encode(array('u'=>$updated_at,'i'=>$id,'c'=>$context,'s'=>max(0,$skip)));if(!is_string($json))return '';
+    private static function encode_catalog_cursor(string $created_at,int $id,string $context,int $skip=0):string {
+        $json=wp_json_encode(array('c_at'=>$created_at,'i'=>$id,'ctx'=>$context,'s'=>max(0,$skip),'t'=>time()));if(!is_string($json))return '';
         $payload=rtrim(strtr(base64_encode($json),'+/','-_'),'=');$sig=hash_hmac('sha256',$payload,wp_salt('auth'));return $payload.'.'.$sig;
     }
 
@@ -71,8 +71,8 @@ final class PLDR_Search {
         if(''===$token)return array();if(strlen($token)>600||1!==substr_count($token,'.'))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor is malformed.',400);
         [$payload,$sig]=explode('.',$token,2);$expected=hash_hmac('sha256',$payload,wp_salt('auth'));if(!hash_equals($expected,$sig))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor signature is invalid.',400);
         $padded=$payload.str_repeat('=',(4-strlen($payload)%4)%4);$raw=base64_decode(strtr($padded,'-_','+/'),true);$decoded=is_string($raw)?json_decode($raw,true):null;
-        if(!is_array($decoded)||!isset($decoded['u'],$decoded['i'],$decoded['c'])||!hash_equals($context,(string)$decoded['c'])||absint($decoded['i'])<1||false===strtotime((string)$decoded['u']))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor does not match this query/audience or is invalid.',400);
-        return array('updated_at'=>(string)$decoded['u'],'id'=>absint($decoded['i']),'skip'=>absint($decoded['s']??0));
+        if(!is_array($decoded)||!isset($decoded['c_at'],$decoded['i'],$decoded['ctx'],$decoded['t'])||!hash_equals($context,(string)$decoded['ctx'])||absint($decoded['i'])<1||absint($decoded['t'])<time()-1800||absint($decoded['t'])>time()+60||false===strtotime((string)$decoded['c_at']))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor does not match this query/audience, is expired, or is invalid.',400);
+        return array('created_at'=>(string)$decoded['c_at'],'id'=>absint($decoded['i']),'skip'=>absint($decoded['s']??0));
     }
 
     public static function ocr(int $edition_id, string $query, int $user_id = 0,string $cursor_token='',int $limit=50): array {
