@@ -309,18 +309,20 @@ final class PLDR_Access {
 
     private static function quarantine_delivery_failure(array $grant,array $object,string $error): void {
         global $wpdb;
-        $object_id=(int)($object['id']??0);$edition_id=(int)($grant['edition_id']??0);
-        if($object_id<1||$edition_id<1)return;
-        $changed=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s','quarantined',PLDR_Core::now(),$object_id,'available'));
-        $edition=PLDR_Core::edition($edition_id);$document_id=(int)($edition['document_id']??0);
+        $object_id=(int)($object['id']??0);$edition_id=(int)($grant['edition_id']??0);if($object_id<1||$edition_id<1)return;
+        $wpdb->last_error='';
+        $changed=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s AND storage_name=%s AND key_id=%s AND encrypted_sha256=%s','quarantined',PLDR_Core::now(),$object_id,'available',(string)($object['storage_name']??''),(string)($object['key_id']??''),(string)($object['encrypted_sha256']??'')));
+        if(false===$changed){PLDR_Core::audit('object',$object_id,'delivery_integrity_reconciliation_failed',array('edition_id'=>$edition_id,'db_error'=>substr((string)$wpdb->last_error,0,500)));return;}
         if(1===$changed){
-            if($document_id>0)self::revoke_document($document_id,'delivery-integrity-failure');
-            PLDR_Core::audit('object',$object_id,'delivery_integrity_quarantined',array('edition_id'=>$edition_id,'document_id'=>$document_id,'error'=>substr(sanitize_text_field($error),0,500)));
-            return;
+            $wpdb->last_error='';$edition=PLDR_Core::edition($edition_id);
+            if(''!==(string)$wpdb->last_error){PLDR_Core::audit('object',$object_id,'delivery_integrity_quarantined',array('edition_id'=>$edition_id,'document_revocation_pending'=>true,'error'=>substr(sanitize_text_field($error),0,500)));return;}
+            $document_id=(int)($edition['document_id']??0);if($document_id>0)self::revoke_document($document_id,'delivery-integrity-failure');
+            PLDR_Core::audit('object',$object_id,'delivery_integrity_quarantined',array('edition_id'=>$edition_id,'document_id'=>$document_id,'error'=>substr(sanitize_text_field($error),0,500),'sample_state_cas'=>true));return;
         }
-        $current=PLDR_Core::object($object_id);
+        $wpdb->last_error='';$current=PLDR_Core::object($object_id);
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('object',$object_id,'delivery_integrity_reconciliation_failed',array('edition_id'=>$edition_id,'db_error'=>substr((string)$wpdb->last_error,0,500)));return;}
         if($current&&'quarantined'===(string)$current['object_status'])return;
-        PLDR_Core::audit('object',$object_id,'delivery_integrity_reconciliation_failed',array('edition_id'=>$edition_id,'document_id'=>$document_id,'db_error'=>substr((string)$wpdb->last_error,0,500)));
+        PLDR_Core::audit('object',$object_id,'delivery_integrity_stale_sample_ignored',array('edition_id'=>$edition_id,'sample_state_changed'=>true));
     }
 
     private static function parse_range(int $size): array {
