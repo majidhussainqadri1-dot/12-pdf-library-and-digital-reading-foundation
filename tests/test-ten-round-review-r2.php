@@ -43,9 +43,11 @@ $must($core, "state'=>'reserved", 'Pending idempotency reservation state missing
 $must($rest, 'pldr_idempotency_in_progress', 'Core REST does not block concurrent same-key mutations.');
 $must($frest, 'pldr_future_idempotency_in_progress', 'Future REST does not block concurrent same-key mutations.');
 
-// Round 4.
+// Round 4. R25 strengthened this boundary: verification uses a stored reviewed assessment rather than refreshing provider evidence inside verify().
 $must($a11y, 'pldr_a11y_refresh_forbidden', 'Accessibility refresh authority is not document-scoped.');
-$must($a11y, 'self::inspect($edition_id,true)', 'Accessibility verification does not force a fresh assessment.');
+$must($a11y, 'pldr_a11y_verify_refresh_required', 'Accessibility verification does not require a stored reviewed assessment.');
+$must($a11y, 'verification_used_stored_assessment', 'Accessibility verification does not disclose stored-assessment verification.');
+if (strpos($a11y, 'self::inspect($edition_id,true)') !== false) { fwrite(STDERR, "Second ten-round regression: accessibility verify still refreshes provider evidence internally.\n"); exit(1); }
 $must($a11y, 'pldr_a11y_verify_forbidden', 'Accessibility verification object guard missing.');
 
 // Round 5.
