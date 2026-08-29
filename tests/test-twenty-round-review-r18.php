@@ -4,6 +4,7 @@ $read=static function(string $path) use($root):string{$full=$root.'/'.$path;if(!
 $must=static function(string $src,string $needle,string $why):void{if(false===strpos($src,$needle)){fwrite(STDERR,"R18 regression: {$why}\n");exit(1);}};
 
 $rights=$read('includes/class-pldr-rights.php');
+$outbox=$read('includes/class-pldr-r21-outbox.php');
 $access=$read('includes/class-pldr-access.php');
 $rest=$read('includes/class-pldr-rest.php');
 $core=$read('includes/class-pldr-core.php');
@@ -75,8 +76,8 @@ $must($access,'$batch=500','token/idempotency cleanup is not bounded.');
 $must($rights,'ORDER BY e.rights_expires_at ASC LIMIT 100','rights-expiry job is not bounded.');
 $must($admin,'$limit=100','search-index repair batch bound missing.');
 $must($admin,'pldr_search_repair_state','search-index repair is not resumable.');
-$must($rights,'outbox_payload_corrupt','corrupt outbox payloads are not quarantined/dead-lettered.');
-$must($rights,'\'invalid-payload-json\'','corrupt outbox payload dead-letter marker missing.');
+$must($outbox,'outbox_dead_lettered','corrupt outbox payloads are not quarantined/dead-lettered.');
+$must($outbox,'\'invalid-payload-json\'','corrupt outbox payload dead-letter marker missing.');
 // Round 19.
 $must($admin,'cas_persistence','integrity sampling CAS persistence disclosure missing.');
 $must($admin,'integrity_verify_reconcile_failed','integrity verification stale-state reconciliation missing.');

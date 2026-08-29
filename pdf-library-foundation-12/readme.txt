@@ -4,7 +4,7 @@ Tags: pdf, library, digital-reading, rights, accessibility, rtl, iiif, annotatio
 Requires at least: 7.0
 Tested up to: 7.0.1
 Requires PHP: 8.1
-Stable tag: 1.1.0-rc.2
+Stable tag: 1.1.0-rc.3
 License: GPLv2 or later
 
 File 12 canonical implementation for the Sabri Social Homeopathy Platform.
@@ -12,7 +12,7 @@ File 12 canonical implementation for the Sabri Social Homeopathy Platform.
 == Description ==
 Provides canonical bibliographic documents and editions, encrypted private objects, lawful rights records, signed short-lived audience/object/operation-bound delivery, HTTP byte ranges, an accessible responsive reader, private cross-device progress/bookmarks/notes/highlights, lawful OCR/search adapters, stable citations, takedown/dispute/appeal workflows, Book Content Pack manifests, preservation/integrity jobs, privacy export/erasure, and versioned cross-file events/contracts.
 
-Version 1.1.0-rc.2 retains the Founder-approved **Future Digital Reading Intelligence 24** expansion and incorporates the R23 twenty-round corrective hardening: governed `/library/manage/` routing, privacy-safe schema diagnostics, stricter signed-delivery method/range semantics, fail-closed cover scanning, rights-expiry restoration protection, retry-safe transient idempotency, logout/login-surface offline-vault purge, and bounded catalog scan cost. Future-24 includes reflow reading, read aloud, smart outline recovery, edition comparison, precise scholarly anchors, citation exports, bibliographic authority enrichment adapters, OCR quality/correction workflow, portable annotations, IIIF manifests, search heatmaps, encrypted offline vault, low-bandwidth text-first mode, multiple layouts, smart shelves, private non-gamified insights, cross-device handoff, accessibility inspection, scholarly room context, knowledge context, AI-ready corpus manifests, translation/transliteration overlays, preservation laboratory, and visual/OCR scan fingerprints.
+Version 1.1.0-rc.3 retains the Founder-approved **Future Digital Reading Intelligence 24** expansion and incorporates the R24 twenty-round corrective hardening: governed route registration, current-rights ingest validation, canonical publication eligibility, monotonic progress concurrency, access-filtered cursor continuity, single governed outbox delivery, reconnect-aware offline authorization, shared Sabri Green token inheritance, deduplicated fingerprint scheduling, authenticated provider-derived POST operations, and bounded private reading-workspace continuation. Future-24 includes reflow reading, read aloud, smart outline recovery, edition comparison, precise scholarly anchors, citation exports, bibliographic authority enrichment adapters, OCR quality/correction workflow, portable annotations, IIIF manifests, search heatmaps, encrypted offline vault, low-bandwidth text-first mode, multiple layouts, smart shelves, private non-gamified insights, cross-device handoff, accessibility inspection, scholarly room context, knowledge context, AI-ready corpus manifests, translation/transliteration overlays, preservation laboratory, and visual/OCR scan fingerprints.
 
 This release is a repository/code candidate. Staging acceptance, live deployment and operational acceptance remain separate evidence gates.
 

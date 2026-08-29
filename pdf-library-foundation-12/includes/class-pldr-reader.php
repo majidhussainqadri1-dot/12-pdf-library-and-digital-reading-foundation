@@ -17,7 +17,7 @@ final class PLDR_Search {
         $cursor_context=hash('sha256',implode('|',array($term,$type,$category,$language,(string)$user_id)));
         $cursor=self::decode_catalog_cursor($cursor_token,$cursor_context);
         if(is_wp_error($cursor))return array('items'=>array(),'error'=>$cursor);
-        $logical_offset=$cursor_token?0:(($page-1)*$per_page);
+        $logical_offset=$cursor_token?absint($cursor['skip']??0):(($page-1)*$per_page);
         if(!$cursor_token&&$logical_offset>20000)return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_cursor_required','Deep catalog traversal requires the signed cursor returned by the previous page.',400,array('legacy_offset_limit'=>20000)));
         $where = array("d.status='published'");$base_params=array();
         if ($term) { $where[]='d.search_text LIKE %s';$base_params[]='%'.$wpdb->esc_like($term).'%'; }
@@ -57,12 +57,13 @@ final class PLDR_Search {
         if(!$exhausted&&$raw_scanned>=$scan_limit&&count($eligible)<$target)$scan_truncated=true;
         $items=array_slice($eligible,$logical_offset,$per_page);$has_more=count($eligible)>($logical_offset+$per_page)||$scan_truncated;
         $cursor_point=$page_cursor?:array('updated_at'=>$after_updated,'id'=>$after_id);
-        $next_cursor=$has_more&&!empty($cursor_point['id'])?self::encode_catalog_cursor((string)$cursor_point['updated_at'],(int)$cursor_point['id'],$cursor_context):null;
-        return array('items'=>$items,'page'=>$page,'per_page'=>$per_page,'has_more'=>$has_more,'next_cursor'=>$next_cursor,'cursor_supported'=>true,'pagination_mode'=>$cursor_token?'cursor':'legacy-page-compatible','access_filtered_pagination'=>true,'scan_truncated'=>$scan_truncated,'raw_rows_scanned'=>$raw_scanned,'scan_limit_provider_failed'=>$scan_limit_provider_failed);
+        $remaining_skip=$scan_truncated?max(0,$logical_offset-count($eligible)):0;
+        $next_cursor=$has_more&&!empty($cursor_point['id'])?self::encode_catalog_cursor((string)$cursor_point['updated_at'],(int)$cursor_point['id'],$cursor_context,$remaining_skip):null;
+        return array('items'=>$items,'page'=>$page,'per_page'=>$per_page,'has_more'=>$has_more,'next_cursor'=>$next_cursor,'cursor_supported'=>true,'pagination_mode'=>$cursor_token?'cursor':'legacy-page-compatible','access_filtered_pagination'=>true,'scan_truncated'=>$scan_truncated,'raw_rows_scanned'=>$raw_scanned,'cursor_skip_remaining'=>$remaining_skip,'scan_limit_provider_failed'=>$scan_limit_provider_failed);
     }
 
-    private static function encode_catalog_cursor(string $updated_at,int $id,string $context):string {
-        $json=wp_json_encode(array('u'=>$updated_at,'i'=>$id,'c'=>$context));if(!is_string($json))return '';
+    private static function encode_catalog_cursor(string $updated_at,int $id,string $context,int $skip=0):string {
+        $json=wp_json_encode(array('u'=>$updated_at,'i'=>$id,'c'=>$context,'s'=>max(0,$skip)));if(!is_string($json))return '';
         $payload=rtrim(strtr(base64_encode($json),'+/','-_'),'=');$sig=hash_hmac('sha256',$payload,wp_salt('auth'));return $payload.'.'.$sig;
     }
 
@@ -71,7 +72,7 @@ final class PLDR_Search {
         [$payload,$sig]=explode('.',$token,2);$expected=hash_hmac('sha256',$payload,wp_salt('auth'));if(!hash_equals($expected,$sig))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor signature is invalid.',400);
         $padded=$payload.str_repeat('=',(4-strlen($payload)%4)%4);$raw=base64_decode(strtr($padded,'-_','+/'),true);$decoded=is_string($raw)?json_decode($raw,true):null;
         if(!is_array($decoded)||!isset($decoded['u'],$decoded['i'],$decoded['c'])||!hash_equals($context,(string)$decoded['c'])||absint($decoded['i'])<1||false===strtotime((string)$decoded['u']))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor does not match this query/audience or is invalid.',400);
-        return array('updated_at'=>(string)$decoded['u'],'id'=>absint($decoded['i']));
+        return array('updated_at'=>(string)$decoded['u'],'id'=>absint($decoded['i']),'skip'=>absint($decoded['s']??0));
     }
 
     public static function ocr(int $edition_id, string $query, int $user_id = 0,string $cursor_token='',int $limit=50): array {
@@ -158,6 +159,11 @@ final class PLDR_Reading {
         $current_revision=(string)($current['updated_at']??'');
         if($current_revision!==$expected_updated_at){$wpdb->query('ROLLBACK');return PLDR_Core::machine_error('pldr_progress_conflict','Reading progress changed on another session or device; refresh before replacing that position.',409,array('current_updated_at'=>$current_revision));}
         $updated_at=PLDR_Core::now();
+        if($current_revision){
+            $current_ts=strtotime($current_revision);
+            $next_ts=strtotime($updated_at);
+            if(false!==$current_ts&&false!==$next_ts&&$next_ts<=$current_ts)$updated_at=gmdate('Y-m-d H:i:s',$current_ts+1);
+        }
         if($current){
             $ok=$wpdb->query($wpdb->prepare('UPDATE '.$table.' SET last_page=%d,percent=%s,edition_version=%d,updated_at=%s WHERE user_id=%d AND edition_id=%d AND updated_at=%s',$page,(string)$percent,(int)$edition['version'],$updated_at,$user_id,$edition_id,$current_revision));
         }else{
@@ -385,19 +391,42 @@ final class PLDR_Reader {
         if (!is_user_logged_in()) return '<div class="pldr-state">' . esc_html__('Log in to view private reading progress.','pdf-library-digital-reading') . '</div>';
         global $wpdb;
         $uid=get_current_user_id();
+        $cursor_token=substr(sanitize_text_field(wp_unslash((string)($_GET['cursor']??''))),0,600);
+        $cursor=self::decode_reading_dashboard_cursor($cursor_token,$uid);
+        if(is_wp_error($cursor))return self::state_html('error');
+        $where='s.user_id=%d';$params=array($uid);
+        if($cursor){
+            $where.=' AND (s.updated_at<%s OR (s.updated_at=%s AND s.edition_id<%d))';
+            $params[]=(string)$cursor['updated_at'];$params[]=(string)$cursor['updated_at'];$params[]=(int)$cursor['edition_id'];
+        }
+        $params[]=51;
         $wpdb->last_error='';
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT s.*,e.document_id,d.public_id,d.title,d.slug FROM '.PLDR_Core::table('reading_state').' s JOIN '.PLDR_Core::table('editions').' e ON e.id=s.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE s.user_id=%d ORDER BY s.updated_at DESC LIMIT 100',$uid),ARRAY_A);
+        $raw=$wpdb->get_results($wpdb->prepare('SELECT s.*,e.document_id,d.public_id,d.title,d.slug FROM '.PLDR_Core::table('reading_state').' s JOIN '.PLDR_Core::table('editions').' e ON e.id=s.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE '.$where.' ORDER BY s.updated_at DESC,s.edition_id DESC LIMIT %d',$params),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return self::state_html('error');
-        $rows=is_array($rows)?$rows:array();
+        $raw=is_array($raw)?$raw:array();$has_more=count($raw)>50;if($has_more)$raw=array_slice($raw,0,50);
         $visible=array();
-        foreach($rows as $row){
+        foreach($raw as $row){
             $wpdb->last_error='';
             $allowed=PLDR_Access::can_access_edition((int)$row['edition_id'],'read',$uid);
             if(''!==(string)$wpdb->last_error)return self::state_html('error');
             if($allowed)$visible[]=$row;
         }
-        $rows=$visible;
-        ob_start();?><main class="pldr-shell"><h1><?php esc_html_e('Reading Workspace','pdf-library-digital-reading');?></h1><div class="pldr-grid"><?php foreach($rows as $row):?><article class="pldr-card"><div class="pldr-card-body"><h2><a href="<?php echo esc_url(PLDR_Core::route_url('read',array('id'=>$row['public_id'])));?>"><?php echo esc_html($row['title']);?></a></h2><p><?php echo esc_html(sprintf(__('Page %1$d · %2$s%% complete','pdf-library-digital-reading'),(int)$row['last_page'],(string)$row['percent']));?></p></div></article><?php endforeach;?></div></main><?php return (string)ob_get_clean();
+        $next_cursor='';
+        if($has_more&&$raw){$last=$raw[count($raw)-1];$next_cursor=self::encode_reading_dashboard_cursor((string)$last['updated_at'],(int)$last['edition_id'],$uid);}
+        ob_start();?><main class="pldr-shell"><h1><?php esc_html_e('Reading Workspace','pdf-library-digital-reading');?></h1><?php if(!$visible):?><div class="pldr-empty"><p><?php echo esc_html($has_more?__('No currently accessible reading items were found in this bounded page. Continue to older private progress.','pdf-library-digital-reading'):__('No accessible private reading progress is available.','pdf-library-digital-reading'));?></p></div><?php endif;?><div class="pldr-grid"><?php foreach($visible as $row):?><article class="pldr-card"><div class="pldr-card-body"><h2><a href="<?php echo esc_url(PLDR_Core::route_url('read',array('id'=>$row['public_id'])));?>"><?php echo esc_html($row['title']);?></a></h2><p><?php echo esc_html(sprintf(__('Page %1$d · %2$s%% complete','pdf-library-digital-reading'),(int)$row['last_page'],(string)$row['percent']));?></p></div></article><?php endforeach;?></div><?php if($next_cursor):?><nav class="pldr-local-nav" aria-label="<?php esc_attr_e('Reading workspace pagination','pdf-library-digital-reading');?>"><a class="pldr-primary" href="<?php echo esc_url(add_query_arg('cursor',$next_cursor,PLDR_Core::route_url('reading')));?>"><?php esc_html_e('Older reading progress','pdf-library-digital-reading');?></a></nav><?php endif;?></main><?php return (string)ob_get_clean();
+    }
+
+    private static function encode_reading_dashboard_cursor(string $updated_at,int $edition_id,int $user_id):string {
+        $json=wp_json_encode(array('u'=>$updated_at,'e'=>$edition_id,'a'=>hash('sha256','reading-dashboard|'.$user_id)));if(!is_string($json))return '';
+        $payload=rtrim(strtr(base64_encode($json),'+/','-_'),'=');return $payload.'.'.hash_hmac('sha256',$payload,wp_salt('auth'));
+    }
+
+    private static function decode_reading_dashboard_cursor(string $token,int $user_id){
+        if(''===$token)return array();if(strlen($token)>600||1!==substr_count($token,'.'))return PLDR_Core::machine_error('pldr_reading_cursor','Reading-workspace cursor is malformed.',400);
+        [$payload,$sig]=explode('.',$token,2);$expected=hash_hmac('sha256',$payload,wp_salt('auth'));if(!hash_equals($expected,$sig))return PLDR_Core::machine_error('pldr_reading_cursor','Reading-workspace cursor signature is invalid.',400);
+        $padded=$payload.str_repeat('=',(4-strlen($payload)%4)%4);$raw=base64_decode(strtr($padded,'-_','+/'),true);$decoded=is_string($raw)?json_decode($raw,true):null;$audience=hash('sha256','reading-dashboard|'.$user_id);
+        if(!is_array($decoded)||!isset($decoded['u'],$decoded['e'],$decoded['a'])||!hash_equals($audience,(string)$decoded['a'])||absint($decoded['e'])<1||false===strtotime((string)$decoded['u']))return PLDR_Core::machine_error('pldr_reading_cursor','Reading-workspace cursor does not match this account or is invalid.',400);
+        return array('updated_at'=>(string)$decoded['u'],'edition_id'=>absint($decoded['e']));
     }
 
     public static function citation(array $edition,int $page=0,string $style='sabri'): string {

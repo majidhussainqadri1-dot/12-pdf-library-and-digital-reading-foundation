@@ -21,8 +21,8 @@ $must($main,"login_enqueue_scripts', array('PLDR_Future', 'vault_purge_asset')",
 $forbid($future,"add_action('wp_logout', array(__CLASS__, 'mark_vault_purge'))",'duplicate Future logout purge hook returned');
 $must($reader,'suggested_limit=max(256,$target*4)','bounded catalog default scan budget missing');
 $must($reader,'min(1000,$scan_limit)','catalog raw scan hard cap missing');
-$must($main,'Version: 1.1.0-rc.2','R23 release-candidate version marker missing');
-$must($main,"define('PLDR_VERSION', '1.1.0-rc.2')",'R23 runtime release-candidate constant missing');
+$must($main,'Version: 1.1.0-rc.','release-candidate version marker missing');
+$must($main,"define('PLDR_VERSION', '1.1.0-rc.",'runtime release-candidate constant missing');
 $must($main,"define('PLDR_DB_VERSION', '1.1.0')",'DB schema version drifted unexpectedly');
 $doc=dirname(__DIR__).'/docs/TWENTY-ROUND-REVIEW-2026-08-13-R23.md';if(!is_file($doc)){fwrite(STDERR,"R23 review record missing.\n");exit(1);} $record=(string)file_get_contents($doc);for($i=1;$i<=20;$i++)$must($record,"## Round {$i}","R23 review record missing Round {$i}");
 $must($record,'First-ten defect rounds: **1, 2, 3, 4, 6**','R23 first-ten defect summary missing');

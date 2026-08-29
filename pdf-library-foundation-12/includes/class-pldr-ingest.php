@@ -76,6 +76,10 @@ final class PLDR_Ingest {
             $requested_rights_expires=self::date_or_null($data['rights_expires_at']??'','rights_expires_at');
             $requested_embargo=self::date_or_null($data['embargo_until']??'','embargo_until');
         }catch(InvalidArgumentException $e){return PLDR_Core::machine_error('pldr_ingest_date',$e->getMessage(),400);}
+        if(null!==$requested_rights_expires){
+            $rights_expires_ts=strtotime($requested_rights_expires);
+            if(false===$rights_expires_ts||$rights_expires_ts<=time())return PLDR_Core::machine_error('pldr_rights_expired_ingest','A new edition cannot be ingested with rights that are already expired; renew or replace the lawful rights evidence first.',409);
+        }
 
         if (empty($files['pdf']['tmp_name']) || !is_uploaded_file($files['pdf']['tmp_name'])) {
             return PLDR_Core::machine_error('pldr_pdf_missing', 'A verified HTTP-uploaded PDF is required.', 400);
