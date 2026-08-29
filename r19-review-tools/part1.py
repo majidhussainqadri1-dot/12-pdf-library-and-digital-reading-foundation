@@ -39,8 +39,8 @@ lint_commit(3,'make delivery grant authorization DB failures explicit',[access])
 
 # Round 4 — a grant issued to the anonymous/public audience must remain anonymous during delivery revalidation.
 replace_once(access,
-"        $user_id = $user_id ?: get_current_user_id();",
-"        $user_id = $user_id < 0 ? 0 : ($user_id ?: get_current_user_id());")
+"    public static function can_access_edition(int $edition_id, string $operation = 'read', int $user_id = 0): bool {\n        $edition = PLDR_Core::edition($edition_id);\n        if (!$edition) return false;\n        $user_id = $user_id ?: get_current_user_id();",
+"    public static function can_access_edition(int $edition_id, string $operation = 'read', int $user_id = 0): bool {\n        $edition = PLDR_Core::edition($edition_id);\n        if (!$edition) return false;\n        $user_id = $user_id < 0 ? 0 : ($user_id ?: get_current_user_id());")
 replace_once(access,
 "        $still_allowed=self::can_access_edition((int)$row['edition_id'],(string)$row['operation'],(int)$row['user_id']);",
 "        $grant_user=(int)$row['user_id']>0?(int)$row['user_id']:-1;\n        $still_allowed=self::can_access_edition((int)$row['edition_id'],(string)$row['operation'],$grant_user);")
