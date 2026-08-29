@@ -235,17 +235,29 @@ final class PLDR_Rights {
         return true;
     }
 
-    public static function expire_rights():void {
+    public static function expire_rights():array {
         global $wpdb;
+        $summary=array('ok'=>true,'selected'=>0,'restricted'=>0,'failed'=>0,'batch_limit'=>100,'continuation_scheduled'=>false);
         $editions=PLDR_Core::table('editions');
         $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare(
             "SELECT e.document_id FROM {$editions} e INNER JOIN (SELECT document_id,MAX(id) current_id FROM {$editions} WHERE status=%s GROUP BY document_id) current ON current.current_id=e.id WHERE e.rights_expires_at IS NOT NULL AND e.rights_expires_at<=%s ORDER BY e.rights_expires_at ASC LIMIT 100",
             'published',PLDR_Core::now()
         ),ARRAY_A);
-        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'rights_expiry_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));return;}
-        $rows=is_array($rows)?$rows:array();
-        foreach($rows as $r){$wpdb->last_error='';$doc=PLDR_Core::document((int)$r['document_id']);if(''!==(string)$wpdb->last_error){PLDR_Core::audit('document',(int)$r['document_id'],'rights_expiry_document_read_failed',array());continue;}if($doc && 'published'===$doc['status'])self::set_document_status((int)$doc['id'],'restricted','rights-expired');}
-        if(100===count($rows))wp_schedule_single_event(time()+60,'pldr_rights_expiry');
+        if(''!==(string)$wpdb->last_error){PLDR_Core::audit('system',0,'rights_expiry_read_failed',array('db_error'=>substr((string)$wpdb->last_error,0,500)));$summary['ok']=false;$summary['failed']=1;return $summary;}
+        $rows=is_array($rows)?$rows:array();$summary['selected']=count($rows);
+        foreach($rows as $r){
+            $document_id=(int)$r['document_id'];$wpdb->last_error='';$doc=PLDR_Core::document($document_id);
+            if(''!==(string)$wpdb->last_error){$summary['ok']=false;$summary['failed']++;PLDR_Core::audit('document',$document_id,'rights_expiry_document_read_failed',array());continue;}
+            if(!$doc||'published'!==$doc['status'])continue;
+            $changed=self::set_document_status($document_id,'restricted','rights-expired');
+            if(is_wp_error($changed)){$summary['ok']=false;$summary['failed']++;PLDR_Core::audit('document',$document_id,'rights_expiry_transition_failed',array('error_code'=>$changed->get_error_code()));continue;}
+            $summary['restricted']++;
+        }
+        if(100===count($rows)||$summary['failed']>0){
+            if(wp_next_scheduled('pldr_rights_expiry'))$summary['continuation_scheduled']=true;
+            else $summary['continuation_scheduled']=(bool)wp_schedule_single_event(time()+60,'pldr_rights_expiry');
+        }
+        return $summary;
     }
 }
 
