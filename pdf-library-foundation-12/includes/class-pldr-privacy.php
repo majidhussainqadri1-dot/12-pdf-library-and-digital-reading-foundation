@@ -31,6 +31,10 @@ final class PLDR_Privacy {
         return $user ? (int) $user->ID : 0;
     }
 
+    private static function subject_ref(int $user_id): string {
+        return substr(hash_hmac('sha256',(string)$user_id,wp_salt('auth')),0,24);
+    }
+
     private static function table_exists(string $suffix): bool {
         global $wpdb;
         $table = PLDR_Core::table($suffix);
@@ -45,7 +49,7 @@ final class PLDR_Privacy {
     }
 
     private static function export_failure(array $data,string $scope,int $user_id): array {
-        PLDR_Core::audit('privacy',0,'privacy_export_read_failed',array('user_id'=>$user_id,'scope'=>$scope),$user_id);
+        PLDR_Core::audit('privacy',0,'privacy_export_read_failed',array('subject_ref'=>self::subject_ref($user_id),'scope'=>$scope),$user_id);
         return array('data'=>$data,'done'=>false);
     }
 
@@ -227,7 +231,7 @@ final class PLDR_Privacy {
         try {
             $hold = (bool) apply_filters('pldr_privacy_legal_hold', false, $user_id);
         } catch (Throwable $e) {
-            PLDR_Core::audit('privacy',0,'privacy_legal_hold_provider_failed',array('user_id'=>$user_id,'provider_failure'=>true),$user_id);
+            PLDR_Core::audit('privacy',0,'privacy_legal_hold_provider_failed',array('subject_ref'=>self::subject_ref($user_id),'provider_failure'=>true),$user_id);
             return array(
                 'items_removed'=>false,
                 'items_retained'=>true,
@@ -332,7 +336,7 @@ final class PLDR_Privacy {
         }
         if($errors)return array('items_removed'=>$removed>0,'items_retained'=>true,'messages'=>array(__('File 12 privacy reconciliation could not confirm completion; retry is required.','pdf-library-digital-reading')),'done'=>false);
 
-        $subject_ref=substr(hash_hmac('sha256',(string)$user_id,wp_salt('auth')),0,24);
+        $subject_ref=self::subject_ref($user_id);
         PLDR_Core::audit('privacy', 0, 'user_reading_erasure_batch', array('subject_ref'=>$subject_ref,'removed'=>$removed,'remaining'=>$remaining,'page'=>max(1,$page)));
         return array(
             'items_removed'=>$removed > 0,
