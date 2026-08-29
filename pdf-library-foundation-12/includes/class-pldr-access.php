@@ -114,7 +114,9 @@ final class PLDR_Access {
             return PLDR_Core::machine_error('pldr_operation', 'Unsupported File 12 delivery operation.', 400);
         }
         $user_id = $user_id ?: get_current_user_id();
-        if (!self::can_access_edition($edition_id, $operation, $user_id)) {
+        $wpdb->last_error='';$allowed=self::can_access_edition($edition_id,$operation,$user_id);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_token_access_read','Delivery authorization state could not be verified reliably; no grant was issued.',503,array('degraded'=>true));
+        if (!$allowed) {
             return PLDR_Core::machine_error('pldr_access_denied', 'The requested document is unavailable for this operation.', 403);
         }
         $wpdb->last_error='';
