@@ -54,11 +54,12 @@ $must($preservation, 'pldr_preservation_quarantine_store', 'Quarantine persisten
 $must($preservation, 'external_health', 'External preservation downgrade guard missing.');
 
 // Round 6.
-$must($data, 'ocr_pages(int $edition_id,int $page=0,int $limit=0,int $offset=0)', 'Bounded OCR retrieval signature missing.');
+$must($data, 'ocr_pages(int $edition_id,int $page=0,int $limit=0,int $offset=0,int $after_page=0)', 'Bounded OCR retrieval signature missing.');
 $must($data, 'public static function reflow(int $edition_id,int $page=0)', 'Page-scoped reflow missing.');
 $must($search, 'pldr_heatmap_query_long', 'Heatmap maximum query bound missing.');
 $must($search, 'pldr_heatmap_page_scan_limit', 'Heatmap work budget missing.');
-$must($corpus, 'next_offset', 'Corpus pagination cursor missing.');
+$must($corpus, 'next_cursor', 'Corpus signed cursor pagination missing.');
+$must($corpus, 'cursor_supported', 'Corpus cursor capability disclosure missing.');
 $must($corpus, 'manifest_version', 'Corpus bounded manifest missing.');
 
 // Round 7.
@@ -79,7 +80,8 @@ $must($insights, 'windowed_completion', 'Completion metric is not bounded to the
 // Round 10.
 $must($frest, 'PLDR_Future_Data::reflow(absint', 'REST reflow does not pass page selection into the data layer.');
 $must($frest, 'PLDR_Future_Corpus::manifest(absint', 'REST corpus pagination is not wired.');
-$must($frest, "'offset'=>array('sanitize_callback'=>'absint')", 'REST corpus offset sanitization missing.');
+$must($frest, "'cursor'=>array('sanitize_callback'=>'sanitize_text_field')", 'REST corpus signed cursor sanitization missing.');
+$must($frest, 'pldr_corpus_cursor_required', 'REST corpus rejects obsolete offset traversal only with an explicit cursor-required error.');
 
 $doc = dirname(__DIR__) . '/docs/TEN-ROUND-REVIEW-2026-08-11-R2.md';
 if (!is_file($doc)) { fwrite(STDERR, "Second ten-round review record missing.\n"); exit(1); }

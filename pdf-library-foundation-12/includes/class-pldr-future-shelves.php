@@ -35,7 +35,6 @@ final class PLDR_Future_Shelves {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return array();
-        $defaults=self::ensure_defaults($uid);if(is_wp_error($defaults))return array('error'=>$defaults);
         $shelves=PLDR_Core::table('shelves');$items=PLDR_Core::table('shelf_items');
         $wpdb->last_error='';
         $rows=$wpdb->get_results($wpdb->prepare(

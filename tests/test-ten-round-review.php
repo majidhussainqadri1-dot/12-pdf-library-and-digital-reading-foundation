@@ -68,7 +68,8 @@ $contains($future, 'r.onsuccess=clear', 'Pass 6 regression: logout purge does no
 $contains($future, '$cookie = \'pldr_vault_purge=;',  'Pass 6 regression: successful client purge does not clear the retry cookie.');
 
 // Pass 7: integrity failure is fail-closed and preservation sampling rotates by verification age.
-$contains($preservation, "'object_status'=>'quarantined'", 'Pass 7 regression: preservation checksum failure no longer quarantines the object.');
+$contains($preservation, "SET object_status=%s,verified_at=%s", 'Pass 7 regression: preservation checksum failure no longer atomically quarantines the object.');
+$contains($preservation, "'quarantined',PLDR_Core::now()", 'Pass 7 regression: preservation quarantine target state is missing.');
 $contains($preservation, "revoke_document", 'Pass 7 regression: preservation integrity failure does not revoke access grants.');
 $contains($preservation, 'last_verified_at IS NULL', 'Pass 7 regression: preservation scheduler no longer rotates by verification age.');
 

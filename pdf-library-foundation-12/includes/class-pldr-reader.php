@@ -74,13 +74,20 @@ final class PLDR_Search {
         return array('updated_at'=>(string)$decoded['u'],'id'=>absint($decoded['i']));
     }
 
-    public static function ocr(int $edition_id, string $query, int $user_id = 0): array {
+    public static function ocr(int $edition_id, string $query, int $user_id = 0,string $cursor_token='',int $limit=50): array {
         global $wpdb;
-        if (!PLDR_Access::can_access_edition($edition_id, 'read', $user_id)) return array('error'=>PLDR_Core::machine_error('pldr_ocr_forbidden','Document text search is unavailable.',404));
+        $wpdb->last_error='';
+        $allowed=PLDR_Access::can_access_edition($edition_id, 'read', $user_id);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_ocr_access_read','Document text-search authorization state could not be verified reliably.',503,array('degraded'=>true)));
+        if (!$allowed) return array('error'=>PLDR_Core::machine_error('pldr_ocr_forbidden','Document text search is unavailable.',404));
         $needle = PLDR_Core::normalize_search($query);
         $needle_len=function_exists('mb_strlen')?mb_strlen($needle,'UTF-8'):strlen($needle);
         if ($needle_len < 2) return array('error'=>PLDR_Core::machine_error('pldr_ocr_query_short','Document text search requires at least two characters.',400));
         if ($needle_len > 160) return array('error'=>PLDR_Core::machine_error('pldr_ocr_query_long','Document text search query is too long.',400,array('max_characters'=>160)));
+        $limit=max(1,min(100,$limit));
+        $context=hash('sha256',$edition_id.'|'.$needle.'|'.$user_id);
+        $after_page=self::decode_ocr_cursor($cursor_token,$context);
+        if(is_wp_error($after_page))return array('error'=>$after_page);
         try {
             $variants = apply_filters('pldr_search_variants', array($needle), $needle, $edition_id);
         } catch (Throwable $e) {
@@ -91,22 +98,41 @@ final class PLDR_Search {
             $value=PLDR_Core::normalize_search((string)$value);
             return function_exists('mb_substr')?mb_substr($value,0,160,'UTF-8'):substr($value,0,160);
         }, (array) $variants))));
-        $clauses = array(); $params = array();
+        $clauses = array(); $params = array($edition_id);
         foreach (array_slice($variants, 0, 5) as $variant) { if(''===$variant)continue; $clauses[] = 'normalized_text LIKE %s'; $params[] = '%' . $wpdb->esc_like($variant) . '%'; }
         if (!$clauses) return array('error'=>PLDR_Core::machine_error('pldr_ocr_variants','No safe document text-search variant was available.',400));
-        array_unshift($params, $edition_id);
-        $sql = 'SELECT page_number,language,quality_score,text_content FROM ' . PLDR_Core::table('ocr_text') . ' WHERE edition_id=%d AND (' . implode(' OR ', $clauses) . ') ORDER BY page_number ASC LIMIT 100';
+        $where='edition_id=%d AND (' . implode(' OR ', $clauses) . ')';
+        if($after_page>0){$where.=' AND page_number>%d';$params[]=$after_page;}
+        $sql = 'SELECT page_number,language,quality_score,text_content FROM ' . PLDR_Core::table('ocr_text') . ' WHERE '.$where.' ORDER BY page_number ASC LIMIT %d';
+        $params[]=$limit+1;
         $wpdb->last_error='';
         $rows = $wpdb->get_results($wpdb->prepare($sql, $params), ARRAY_A);
         if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_ocr_read','Document OCR search state could not be read reliably.',503,array('degraded'=>true)));
-        return array_map(static function (array $row) use ($query): array {
+        $rows=is_array($rows)?$rows:array();$has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
+        $items=array_map(static function (array $row) use ($query): array {
             $text = (string) $row['text_content'];
             $pos = function_exists('mb_stripos') ? mb_stripos($text,$query,0,'UTF-8') : stripos($text,$query);
             $start = false === $pos ? 0 : max(0, $pos - 90);
             $snippet=function_exists('mb_substr')?mb_substr($text,$start,240,'UTF-8'):substr($text,$start,240);
             return array('page' => (int) $row['page_number'], 'language' => $row['language'], 'quality' => (float) $row['quality_score'], 'snippet' => $snippet);
-        }, is_array($rows)?$rows:array());
+        },$rows);
+        $last=$items?(int)$items[count($items)-1]['page']:0;
+        return array('items'=>$items,'limit'=>$limit,'has_more'=>$has_more,'next_cursor'=>$has_more&&$last>0?self::encode_ocr_cursor($last,$context):null,'cursor_supported'=>true);
     }
+
+    private static function encode_ocr_cursor(int $page,string $context):string {
+        $json=wp_json_encode(array('p'=>$page,'c'=>$context));if(!is_string($json))return '';
+        $payload=rtrim(strtr(base64_encode($json),'+/','-_'),'=');return $payload.'.'.hash_hmac('sha256',$payload,wp_salt('auth'));
+    }
+
+    private static function decode_ocr_cursor(string $token,string $context){
+        $token=trim($token);if(''===$token)return 0;if(strlen($token)>500||1!==substr_count($token,'.'))return PLDR_Core::machine_error('pldr_ocr_cursor','OCR search cursor is malformed.',400);
+        [$payload,$sig]=explode('.',$token,2);$expected=hash_hmac('sha256',$payload,wp_salt('auth'));if(!hash_equals($expected,$sig))return PLDR_Core::machine_error('pldr_ocr_cursor','OCR search cursor signature is invalid.',400);
+        $padded=$payload.str_repeat('=',(4-strlen($payload)%4)%4);$raw=base64_decode(strtr($padded,'-_','+/'),true);$decoded=is_string($raw)?json_decode($raw,true):null;
+        if(!is_array($decoded)||!isset($decoded['p'],$decoded['c'])||!hash_equals($context,(string)$decoded['c'])||absint($decoded['p'])<1)return PLDR_Core::machine_error('pldr_ocr_cursor','OCR search cursor does not match this query/audience or is invalid.',400);
+        return absint($decoded['p']);
+    }
+
 }
 
 final class PLDR_Reading {

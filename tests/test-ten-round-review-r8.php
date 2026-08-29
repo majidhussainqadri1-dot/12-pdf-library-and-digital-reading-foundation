@@ -35,9 +35,11 @@ $must($insights, 'private const REPORT_GROUP_LIMIT = 1000', 'Reading-insight gro
 $must($insights, 'group_scan_truncated', 'Reading-insight group truncation is not disclosed.');
 $must($insights, 'aggregate_truncated', 'Reading-insight aggregate incompleteness is not disclosed.');
 
-// Round 4 — public accessibility cache misses are read-only.
-$must($a11y, 'if(!$can_refresh)return $report;', 'Public accessibility cache misses can still persist/provider-refresh.');
-$must($a11y, "'persisted'=>false", 'Transient public accessibility result is not marked non-persistent.');
+// Round 4 — public accessibility reads are read-only; provider/persistence refresh is governed.
+$must($a11y, 'if($refresh&&!$can_refresh)', 'Accessibility refresh authority gate is missing.');
+$must($a11y, 'if($refresh){', 'Accessibility provider invocation is not confined to governed refresh.');
+$must($a11y, 'if(!$refresh)return $report;', 'Read-only accessibility cache-miss path can still persist/provider-refresh.');
+$must($a11y, "'persisted'=>false", 'Transient read-only accessibility result is not marked non-persistent.');
 $must($a11y, "'persisted'=>true", 'Persisted accessibility DTO state is not explicit.');
 
 // Round 5 — bounded provider invocation for derived text.

@@ -99,7 +99,7 @@ final class PLDR_Future {
         if (!wp_next_scheduled('pldr_future_cleanup')) {
             wp_schedule_event(time() + 600, 'daily', 'pldr_future_cleanup');
         }
-        add_action('pldr_future_fingerprint_edition', array('PLDR_Future_Fingerprint', 'compute_and_store'));
+        add_action('pldr_future_fingerprint_edition', array(__CLASS__, 'fingerprint_job'), 10, 2);
         add_action('pldr_generate_derivatives', array(__CLASS__, 'after_derivatives'), 40, 2);
         add_action('admin_notices', array(__CLASS__, 'schema_notice'));
         do_action('sabri_register_module_extension', array(
@@ -113,8 +113,20 @@ final class PLDR_Future {
     public static function after_derivatives(int $edition_id, int $cursor = 0): void {
         if (0 !== $cursor) return;
         if (!wp_next_scheduled('pldr_future_fingerprint_edition', array($edition_id))) {
-            wp_schedule_single_event(time() + 90, 'pldr_future_fingerprint_edition', array($edition_id));
+            wp_schedule_single_event(time() + 90, 'pldr_future_fingerprint_edition', array($edition_id,0));
         }
+    }
+
+
+    public static function fingerprint_job(int $edition_id,int $attempt=0): void {
+        $attempt=max(0,min(3,$attempt));
+        $result=PLDR_Future_Fingerprint::compute_and_store($edition_id);
+        $error=is_array($result)&&isset($result['error'])&&is_wp_error($result['error'])?$result['error']:null;
+        if(!$error)return;
+        PLDR_Core::audit('edition',$edition_id,'fingerprint_background_failed',array('attempt'=>$attempt,'error_code'=>$error->get_error_code()));
+        if($attempt>=3)return;
+        $delay=min(3600,60*(2**$attempt));
+        wp_schedule_single_event(time()+$delay,'pldr_future_fingerprint_edition',array($edition_id,$attempt+1));
     }
 
     public static function cleanup(): void {
@@ -127,7 +139,9 @@ final class PLDR_Future {
             'authority_cache'=>$wpdb->prepare('DELETE FROM '.PLDR_Core::table('authority_cache').' WHERE expires_at<%s ORDER BY id ASC LIMIT 1000',gmdate('Y-m-d H:i:s',time()-7*DAY_IN_SECONDS)),
             'room_contexts'=>$wpdb->prepare('DELETE FROM '.PLDR_Core::table('room_contexts').' WHERE status=%s AND created_at<%s ORDER BY id ASC LIMIT 1000','pending-provider',gmdate('Y-m-d H:i:s',time()-30*DAY_IN_SECONDS)),
         );
-        foreach($queries as $scope=>$sql){if(false===$wpdb->query($sql))PLDR_Core::audit('system',0,'future_cleanup_failed',array('scope'=>$scope,'db_error'=>substr((string)$wpdb->last_error,0,500)));}
+        $continuation=false;
+        foreach($queries as $scope=>$sql){$affected=$wpdb->query($sql);if(false===$affected)PLDR_Core::audit('system',0,'future_cleanup_failed',array('scope'=>$scope,'db_error'=>substr((string)$wpdb->last_error,0,500)));elseif(1000===$affected)$continuation=true;}
+        if($continuation)wp_schedule_single_event(time()+60,'pldr_future_cleanup');
     }
 
     public static function mark_vault_purge(): void {

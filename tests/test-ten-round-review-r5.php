@@ -72,7 +72,8 @@ $must($insights, 'pldr_insight_rate_limit', 'Reading-event 429 path is missing.'
 // Round 10 — clean verification scope retained.
 $must($schema, 'option_value=%s WHERE option_name=%s AND option_value=%s', 'Future migration stale-lock CAS guard is missing.');
 $must($corpus, 'pldr_ai_corpus_allowed', 'AI corpus deny-by-default allowlist boundary is missing.');
-$must($corpus, 'next_offset', 'AI corpus pagination is missing.');
+$must($corpus, 'next_cursor', 'AI corpus signed pagination is missing.');
+$must($corpus, 'cursor_supported', 'AI corpus cursor capability disclosure is missing.');
 $must($authority, 'pldr_authority_provider', 'Authority-provider degraded path is missing.');
 $must($preservation, 'pldr_preservation_quarantine_store', 'Preservation quarantine persistence guard is missing.');
 

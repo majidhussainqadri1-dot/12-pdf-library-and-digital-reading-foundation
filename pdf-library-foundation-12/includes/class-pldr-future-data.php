@@ -28,21 +28,25 @@ final class PLDR_Future_Data {
         return $edition;
     }
 
-    public static function ocr_pages(int $edition_id,int $page=0,int $limit=0,int $offset=0): array {
+    public static function ocr_pages(int $edition_id,int $page=0,int $limit=0,int $offset=0,int $after_page=0): array {
         global $wpdb;
-        $page=max(0,$page);$offset=max(0,$offset);$limit=max(0,min(self::BULK_OCR_LIMIT,$limit));
+        $page=max(0,$page);$offset=max(0,$offset);$after_page=max(0,$after_page);$limit=max(0,min(self::BULK_OCR_LIMIT,$limit));
         if(0===$page && 0===$limit)$limit=self::BULK_OCR_LIMIT;
         $sql='SELECT page_number,language,quality_score,text_content,normalized_text FROM '.PLDR_Core::table('ocr_text').' WHERE edition_id=%d';
         $params=array($edition_id);
-        if($page>0){$sql.=' AND page_number=%d';$params[]=$page;}
+        if($page>0){$sql.=' AND page_number=%d';$params[]=$page;}elseif($after_page>0){$sql.=' AND page_number>%d';$params[]=$after_page;}
         $sql.=' ORDER BY page_number ASC';
-        if($limit>0){$sql.=' LIMIT %d OFFSET %d';$params[]=$limit;$params[]=$offset;}
-        $rows=$wpdb->get_results($wpdb->prepare($sql,$params),ARRAY_A)?:array();
+        if($limit>0){$sql.=' LIMIT %d';$params[]=$limit;if($offset>0&&$after_page===0){$sql.=' OFFSET %d';$params[]=$offset;}}
+        $rows=$wpdb->get_results($wpdb->prepare($sql,$params),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array();
+        $rows=is_array($rows)?$rows:array();
         if(!$rows)return array();
         $page_ids=array_values(array_unique(array_map(static fn(array $row):int=>(int)$row['page_number'],$rows)));
         $placeholders=implode(',',array_fill(0,count($page_ids),'%d'));
         $correction_sql='SELECT page_number,original_text,corrected_text FROM '.PLDR_Core::table('ocr_corrections').' WHERE edition_id=%d AND status=%s AND page_number IN ('.$placeholders.') ORDER BY page_number ASC,id ASC';
-        $corrections=$wpdb->get_results($wpdb->prepare($correction_sql,array_merge(array($edition_id,'approved'),$page_ids)),ARRAY_A)?:array();
+        $corrections=$wpdb->get_results($wpdb->prepare($correction_sql,array_merge(array($edition_id,'approved'),$page_ids)),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return array();
+        $corrections=is_array($corrections)?$corrections:array();
         $by_page=array();
         foreach($corrections as $correction)$by_page[(int)$correction['page_number']][]=$correction;
         foreach($rows as &$row){

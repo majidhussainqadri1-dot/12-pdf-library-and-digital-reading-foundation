@@ -98,29 +98,39 @@
     try { const grant = await refreshToken('read'); tokenUrl = grant.url; updateFrame(); } catch (e) { say(e.message); }
   });
 
+  const renderOcrPage = async (query, cursor = '', append = false) => {
+    const suffix = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+    const result = await api(`ocr-search/${cfg.editionId}?q=${encodeURIComponent(query)}&limit=50${suffix}`);
+    if (!append && !result.items?.length) { ocrResults.innerHTML = '<p>No lawful OCR text matches were found.</p>'; return; }
+    let list = append ? ocrResults.querySelector('ol') : null;
+    if (!list) list = document.createElement('ol');
+    (result.items || []).forEach((item) => { const li=document.createElement('li'); const b=document.createElement('button'); b.type='button'; b.textContent=`Page ${item.page}: ${item.snippet}`; b.addEventListener('click',()=>setPage(item.page)); li.appendChild(b); list.appendChild(li); });
+    const oldMore=ocrResults.querySelector('[data-ocr-more]');if(oldMore)oldMore.remove();
+    if(!append)ocrResults.replaceChildren(list);
+    if(result.has_more&&result.next_cursor){const more=document.createElement('button');more.type='button';more.dataset.ocrMore='1';more.textContent='Load more search results';more.addEventListener('click',async()=>{more.disabled=true;try{await renderOcrPage(query,result.next_cursor,true);}catch(e){ocrResults.append(Object.assign(document.createElement('p'),{textContent:e.message}));}});ocrResults.append(more);}
+  };
+
   ocrForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const query = new FormData(ocrForm).get('q')?.toString().trim() || '';
     if (query.length < 2) return;
     ocrResults.innerHTML = '<p>Searching…</p>';
-    try {
-      const result = await api(`ocr-search/${cfg.editionId}?q=${encodeURIComponent(query)}`);
-      if (!result.items?.length) { ocrResults.innerHTML = '<p>No lawful OCR text matches were found.</p>'; return; }
-      const list = document.createElement('ol');
-      result.items.forEach((item) => { const li=document.createElement('li'); const b=document.createElement('button'); b.type='button'; b.textContent=`Page ${item.page}: ${item.snippet}`; b.addEventListener('click',()=>setPage(item.page)); li.appendChild(b); list.appendChild(li); });
-      ocrResults.replaceChildren(list);
-    } catch(e){ ocrResults.textContent=e.message; }
+    try { await renderOcrPage(query); } catch(e){ ocrResults.textContent=e.message; }
   });
 
-  const loadPrivateItems = async () => {
+  const loadPrivateItems = async (cursor = '', append = false) => {
     if (!privateItems) return;
     try {
-      const result = await api(`reading/items?edition_id=${cfg.editionId}`);
-      if (!result.items?.length) { privateItems.innerHTML=''; return; }
-      const section=document.createElement('section'); section.innerHTML='<h2>Private bookmarks and notes</h2>';
-      const ul=document.createElement('ul');
-      result.items.forEach((item)=>{const li=document.createElement('li');const jump=document.createElement('button');jump.type='button';jump.textContent=`${item.item_type} · page ${item.page_number}`;jump.addEventListener('click',()=>setPage(item.page_number));li.appendChild(jump);if(item.note_text){const span=document.createElement('span');span.textContent=` — ${item.note_text}`;li.appendChild(span);}const del=document.createElement('button');del.type='button';del.textContent='Delete';del.addEventListener('click',async()=>{await api(`reading/items/${item.id}`,{method:'DELETE',headers:{'Idempotency-Key':crypto.randomUUID?.()||`delete-${item.id}-${Date.now()}-${Math.random()}`}});loadPrivateItems();});li.appendChild(del);ul.appendChild(li);});section.appendChild(ul);privateItems.replaceChildren(section);
-    } catch(e){ /* private overlays degrade without blocking reading */ }
+      const suffix=cursor?`&cursor=${encodeURIComponent(cursor)}`:'';
+      const result = await api(`reading/items?edition_id=${cfg.editionId}&limit=100${suffix}`);
+      if (!append && !result.items?.length) { privateItems.innerHTML=''; return; }
+      let section=append?privateItems.querySelector('section'):null,ul=section?.querySelector('ul');
+      if(!section){section=document.createElement('section');section.innerHTML='<h2>Private bookmarks and notes</h2>';ul=document.createElement('ul');section.appendChild(ul);}
+      (result.items||[]).forEach((item)=>{const li=document.createElement('li');const jump=document.createElement('button');jump.type='button';jump.textContent=`${item.item_type} · page ${item.page_number}`;jump.addEventListener('click',()=>setPage(item.page_number));li.appendChild(jump);if(item.note_text){const span=document.createElement('span');span.textContent=` — ${item.note_text}`;li.appendChild(span);}const del=document.createElement('button');del.type='button';del.textContent='Delete';del.addEventListener('click',async()=>{try{await api(`reading/items/${item.id}`,{method:'DELETE',body:{expected_version:Number(item.version||0)},headers:{'Idempotency-Key':crypto.randomUUID?.()||`delete-${item.id}-${Date.now()}-${Math.random()}`}});say('Private reading item deleted.');loadPrivateItems();}catch(e){say(e.message);}});li.appendChild(del);ul.appendChild(li);});
+      section.querySelector('[data-private-items-more]')?.remove();
+      if(result.has_more&&result.next_cursor){const more=document.createElement('button');more.type='button';more.dataset.privateItemsMore='1';more.textContent='Load more private bookmarks and notes';more.addEventListener('click',async()=>{more.disabled=true;await loadPrivateItems(result.next_cursor,true);});section.appendChild(more);}
+      if(!append)privateItems.replaceChildren(section);
+    } catch(e){ privateItems.textContent=`Private bookmarks and notes are temporarily unavailable: ${e.message}`; }
   };
 
   const dm = root.querySelector('[data-download-manager]');

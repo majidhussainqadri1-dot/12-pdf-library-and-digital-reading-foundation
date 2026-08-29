@@ -63,11 +63,13 @@ final class PLDR_Future_Preservation {
         if('failed'===$integrity){
             $health='quarantined';$findings[]='Plaintext checksum verification failed.';
             if('quarantined'!==$object['object_status']){
-                $updated=$wpdb->update(PLDR_Core::table('objects'),array('object_status'=>'quarantined','verified_at'=>PLDR_Core::now()),array('id'=>(int)$object['id'],'object_status'=>$object['object_status']));
-                if(1!==$updated)return array('error'=>PLDR_Core::machine_error('pldr_preservation_quarantine_store','Integrity failure was detected but quarantine state could not be persisted; access state must be reconciled before proceeding.',500));
-                $object['object_status']='quarantined';
-                if(PLDR_Access::revoke_document($document_id,'preservation-integrity-failure')<0)return array('error'=>PLDR_Core::machine_error('pldr_preservation_revoke_reconcile','Object was quarantined but delivery-grant revocation could not be confirmed; reconciliation is required.',503,array('committed'=>true)));
+                if(false===$wpdb->query('START TRANSACTION'))return array('error'=>PLDR_Core::machine_error('pldr_preservation_quarantine_transaction','Integrity failure was detected but the quarantine transaction could not be started.',500));
+                $updated=$wpdb->query($wpdb->prepare('UPDATE '.PLDR_Core::table('objects').' SET object_status=%s,verified_at=%s WHERE id=%d AND object_status=%s AND storage_name=%s AND key_id=%s AND sha256=%s AND encrypted_sha256=%s','quarantined',PLDR_Core::now(),(int)$object['id'],(string)$object['object_status'],(string)$object['storage_name'],(string)$object['key_id'],(string)$object['sha256'],(string)$object['encrypted_sha256']));
+                if(1!==$updated){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_preservation_quarantine_store','Integrity failure was detected but the exact sampled object could not be quarantined atomically; access state must be reconciled before proceeding.',503));}
+                if(PLDR_Access::revoke_document($document_id,'preservation-integrity-failure')<0){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_preservation_revoke_atomic','Object quarantine was rolled back because delivery grants could not be revoked atomically.',503,array('committed'=>false)));}
                 PLDR_Core::audit('object',(int)$object['id'],'preservation_integrity_quarantined',array('edition_id'=>$edition_id,'error'=>$error));
+                if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_preservation_quarantine_commit','Object quarantine and grant revocation could not be committed atomically.',500));}
+                $object['object_status']='quarantined';
             }
         }
         if('quarantined'===$object['object_status']){$health='quarantined';$findings[]='Object is quarantined.';}
@@ -101,20 +103,28 @@ final class PLDR_Future_Preservation {
         if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_derivative_read','Preservation derivative state could not be read; no assessment record was written.',503,array('degraded'=>true)));
         $derivatives=is_array($derivatives)?$derivatives:array();
 
-        $wpdb->last_error='';
-        $existing=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('preservation_records').' WHERE edition_id=%d',$edition_id),ARRAY_A);
-        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_preservation_record_read','Existing preservation evidence could not be read; checksum generation was not advanced.',503,array('degraded'=>true)));
-
-        $verified_now=$verify&&in_array($integrity,array('verified','failed'),true);
-        $generation=max(1,(int)($existing['checksum_generation']??0)+($verified_now?1:0));
-        $last_verified_at=$verified_now?PLDR_Core::now():($existing['last_verified_at']??null);
         $assessment=array('integrity'=>$integrity,'findings'=>$findings,'error'=>self::limit($error,1000),'provider_failure'=>$provider_failure,'provider_requested_quarantine'=>$provider_requested_quarantine,'provider_input_total'=>$provider_input_total,'provider_findings_limit'=>self::PROVIDER_FINDINGS_LIMIT,'provider_input_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT);
         $assessment_json=wp_json_encode($assessment);
         if(!is_string($assessment_json))return array('error'=>PLDR_Core::machine_error('pldr_preservation_encode','Preservation assessment could not be encoded.',500));
         $derivative_json=wp_json_encode($derivatives);
         if(!is_string($derivative_json))return array('error'=>PLDR_Core::machine_error('pldr_preservation_derivative_encode','Preservation derivative state could not be encoded safely.',500));
+
+        if(false===$wpdb->query('START TRANSACTION'))return array('error'=>PLDR_Core::machine_error('pldr_preservation_record_transaction','Preservation evidence persistence could not start.',500));
+        $wpdb->last_error='';
+        $current_object=$wpdb->get_row($wpdb->prepare('SELECT id,object_status,storage_name,storage_scope,key_id,sha256,encrypted_sha256 FROM '.PLDR_Core::table('objects').' WHERE id=%d FOR UPDATE',(int)$object['id']),ARRAY_A);
+        if(''!==(string)$wpdb->last_error||!is_array($current_object)){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_preservation_object_reconcile','The sampled object state could not be revalidated before preservation evidence was stored.',503,array('degraded'=>true)));}
+        foreach(array('id','object_status','storage_name','storage_scope','key_id','sha256','encrypted_sha256') as $field){
+            if((string)($current_object[$field]??'')!==(string)($object[$field]??'')){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_preservation_object_changed','The object changed during preservation assessment; no stale verification evidence was stored.',409,array('reconcile_required'=>true)));}
+        }
+        $wpdb->last_error='';
+        $existing=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.PLDR_Core::table('preservation_records').' WHERE edition_id=%d FOR UPDATE',$edition_id),ARRAY_A);
+        if(''!==(string)$wpdb->last_error){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_preservation_record_read','Existing preservation evidence could not be read; checksum generation was not advanced.',503,array('degraded'=>true)));}
+        $verified_now=$verify&&in_array($integrity,array('verified','failed'),true);
+        $generation=max(1,(int)($existing['checksum_generation']??0)+($verified_now?1:0));
+        $last_verified_at=$verified_now?PLDR_Core::now():($existing['last_verified_at']??null);
         $stored=$wpdb->replace(PLDR_Core::table('preservation_records'),array('edition_id'=>$edition_id,'object_id'=>(int)$object['id'],'format_health'=>$health,'checksum_generation'=>$generation,'sha256'=>(string)$object['sha256'],'encrypted_sha256'=>(string)$object['encrypted_sha256'],'derivative_status_json'=>$derivative_json,'assessment_json'=>$assessment_json,'last_verified_at'=>$last_verified_at,'updated_at'=>PLDR_Core::now()));
-        if(false===$stored)return array('error'=>PLDR_Core::machine_error('pldr_preservation_store','Preservation assessment could not be stored.',500));
+        if(false===$stored){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_preservation_store','Preservation assessment could not be stored.',500));}
+        if(false===$wpdb->query('COMMIT')){$wpdb->query('ROLLBACK');return array('error'=>PLDR_Core::machine_error('pldr_preservation_record_commit','Preservation assessment could not be committed atomically.',500));}
         return array('edition_id'=>$edition_id,'format_health'=>$health,'checksum_generation'=>$generation,'sha256'=>$object['sha256'],'encrypted_sha256'=>$object['encrypted_sha256'],'integrity'=>$integrity,'findings'=>$findings,'derivatives'=>$derivatives,'provider_failure'=>$provider_failure,'provider_requested_quarantine'=>$provider_requested_quarantine,'provider_findings_truncated'=>$provider_input_total>self::PROVIDER_FINDINGS_LIMIT,'original_immutable'=>true,'preservation_derivative_policy'=>'separate object only; never overwrite original');
     }
 

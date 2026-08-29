@@ -6,18 +6,19 @@ final class PLDR_Future_Annotations {
     private const EXPORT_LIMIT = 1000;
     private const IMPORT_LIMIT = 500;
 
-    public static function export(int $edition_id): array {
+    public static function export(int $edition_id,int $after_id=0,int $limit=200): array {
         global $wpdb;
         $edition = PLDR_Future_Data::require_edition($edition_id);if (is_wp_error($edition)) return array('error' => $edition);
         $uid=get_current_user_id();if (!$uid) return array('error' => PLDR_Core::machine_error('pldr_annotations_login','Log in to export private annotations.',401));
+        $limit=max(1,min(self::EXPORT_LIMIT,$limit));$after_id=max(0,$after_id);
         $wpdb->last_error='';
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM '.PLDR_Core::table('reading_items').' WHERE user_id=%d AND edition_id=%d ORDER BY page_number ASC,id ASC LIMIT %d',$uid,$edition_id,self::EXPORT_LIMIT+1),ARRAY_A);
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT id,item_type,page_number,anchor_text,note_text,tags_json,version,created_at,updated_at FROM '.PLDR_Core::table('reading_items').' WHERE user_id=%d AND edition_id=%d AND id>%d ORDER BY id ASC LIMIT %d',$uid,$edition_id,$after_id,$limit+1),ARRAY_A);
         if(''!==(string)$wpdb->last_error){
             PLDR_Core::audit('edition',$edition_id,'annotation_export_read_failed',array('user_id'=>$uid));
             return array('error'=>PLDR_Core::machine_error('pldr_annotation_export_read','Private annotations could not be read reliably; no empty export page was returned.',503,array('degraded'=>true)));
         }
         $rows=is_array($rows)?$rows:array();
-        $truncated=count($rows)>self::EXPORT_LIMIT;if($truncated)$rows=array_slice($rows,0,self::EXPORT_LIMIT);
+        $has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
         $source=self::canonical_source($edition,$edition_id);$annotations = array();
         foreach ($rows as $item) {
             $target = array('source' => $source, 'selector' => array(array('type'=>'FragmentSelector','conformsTo'=>'https://www.w3.org/TR/media-frags/','value'=>'page='.(int)$item['page_number'])));
@@ -26,7 +27,8 @@ final class PLDR_Future_Annotations {
             $motivation='bookmark'===$item['item_type']?'bookmarking':('highlight'===$item['item_type']?'highlighting':'commenting');
             $annotations[] = array('@context'=>'http://www.w3.org/ns/anno.jsonld','id'=>self::annotation_id($uid,$edition_id,(int)$item['id']),'type'=>'Annotation','motivation'=>$motivation,'body'=>array('type'=>'TextualBody','value'=>self::limit((string)$item['note_text'],4000),'purpose'=>'commenting'),'target'=>$target,'created'=>$item['created_at'],'modified'=>$item['updated_at']);
         }
-        return array('@context'=>'http://www.w3.org/ns/anno.jsonld','type'=>'AnnotationPage','items'=>$annotations,'private'=>true,'portable'=>true,'stable_annotation_ids'=>true,'document_id'=>$edition['public_id'],'edition_id'=>$edition_id,'source'=>$source,'export_limit'=>self::EXPORT_LIMIT,'returned'=>count($annotations),'truncated'=>$truncated);
+        $last_id=$rows?(int)$rows[count($rows)-1]['id']:0;
+        return array('@context'=>'http://www.w3.org/ns/anno.jsonld','type'=>'AnnotationPage','items'=>$annotations,'private'=>true,'portable'=>true,'stable_annotation_ids'=>true,'document_id'=>$edition['public_id'],'edition_id'=>$edition_id,'source'=>$source,'export_limit'=>self::EXPORT_LIMIT,'limit'=>$limit,'returned'=>count($annotations),'has_more'=>$has_more,'next_after_id'=>$has_more&&$last_id>0?$last_id:null,'cursor_mode'=>'owned-row-id');
     }
 
     public static function import(int $edition_id, array $page): array {

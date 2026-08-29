@@ -30,6 +30,14 @@ jobs:
         run: php tests/test-plan-contract.php
       - name: Future Digital Reading Intelligence 24 contract scan
         run: php tests/test-future-24-contract.php
+      - name: Full corrective-review regression sweep
+        run: |
+          failed=0
+          for test in tests/test-ten-round-review*.php tests/test-twenty-round-review*.php; do
+            echo "==> ${test}"
+            php "${test}" || failed=1
+          done
+          exit "${failed}"
       - name: First fresh ten-round corrective-review regressions
         run: php tests/test-ten-round-review.php
       - name: Second fresh ten-round corrective-review regressions
@@ -66,6 +74,8 @@ jobs:
         run: php tests/test-twenty-round-review-r17.php
       - name: Eighteenth fresh twenty-round corrective-review regressions
         run: php tests/test-twenty-round-review-r18.php
+      - name: Nineteenth fresh twenty-round corrective-review regressions
+        run: php tests/test-twenty-round-review-r19.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
