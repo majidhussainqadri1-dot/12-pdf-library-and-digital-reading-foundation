@@ -7,7 +7,7 @@ final class PLDR_Access {
     public static function can_access_edition(int $edition_id, string $operation = 'read', int $user_id = 0): bool {
         $edition = PLDR_Core::edition($edition_id);
         if (!$edition) return false;
-        $user_id = $user_id ?: get_current_user_id();
+        $user_id = $user_id < 0 ? 0 : ($user_id ?: get_current_user_id());
         if (isset($edition['status']) && 'published' !== $edition['status'] && !PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id) && !PLDR_Core::authorize('rights',(int)$edition['document_id'],$user_id)) return false;
         if (!in_array($edition['document_status'], array('published', 'restricted'), true)) {
             if (!PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id) && !PLDR_Core::authorize('rights', (int) $edition['document_id'], $user_id)) return false;
@@ -242,7 +242,8 @@ final class PLDR_Access {
             self::fail_delivery(403, 'Access grant binding failed.');
         }
         $wpdb->last_error='';
-        $still_allowed=self::can_access_edition((int)$row['edition_id'],(string)$row['operation'],(int)$row['user_id']);
+        $grant_user=(int)$row['user_id']>0?(int)$row['user_id']:-1;
+        $still_allowed=self::can_access_edition((int)$row['edition_id'],(string)$row['operation'],$grant_user);
         if(''!==(string)$wpdb->last_error)self::fail_delivery(503,'Document authorization state is temporarily unavailable.');
         if (!$still_allowed) {
             self::fail_delivery(403, 'Document access is no longer permitted.');
