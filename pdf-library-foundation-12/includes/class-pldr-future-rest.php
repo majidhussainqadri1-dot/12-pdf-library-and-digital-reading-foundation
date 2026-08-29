@@ -118,7 +118,7 @@ final class PLDR_Future_REST {
     public static function authority(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'authority',static fn()=>PLDR_Future_Authority::lookup((string)($b['type']??''),(string)($b['value']??''),!empty($b['force']))); }
     public static function ocr_quality(WP_REST_Request $r) { return self::response(PLDR_Future_OCR_Lab::report(absint($r['edition']))); }
     public static function ocr_correction(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'ocr-correction',static fn()=>PLDR_Future_OCR_Lab::submit(absint($r['edition']),absint($b['page']??0),(string)($b['original']??''),(string)($b['corrected']??''))); }
-    public static function ocr_review(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'ocr-review',static fn()=>PLDR_Future_OCR_Lab::review(absint($r['id']),(string)($b['decision']??''),(string)($b['note']??''))); }
+    public static function ocr_review(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'ocr-review',static fn()=>PLDR_Future_OCR_Lab::review(absint($r['id']),(string)($b['decision']??''),(string)($b['note']??''),absint($b['expected_version']??0))); }
     public static function annotations_export(WP_REST_Request $r) { return self::response(PLDR_Future_Annotations::export(absint($r['edition']))); }
     public static function annotations_import(WP_REST_Request $r) { return self::idempotent($r,'annotations-import',static fn()=>PLDR_Future_Annotations::import(absint($r['edition']),self::body($r))); }
     public static function iiif(WP_REST_Request $r) { return self::response(PLDR_Future_IIIF::manifest((string)$r['id'])); }
