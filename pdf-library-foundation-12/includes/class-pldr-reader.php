@@ -76,7 +76,9 @@ final class PLDR_Search {
 
     public static function ocr(int $edition_id, string $query, int $user_id = 0): array {
         global $wpdb;
-        if (!PLDR_Access::can_access_edition($edition_id, 'read', $user_id)) return array('error'=>PLDR_Core::machine_error('pldr_ocr_forbidden','Document text search is unavailable.',404));
+        $wpdb->last_error='';$allowed=PLDR_Access::can_access_edition($edition_id,'read',$user_id);
+        if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_ocr_access_read','Document text-search authorization state could not be verified reliably.',503,array('degraded'=>true)));
+        if(!$allowed)return array('error'=>PLDR_Core::machine_error('pldr_ocr_forbidden','Document text search is unavailable.',404));
         $needle = PLDR_Core::normalize_search($query);
         $needle_len=function_exists('mb_strlen')?mb_strlen($needle,'UTF-8'):strlen($needle);
         if ($needle_len < 2) return array('error'=>PLDR_Core::machine_error('pldr_ocr_query_short','Document text search requires at least two characters.',400));
