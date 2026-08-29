@@ -331,8 +331,8 @@ final class PLDR_Integrations {
         do_action('spui_register_component_provider','file-12',array('components'=>array('document-card','reader-toolbar','download-manager'),'visual_owner'=>'25'));
     }
 
-    public static function dispatch_outbox():void {
+    public static function dispatch_outbox():array {
         // Backward-compatible legacy entrypoint; the governed R21 dispatcher is the single implementation.
-        PLDR_R21_Outbox::dispatch();
+        return PLDR_R21_Outbox::dispatch();
     }
 }

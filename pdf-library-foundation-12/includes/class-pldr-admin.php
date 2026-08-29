@@ -51,7 +51,7 @@ final class PLDR_Health {
             $done=count($rows)<$limit;if($done)delete_option('pldr_search_repair_state');else update_option('pldr_search_repair_state',array('after_id'=>$last,'updated_at'=>PLDR_Core::now()),false);PLDR_Core::audit('system',0,'search_index_rebuilt_batch',array('documents'=>count($rows),'after_id'=>$last,'done'=>$done));return array('operation'=>'search-index','documents'=>count($rows),'done'=>$done,'after_id'=>$last,'batch_limit'=>$limit,'resumable'=>true);
         }
         if('tokens'===$operation){PLDR_Access::cleanup_tokens();return array('operation'=>'tokens','ok'=>true);}
-        if('outbox'===$operation){PLDR_R21_Outbox::dispatch();return array('operation'=>'outbox','ok'=>true,'canonical_guard'=>'R21');}
+        if('outbox'===$operation){$result=PLDR_R21_Outbox::dispatch();return array_merge(array('operation'=>'outbox','canonical_guard'=>'R21'),$result);}
         if('legacy-migration'===$operation){PLDR_R21_Runtime_Guards::legacy_migration_guarded();return array('operation'=>'legacy-migration','state'=>get_option('pldr_legacy_migration_state'),'canonical_guard'=>'R21');}
         if('rescan-pending'===$operation){$wpdb->last_error='';$ids=$wpdb->get_col("SELECT id FROM ".PLDR_Core::table('documents')." WHERE status='scan' ORDER BY id ASC LIMIT 25");if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_rescan_queue_read','Pending rescan queue could not be read reliably.',503,array('degraded'=>true));$results=array();foreach(is_array($ids)?$ids:array() as $id)$results[]=PLDR_Ingest::rescan_document((int)$id);return array('operation'=>'rescan-pending','results'=>$results);}
         if('rotate-keys'===$operation){return self::rotate_keys(10);}
