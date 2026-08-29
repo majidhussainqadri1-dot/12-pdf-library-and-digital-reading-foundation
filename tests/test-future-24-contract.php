@@ -25,7 +25,7 @@ $requiredFiles = array(
 );
 foreach ($requiredFiles as $file) if (!is_file($root . '/includes/' . $file)) { fwrite(STDERR, "Missing Future-24 implementation file: {$file}\n"); exit(1); }
 $must = array(
-    'Version: 1.1.0-rc.3','PLDR_DB_VERSION', "'1.1.0'", 'PLDR_CONTRACT_VERSION',
+    'Version: 1.1.0-rc.4','PLDR_DB_VERSION', "'1.1.0'", 'PLDR_CONTRACT_VERSION',
     'Advanced Reflow Reading Mode','Read Aloud / Text-to-Speech Reader','Smart Table of Contents & Outline Recovery',
     'Edition Comparison Laboratory','Precise Scholarly Anchors','Citation Export Center',
     'Global Bibliographic Authority Enrichment','OCR Quality Laboratory','Portable Annotation Standard',
