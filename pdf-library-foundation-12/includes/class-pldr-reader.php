@@ -17,9 +17,11 @@ final class PLDR_Search {
         $cursor_context=hash('sha256',implode('|',array($term,$type,$category,$language,(string)$user_id)));
         $cursor=self::decode_catalog_cursor($cursor_token,$cursor_context);
         if(is_wp_error($cursor))return array('items'=>array(),'error'=>$cursor);
+        $snapshot_at=$cursor_token?(string)($cursor['snapshot_at']??''):self::now_snapshot();
+        if(''===$snapshot_at)return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_snapshot','Catalog snapshot could not be established safely.',503));
         $logical_offset=$cursor_token?0:(($page-1)*$per_page);
         if(!$cursor_token&&$logical_offset>20000)return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_cursor_required','Deep catalog traversal requires the signed cursor returned by the previous page.',400,array('legacy_offset_limit'=>20000)));
-        $where = array("d.status='published'");$base_params=array();
+        $where = array("d.status='published'",'d.updated_at<=%s');$base_params=array($snapshot_at);
         if ($term) { $where[]='d.search_text LIKE %s';$base_params[]='%'.$wpdb->esc_like($term).'%'; }
         if ($type && isset(PLDR_Core::DOCUMENT_TYPES[$type])) { $where[]='d.document_type=%s';$base_params[]=$type; }
         if ($category && isset(PLDR_Core::CATEGORIES[$category])) { $where[]='d.category=%s';$base_params[]=$category; }
@@ -57,12 +59,14 @@ final class PLDR_Search {
         if(!$exhausted&&$raw_scanned>=$scan_limit&&count($eligible)<$target)$scan_truncated=true;
         $items=array_slice($eligible,$logical_offset,$per_page);$has_more=count($eligible)>($logical_offset+$per_page)||$scan_truncated;
         $cursor_point=$page_cursor?:array('updated_at'=>$after_updated,'id'=>$after_id);
-        $next_cursor=$has_more&&!empty($cursor_point['id'])?self::encode_catalog_cursor((string)$cursor_point['updated_at'],(int)$cursor_point['id'],$cursor_context):null;
+        $next_cursor=$has_more&&!empty($cursor_point['id'])?self::encode_catalog_cursor((string)$cursor_point['updated_at'],(int)$cursor_point['id'],$cursor_context,$snapshot_at):null;
         return array('items'=>$items,'page'=>$page,'per_page'=>$per_page,'has_more'=>$has_more,'next_cursor'=>$next_cursor,'cursor_supported'=>true,'pagination_mode'=>$cursor_token?'cursor':'legacy-page-compatible','access_filtered_pagination'=>true,'scan_truncated'=>$scan_truncated,'raw_rows_scanned'=>$raw_scanned,'scan_limit_provider_failed'=>$scan_limit_provider_failed);
     }
 
-    private static function encode_catalog_cursor(string $updated_at,int $id,string $context):string {
-        $json=wp_json_encode(array('u'=>$updated_at,'i'=>$id,'c'=>$context,'t'=>time()));if(!is_string($json))return '';
+    private static function now_snapshot():string { return gmdate('Y-m-d H:i:s'); }
+
+    private static function encode_catalog_cursor(string $updated_at,int $id,string $context,string $snapshot_at):string {
+        $json=wp_json_encode(array('u'=>$updated_at,'i'=>$id,'c'=>$context,'s'=>$snapshot_at,'t'=>time()));if(!is_string($json))return '';
         $payload=rtrim(strtr(base64_encode($json),'+/','-_'),'=');$sig=hash_hmac('sha256',$payload,wp_salt('auth'));return $payload.'.'.$sig;
     }
 
@@ -70,8 +74,8 @@ final class PLDR_Search {
         if(''===$token)return array();if(strlen($token)>600||1!==substr_count($token,'.'))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor is malformed.',400);
         [$payload,$sig]=explode('.',$token,2);$expected=hash_hmac('sha256',$payload,wp_salt('auth'));if(!hash_equals($expected,$sig))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor signature is invalid.',400);
         $padded=$payload.str_repeat('=',(4-strlen($payload)%4)%4);$raw=base64_decode(strtr($padded,'-_','+/'),true);$decoded=is_string($raw)?json_decode($raw,true):null;
-        if(!is_array($decoded)||!isset($decoded['u'],$decoded['i'],$decoded['c'],$decoded['t'])||!hash_equals($context,(string)$decoded['c'])||absint($decoded['i'])<1||absint($decoded['t'])<time()-1800||absint($decoded['t'])>time()+60||false===strtotime((string)$decoded['u']))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor does not match this query/audience, is expired, or is invalid.',400);
-        return array('updated_at'=>(string)$decoded['u'],'id'=>absint($decoded['i']));
+        if(!is_array($decoded)||!isset($decoded['u'],$decoded['i'],$decoded['c'],$decoded['s'],$decoded['t'])||!hash_equals($context,(string)$decoded['c'])||absint($decoded['i'])<1||absint($decoded['t'])<time()-1800||absint($decoded['t'])>time()+60||false===strtotime((string)$decoded['u'])||false===strtotime((string)$decoded['s']))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor does not match this query/audience, is expired, or is invalid.',400);
+        return array('updated_at'=>(string)$decoded['u'],'id'=>absint($decoded['i']),'snapshot_at'=>(string)$decoded['s']);
     }
 
     public static function ocr(int $edition_id, string $query, int $user_id = 0): array {
