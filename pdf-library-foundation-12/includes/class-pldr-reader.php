@@ -62,7 +62,7 @@ final class PLDR_Search {
     }
 
     private static function encode_catalog_cursor(string $updated_at,int $id,string $context):string {
-        $json=wp_json_encode(array('u'=>$updated_at,'i'=>$id,'c'=>$context));if(!is_string($json))return '';
+        $json=wp_json_encode(array('u'=>$updated_at,'i'=>$id,'c'=>$context,'t'=>time()));if(!is_string($json))return '';
         $payload=rtrim(strtr(base64_encode($json),'+/','-_'),'=');$sig=hash_hmac('sha256',$payload,wp_salt('auth'));return $payload.'.'.$sig;
     }
 
@@ -70,7 +70,7 @@ final class PLDR_Search {
         if(''===$token)return array();if(strlen($token)>600||1!==substr_count($token,'.'))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor is malformed.',400);
         [$payload,$sig]=explode('.',$token,2);$expected=hash_hmac('sha256',$payload,wp_salt('auth'));if(!hash_equals($expected,$sig))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor signature is invalid.',400);
         $padded=$payload.str_repeat('=',(4-strlen($payload)%4)%4);$raw=base64_decode(strtr($padded,'-_','+/'),true);$decoded=is_string($raw)?json_decode($raw,true):null;
-        if(!is_array($decoded)||!isset($decoded['u'],$decoded['i'],$decoded['c'])||!hash_equals($context,(string)$decoded['c'])||absint($decoded['i'])<1||false===strtotime((string)$decoded['u']))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor does not match this query/audience or is invalid.',400);
+        if(!is_array($decoded)||!isset($decoded['u'],$decoded['i'],$decoded['c'],$decoded['t'])||!hash_equals($context,(string)$decoded['c'])||absint($decoded['i'])<1||absint($decoded['t'])<time()-1800||absint($decoded['t'])>time()+60||false===strtotime((string)$decoded['u']))return PLDR_Core::machine_error('pldr_catalog_cursor','Catalog cursor does not match this query/audience, is expired, or is invalid.',400);
         return array('updated_at'=>(string)$decoded['u'],'id'=>absint($decoded['i']));
     }
 
