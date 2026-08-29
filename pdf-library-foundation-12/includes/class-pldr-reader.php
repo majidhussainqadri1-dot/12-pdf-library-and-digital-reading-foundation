@@ -349,21 +349,11 @@ final class PLDR_Reader {
 
     public static function reading_dashboard_html(): string {
         if (!is_user_logged_in()) return '<div class="pldr-state">' . esc_html__('Log in to view private reading progress.','pdf-library-digital-reading') . '</div>';
-        global $wpdb;
-        $uid=get_current_user_id();
-        $wpdb->last_error='';
-        $rows=$wpdb->get_results($wpdb->prepare('SELECT s.*,e.document_id,d.public_id,d.title,d.slug FROM '.PLDR_Core::table('reading_state').' s JOIN '.PLDR_Core::table('editions').' e ON e.id=s.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE s.user_id=%d ORDER BY s.updated_at DESC LIMIT 100',$uid),ARRAY_A);
-        if(''!==(string)$wpdb->last_error)return self::state_html('error');
-        $rows=is_array($rows)?$rows:array();
-        $visible=array();
-        foreach($rows as $row){
-            $wpdb->last_error='';
-            $allowed=PLDR_Access::can_access_edition((int)$row['edition_id'],'read',$uid);
-            if(''!==(string)$wpdb->last_error)return self::state_html('error');
-            if($allowed)$visible[]=$row;
-        }
-        $rows=$visible;
-        ob_start();?><main class="pldr-shell"><h1><?php esc_html_e('Reading Workspace','pdf-library-digital-reading');?></h1><div class="pldr-grid"><?php foreach($rows as $row):?><article class="pldr-card"><div class="pldr-card-body"><h2><a href="<?php echo esc_url(PLDR_Core::route_url('read',array('id'=>$row['public_id'])));?>"><?php echo esc_html($row['title']);?></a></h2><p><?php echo esc_html(sprintf(__('Page %1$d · %2$s%% complete','pdf-library-digital-reading'),(int)$row['last_page'],(string)$row['percent']));?></p></div></article><?php endforeach;?></div></main><?php return (string)ob_get_clean();
+        global $wpdb;$uid=get_current_user_id();$page=max(1,absint($_GET['reading_page']??1));$limit=100;$offset=($page-1)*$limit;
+        $wpdb->last_error='';$rows=$wpdb->get_results($wpdb->prepare('SELECT s.*,e.document_id,d.public_id,d.title,d.slug FROM '.PLDR_Core::table('reading_state').' s JOIN '.PLDR_Core::table('editions').' e ON e.id=s.edition_id JOIN '.PLDR_Core::table('documents').' d ON d.id=e.document_id WHERE s.user_id=%d ORDER BY s.updated_at DESC,s.edition_id DESC LIMIT %d OFFSET %d',$uid,$limit+1,$offset),ARRAY_A);
+        if(''!==(string)$wpdb->last_error)return self::state_html('error');$rows=is_array($rows)?$rows:array();$has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
+        $visible=array();foreach($rows as $row){$wpdb->last_error='';$allowed=PLDR_Access::can_access_edition((int)$row['edition_id'],'read',$uid);if(''!==(string)$wpdb->last_error)return self::state_html('error');if($allowed)$visible[]=$row;}$rows=$visible;
+        ob_start();?><main class="pldr-shell"><h1><?php esc_html_e('Reading Workspace','pdf-library-digital-reading');?></h1><div class="pldr-grid"><?php foreach($rows as $row):?><article class="pldr-card"><div class="pldr-card-body"><h2><a href="<?php echo esc_url(PLDR_Core::route_url('read',array('id'=>$row['public_id'])));?>"><?php echo esc_html($row['title']);?></a></h2><p><?php echo esc_html(sprintf(__('Page %1$d · %2$s%% complete','pdf-library-digital-reading'),(int)$row['last_page'],(string)$row['percent']));?></p></div></article><?php endforeach;?></div><nav class="pldr-pagination" aria-label="<?php esc_attr_e('Reading workspace pages','pdf-library-digital-reading');?>"><?php if($page>1):?><a href="<?php echo esc_url(add_query_arg('reading_page',$page-1));?>"><?php esc_html_e('Previous','pdf-library-digital-reading');?></a><?php endif;?><?php if($has_more):?><a href="<?php echo esc_url(add_query_arg('reading_page',$page+1));?>"><?php esc_html_e('Next','pdf-library-digital-reading');?></a><?php endif;?></nav></main><?php return (string)ob_get_clean();
     }
 
     public static function citation(array $edition,int $page=0,string $style='sabri'): string {
