@@ -206,6 +206,25 @@ final class PLDR_Access {
         return (bool)$id;
     }
 
+    /**
+     * Check the edition/object binding again at grant consumption time.
+     *
+     * Thumbnail regeneration can replace a derivative row after a grant was
+     * issued; an old grant must not continue serving a detached ciphertext.
+     * A failed canonical DB read is never interpreted as a valid binding.
+     */
+    private static function current_delivery_binding(int $edition_id,int $object_id) {
+        global $wpdb;
+        $wpdb->last_error='';
+        $edition=PLDR_Core::edition($edition_id);
+        if(''!==(string)$wpdb->last_error) {
+            return PLDR_Core::machine_error('pldr_delivery_binding_read','Delivery object ownership could not be verified reliably.',503,array('degraded'=>true));
+        }
+        if(!$edition) return false;
+        if((int)$edition['object_id']===$object_id) return true;
+        return self::derivative_belongs($edition_id,$object_id);
+    }
+
     public static function revoke_document(int $document_id, string $reason = 'policy-change'): int {
         global $wpdb;
         $wpdb->last_error='';
@@ -253,6 +272,9 @@ final class PLDR_Access {
         if (!$object || 'available' !== $object['object_status']) {
             self::fail_delivery(404, 'Document object unavailable.');
         }
+        $binding=self::current_delivery_binding((int)$row['edition_id'],(int)$row['object_id']);
+        if(is_wp_error($binding)) self::fail_delivery(503,'Document object binding is temporarily unavailable.');
+        if(!$binding) self::fail_delivery(410,'Document object is no longer attached to this edition.');
         $path = PLDR_Storage::path((string) $object['storage_name'], (string) $object['storage_scope']);
         if (is_wp_error($path)) {
             self::fail_delivery(503, $path->get_error_message());
