@@ -76,3 +76,16 @@ Automated presence/negative-boundary checks are implemented in `tests/test-futur
 ## Truth boundary
 
 This traceability establishes implementation presence and automated repository evidence. It does **not** claim Hostinger staging acceptance, external provider configuration, real backup/restore proof, browser/device/accessibility/offline-vault acceptance, production deployment or live operational correctness.
+
+
+## R27 cross-plan corrective trace — 10 October 2026
+
+| Requirement / shared contract | Finding / actual source change | Retained check | Acceptance still outstanding |
+|---|---|---|---|
+| F12-FR-009 signed delivery, F12-FR-010 reader, F12-NFR-003 reliability | R27-D01: Move all reader-manifest policy, thumbnail, private state and accessibility read/error guards **ahead of** original bearer grant issuance in `PLDR_REST::reader_manifest` | R27 grant-order regression | Failure-injection under real WP/MySQL; bearer-token row count remains unchanged on 503 |
+| F12-FUT-010 IIIF, F12-FR-008 access policy | R27-D02: Move rights/access-policy DB check **ahead of** `PLDR_Future_IIIF` preview token loop | R27 IIIF pregrant regression | Real staging rights provider/DB failure tests |
+| F12-FR-001..019, F12-NFR-001..010, F12-FUT-001..024 / File 05/06/16/17/19/20/21/23/24/25/26 | Twenty separate plan-to-source focus passes of the R26 baseline; feature/source anchors only; no unsupported claim of companion operational acceptance | `tests/test-twenty-round-review-r27.php` | Real counterpart version/endpoint/role contract journeys |
+| File 12 package-folder constitution | Written `12-pdf-library-foundation` vs source candidate `pdf-library-foundation-12` persists historically; **no silent rename**. | R27 review register | Founder-approved dated change request, staging compatibility/migration plan |
+| Versioned release | Candidate software `1.1.0-rc.6` / DB `1.1.0` / contract `1.1.0`, package checksum controlled separately | CI exact-head build | Deployed parity + staging/live acceptance |
+
+R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot prove deployed source checksum, actual schema/migration, live UI, backup/restore, rollback, or installed companion owner contracts.
