@@ -1,38 +1,29 @@
-# File 12 Status — R24 Final Twenty-Round Review Candidate — 1.1.0-rc.3
+# File 12 — R26 Fresh Twenty-Dimension Review Candidate (2026-10-10)
 
-| Gate | Status |
+## Separate reality gates
+
+| Gate | Evidence/status |
 |---|---|
-| Governing source | Latest central governing corpus + File 12 PDF Library/Digital Reading v1.1 Future-24 amended plan |
-| R24 baseline | `3d9adb18732cfa4c25119f18c0a47f8f4c0512b4` — exact green R23 candidate |
-| R24 numbered review | **20/20 complete** under complete-review → post-review batch-fix → retest discipline |
-| First-ten defect rounds | **1, 5, 7, 8, 9** |
-| Final defect rounds | **1, 5, 7, 8, 9, 14, 15, 16, 17, 18, 19, 20** |
-| Final clean rounds | **2, 3, 4, 6, 10, 11, 12, 13** |
-| R24 review record | `docs/TWENTY-ROUND-REVIEW-2026-08-13-R24.md` |
-| R24 permanent regression | `tests/test-twenty-round-review-r24.php` |
-| Software candidate | `1.1.0-rc.3` |
-| Repository DB contract | `1.1.0` |
-| Exact final R24 automated QA | **Pending exact-head GitHub Actions; report GREEN only from the final unchanged branch HEAD** |
-| Hostinger staging | **Not verified by repository evidence** |
-| Live deployed version | **Unverified** |
-| Deployed DB/schema version | **Unverified** |
-| Migration state on deployed site | **Unverified** |
-| Operational/live verification | **Not claimed** |
+| Governing plan | Latest consolidated central plan; File 12 v1.1 Future Digital Reading Intelligence 24; connected Files 00/01/05/06/16/17/19/20/21/24/25/26 and CF-04 owner boundaries |
+| Baseline source HEAD | `a7a3c72597e8c289fa4591d2992366ca4fd55248` (R25 Draft PR #11) |
+| This review | Twenty focused code-to-plan dimensions, documented in `docs/TWENTY-ROUND-REVIEW-2026-10-10-R26.md`; **not** twenty live WordPress integration runs |
+| Confirmed source defect | R26-01: anonymous public delivery reauthorization could inherit logged-in curator authority through nested `PLDR_Core::authorize` zero-user fallback |
+| Correction | Explicit anonymous privilege checks use a non-fallback gate; actual PHP regression added in `tests/test-twenty-round-review-r26.php` |
+| Documentation discrepancy | R25 product code and CI identified `1.1.0-rc.4` while this STATUS and prior README still described R24 `rc.3`; aligned in R26 |
+| Source software candidate | `1.1.0-rc.4`; no release-version bump without a reviewed release change request |
+| Repository DB contract | `1.1.0` (source-declared, not live database evidence) |
+| Exact R26 automated QA | **Run the unchanged final R26 HEAD via the File 12 Future-24 Quality Gate**. Historical R25 green does not verify new changes. |
+| Staging | Not independently verified |
+| Deployed/runtime version | Unverified |
+| Live DB/schema version | Unverified |
+| Live migration state | Unverified |
+| Live smoke / actual artifact checksum parity | Not performed / unverified |
+| Production operational acceptance | Not claimed |
 
-## R24 final repository review result
+## Release decision
 
-R24 performed twenty fresh numbered reviews from the exact-green R23 baseline. Every numbered review was completed in full before that round's complete defect ledger was corrected; no mid-review patching was used. The first-ten defect rounds are **1, 5, 7, 8, 9**. The full defect-round set is **1, 5, 7, 8, 9, 14, 15, 16, 17, 18, 19, 20**.
+No change to `main`, no staging/live deployment and no Founder operational acceptance is implied. Real File 00 assertions, encrypted object/key restore, malware/rights/entitlement negative tests, external owners and providers, 320–1920px RTL/a11y browsers, backup/restore/rollback and live-deployed parity remain mandatory.
 
-Principal hardening: canonical management-route registry parity; current-rights ingest validation; publication/restore rights-policy enforcement; monotonic progress concurrency; access-filtered cursor continuity; single governed outbox dispatch; reconnect-aware encrypted-offline authorization; shared Sabri Green token inheritance; fingerprint cron dedupe; authenticated provider-derived POST operations; bounded signed-cursor reading-workspace pagination; and R24 release/regression traceability.
-
-## Exact-head evidence rule
-
-The final R24 branch HEAD must run the complete canonical quality gate unchanged. Only that exact run may establish Automated-QA Green and the deterministic package digest. If the exact-head run fails, the failed gate must be diagnosed, corrected and retested before any green claim.
-
-## Production-truth boundary
-
-Repository source, a green CI run and a deterministic package prove only their corresponding repository/package gates. They do **not** prove Hostinger staging or live state. Staging fresh install/upgrade/migration, exact deployed checksum/version parity, deployed DB/schema/migration state, real-role/IDOR/privacy/rights/browser/offline/RTL/accessibility/provider tests, backup/restore/rollback, Founder acceptance, production deployment and live re-test remain separate gates.
-
-Final release/incident reporting must state separately: **Repository HEAD / Deployed Version / DB Version / Migration State / Live Verification Status**.
+Final incident report must separately identify **Repository HEAD / Deployed Version / DB Version / Migration State / Live Verification Status**.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
