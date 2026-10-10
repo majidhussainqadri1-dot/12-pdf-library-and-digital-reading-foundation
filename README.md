@@ -1,10 +1,10 @@
 # File 12 — PDF Library and Digital Reading
 
-This branch contains the **File 12 Future Digital Reading Intelligence 24 candidate** for the Sabri Social Homeopathy Platform. It starts from the exact-green R23 candidate and includes the R24 fresh twenty-round corrective hardening without transferring canonical ownership from companion files.
+This branch contains the **File 12 Future Digital Reading Intelligence 24 candidate** for the Sabri Social Homeopathy Platform. The source lineage includes the R25 and R26 (PR #13) corrective candidates. This R27 review adds grant-consumption object-binding checks without transferring canonical ownership from companion files.
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.3`
+- Software: `1.1.0-rc.6`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -19,6 +19,12 @@ The candidate retains File 12 canonical catalog/bibliographic ownership, private
 ## R24 corrective hardening
 
 R24 adds File 01 registration for `/library/manage/`; fail-closed rejection of already-expired ingest rights; canonical publication/restore rights-policy checks; strictly monotonic private progress revisions; access-filtered catalog cursor skip continuity; one governed R21 outbox dispatcher; offline-vault reconnect/server reauthorization; shared Sabri Green token inheritance; duplicate-safe fingerprint scheduling; authenticated derived-text provider mutations; bounded signed-cursor pagination for the private reading workspace; and permanent R24 review/regression evidence.
+
+## R27 source correction (10 October 2026)
+
+A previously issued signed PDF/thumbnail grant is checked again against the edition's **current** canonical original-object binding or an **available** edition derivative immediately before file delivery. This closes the gap where a thumbnail was replaced by a new derivative but its old object stayed `available` until cleanup, allowing a stale signed URL to read the detached object. Database read failures deny delivery.
+
+The exact-source regression is `tests/test-twenty-round-review-r27.php`; full review and release limitations are in `docs/TWENTY-ROUND-REVIEW-2026-10-10-R27.md` and `STATUS.md`. Do not equate green repository CI with a staging/live fix.
 
 ## Future Digital Reading Intelligence 24
 
