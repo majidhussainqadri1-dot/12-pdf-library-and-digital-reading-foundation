@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.5`
+Candidate: `1.1.0-rc.6`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
