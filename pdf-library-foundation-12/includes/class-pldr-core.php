@@ -83,6 +83,9 @@ final class PLDR_Core {
     }
 
     public static function authorize(string $action, int $object_id = 0, int $user_id = 0): bool {
+        // A negative caller ID is an explicit anonymous audience, never the current browser user.
+        // In particular, revalidating an anonymous signed grant must not inherit a curator's session.
+        if ($user_id < 0) return false;
         $user_id = $user_id ?: get_current_user_id();
         try {
             $external = apply_filters('pldr_authorize', null, $action, $user_id, $object_id);

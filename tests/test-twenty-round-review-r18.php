@@ -60,7 +60,7 @@ $must($reader,'encode_catalog_cursor','signed catalog cursor encoder missing.');
 $must($reader,'decode_catalog_cursor','signed catalog cursor decoder missing.');
 $must($reader,'pldr_catalog_cursor_required','deep legacy traversal is not forced onto the cursor path.');
 $must($reader,'ORDER BY d.created_at DESC,d.id DESC LIMIT %d','catalog immutable keyset ordering/bound missing.');
-$must($reader,"'c_at'=>$created_at",'catalog immutable cursor boundary missing.');
+$must($reader,"'c_at'=>\$created_at",'catalog immutable cursor boundary missing.');
 $must($reader,'time()-1800','catalog cursor lifetime bound missing.');
 $must($rest,'\'cursor\'=>array(\'sanitize_callback\'=>\'sanitize_text_field\')','catalog REST cursor argument missing.');
 $must($reader,'pldr_catalog_query_long','catalog normalized query length bound missing.');

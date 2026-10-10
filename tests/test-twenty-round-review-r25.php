@@ -13,7 +13,7 @@ $outbox=$read('includes/class-pldr-r21-outbox.php');
 $main=$read('pdf-library-digital-reading.php');
 
 $must($access,"\$grant_user=(int)\$row['user_id']>0?(int)\$row['user_id']:-1",'public delivery grant does not preserve anonymous reauthorization semantics');
-$must($access,'$user_id = $user_id < 0 ? 0 : ($user_id ?: get_current_user_id());','explicit anonymous authorization sentinel missing');
+$must($access,'$user_id = $user_id < 0 ? -1 : ($user_id ?: get_current_user_id());','explicit anonymous authorization sentinel missing');
 $must($storage,'$raw !== $name','path-like private storage metadata is still silently canonicalized');
 $must($storage,'public static function delete(string $path): bool','storage deletion outcome is not observable');
 $must($admin,"'old_ciphertext_deleted'=>\$old_deleted",'key rotation does not surface superseded-ciphertext cleanup');
@@ -32,8 +32,8 @@ $must($admin,"array('search_text'=>\$text)",'derived search-index repair still l
 $forbid($admin,"array('search_text'=>\$text,'updated_at'=>PLDR_Core::now())",'derived search-index repair still rewrites canonical document updated_at');
 $must($access,'public static function cleanup_tokens(): array','token cleanup does not return truthful bounded outcome');
 $must($admin,"array_merge(array('operation'=>'tokens'),\$result)",'token repair still fabricates success');
-$must($main,'Version: 1.1.0-rc.4','R25 release-candidate marker missing');
-$must($main,"define('PLDR_VERSION', '1.1.0-rc.4')",'R25 runtime release-candidate constant missing');
+$must($main,'Version: 1.1.0-rc.5','R25 release-candidate marker missing');
+$must($main,"define('PLDR_VERSION', '1.1.0-rc.5')",'R25 runtime release-candidate constant missing');
 $must($main,"define('PLDR_DB_VERSION', '1.1.0')",'R25 unexpectedly changed DB version');
 $must($main,"define('PLDR_CONTRACT_VERSION', '1.1.0')",'R25 unexpectedly changed integration contract version');
 
