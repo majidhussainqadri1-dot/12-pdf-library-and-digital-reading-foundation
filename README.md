@@ -1,10 +1,10 @@
 # File 12 — PDF Library and Digital Reading
 
-This branch contains the **File 12 Future Digital Reading Intelligence 24 candidate** for the Sabri Social Homeopathy Platform. It starts from the exact-green R23 candidate and includes the R24 fresh twenty-round corrective hardening without transferring canonical ownership from companion files.
+This branch contains the **File 12 Future Digital Reading Intelligence 24 candidate** for the Sabri Social Homeopathy Platform. It carries the prior R25 corrective candidate and the subsequent R26 source review/anonymous grant reauthorization hardening without transferring canonical ownership from companion files.
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.3`
+- Software: `1.1.0-rc.4`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -19,6 +19,12 @@ The candidate retains File 12 canonical catalog/bibliographic ownership, private
 ## R24 corrective hardening
 
 R24 adds File 01 registration for `/library/manage/`; fail-closed rejection of already-expired ingest rights; canonical publication/restore rights-policy checks; strictly monotonic private progress revisions; access-filtered catalog cursor skip continuity; one governed R21 outbox dispatcher; offline-vault reconnect/server reauthorization; shared Sabri Green token inheritance; duplicate-safe fingerprint scheduling; authenticated derived-text provider mutations; bounded signed-cursor pagination for the private reading workspace; and permanent R24 review/regression evidence.
+
+## R26 review (10 October 2026)
+
+The full previous R25 branch has been retained. R26 confirms and corrects a remaining anonymous grant identity bug: an explicitly public `user_id=0` grant was mapped to the anonymous sentinel by delivery, but `PLDR_Access::can_access_edition` still called `PLDR_Core::authorize` with zero inside its curator/restricted-status exceptions. Core's zero-user fallback could turn the check into an authorization against the signed-in session. All curator/right/restricted exceptions now require a positively bound user ID; the anonymous grant remains anonymous. `tests/test-twenty-round-review-r26.php` exercises real access-policy code under a privileged-session fixture.
+
+See `docs/TWENTY-ROUND-REVIEW-2026-10-10-R26.md` and `STATUS.md`. Source test and CI evidence do not prove deployment or live resolution.
 
 ## Future Digital Reading Intelligence 24
 
