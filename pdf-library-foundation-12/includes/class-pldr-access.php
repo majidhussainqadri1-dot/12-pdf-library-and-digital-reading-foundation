@@ -31,7 +31,8 @@ final class PLDR_Access {
 
         $audience = (string) $policy['audience'];
         if ('public' === $audience) return true;
-        if (!$user_id) return false;
+        // An anonymous grant may read public material only. Never call entitlement adapters with -1.
+        if ($user_id <= 0) return false;
         if ('account' === $audience) return true;
 
         $entitlement_key = trim((string)($policy['entitlement_key'] ?? ''));
