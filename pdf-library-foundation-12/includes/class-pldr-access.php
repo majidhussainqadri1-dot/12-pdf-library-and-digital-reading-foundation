@@ -9,7 +9,7 @@ final class PLDR_Access {
         if (!$edition) return false;
         // A negative sentinel means an explicitly anonymous/public authorization check.
         // Zero keeps the historical caller contract of resolving the current user.
-        $user_id = $user_id < 0 ? 0 : ($user_id ?: get_current_user_id());
+        $user_id = $user_id < 0 ? -1 : ($user_id ?: get_current_user_id());
         if (isset($edition['status']) && 'published' !== $edition['status'] && !PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id) && !PLDR_Core::authorize('rights',(int)$edition['document_id'],$user_id)) return false;
         if (!in_array($edition['document_status'], array('published', 'restricted'), true)) {
             if (!PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id) && !PLDR_Core::authorize('rights', (int) $edition['document_id'], $user_id)) return false;
