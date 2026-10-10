@@ -5,6 +5,7 @@
  */
 require __DIR__ . '/bootstrap.php';
 defined('ARRAY_A') || define('ARRAY_A', 'ARRAY_A');
+if (!function_exists('absint')) { function absint($value): int { return abs((int)$value); } }
 final class PLDR_R26_DB {
     public string $prefix = 'wp_';
     public string $last_error = '';
