@@ -141,9 +141,6 @@ final class PLDR_REST {
         $object=PLDR_Core::object((int)$edition['object_id']);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_reader_object_read','Reader object state could not be read reliably.',503,array('degraded'=>true));
         if(!$object)return PLDR_Core::machine_error('pldr_object_missing','Document object not found.',404);
-        $grant=PLDR_Access::issue_token($edition_id,(int)$object['id'],'read',get_current_user_id(),900);
-        if(is_wp_error($grant))return $grant;
-
         $thumb_table=PLDR_Core::table('derivatives');
         $wpdb->last_error='';
         $thumb_total=(int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.$thumb_table.' WHERE edition_id=%d AND derivative_type=%s AND status=%s',$edition_id,'thumbnail','available'));
@@ -152,13 +149,6 @@ final class PLDR_REST {
         $thumb_rows=$wpdb->get_results($wpdb->prepare('SELECT page_number,object_id FROM '.$thumb_table.' WHERE edition_id=%d AND derivative_type=%s AND status=%s ORDER BY page_number ASC LIMIT %d',$edition_id,'thumbnail','available',self::READER_THUMB_LIMIT),ARRAY_A);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_reader_thumbnail_read','Reader thumbnail state could not be read reliably.',503,array('degraded'=>true));
         $thumb_rows=is_array($thumb_rows)?$thumb_rows:array();
-        $thumbs=array();$preview_grants_issued=0;$preview_grants_failed=0;$preview_grants_deferred=0;
-        foreach($thumb_rows as $row){
-            if($preview_grants_issued>=self::READER_PREVIEW_GRANT_LIMIT){$preview_grants_deferred++;continue;}
-            $g=PLDR_Access::issue_token($edition_id,(int)$row['object_id'],'preview',get_current_user_id(),900);
-            if(is_array($g)){$thumbs[(int)$row['page_number']]=$g['url'];$preview_grants_issued++;}
-            else $preview_grants_failed++;
-        }
         $wpdb->last_error='';
         $policy=PLDR_Core::policy((int)$edition['document_id']);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_reader_policy_read','Reader access-policy state could not be read reliably.',503,array('degraded'=>true));
@@ -167,6 +157,16 @@ final class PLDR_REST {
         if(isset($reading['error'])&&is_wp_error($reading['error']))return $reading['error'];
         $accessibility=self::accessibility_metadata($edition_id,$edition);
         if(isset($accessibility['error'])&&is_wp_error($accessibility['error']))return $accessibility['error'];
+        $grant=PLDR_Access::issue_token($edition_id,(int)$object['id'],'read',get_current_user_id(),900);
+        if(is_wp_error($grant))return $grant;
+
+        $thumbs=array();$preview_grants_issued=0;$preview_grants_failed=0;$preview_grants_deferred=0;
+        foreach($thumb_rows as $row){
+            if($preview_grants_issued>=self::READER_PREVIEW_GRANT_LIMIT){$preview_grants_deferred++;continue;}
+            $g=PLDR_Access::issue_token($edition_id,(int)$row['object_id'],'preview',get_current_user_id(),900);
+            if(is_array($g)){$thumbs[(int)$row['page_number']]=$g['url'];$preview_grants_issued++;}
+            else $preview_grants_failed++;
+        }
         return rest_ensure_response(array(
             'edition_id'=>$edition_id,
             'title'=>$edition['title'],
