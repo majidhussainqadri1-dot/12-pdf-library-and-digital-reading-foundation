@@ -76,3 +76,13 @@ Automated presence/negative-boundary checks are implemented in `tests/test-futur
 ## Truth boundary
 
 This traceability establishes implementation presence and automated repository evidence. It does **not** claim Hostinger staging acceptance, external provider configuration, real backup/restore proof, browser/device/accessibility/offline-vault acceptance, production deployment or live operational correctness.
+
+## R26 anonymous access regression and exact-HEAD release trace (2026-10-10)
+
+| Source requirement / dependency | Implementation | Test / evidence | Residual boundary |
+|---|---|---|---|
+| F12-FR-008, F12-FR-009, F12-NFR-001, F12-CEN-01 | `PLDR_Access::can_access_edition()` resolves an intentionally anonymous `-1` to zero **without invoking** session-fallback `Core::authorize` for any curator, restricted or embargo exception | `tests/test-twenty-round-review-r26.php`; `docs/TWENTY-ROUND-REVIEW-2026-10-10-R26.md` | Real authenticated browser, stale grants, File00 claims, DB rights/embargo and signed HTTP delivery need staging acceptance |
+| CEN-GOV-001 / CEN-STATUS-001, R26-02 | Runtime and docs consistently label repository candidate `1.1.0-rc.4` and distinguish live from source | `STATUS.md`, `README.md`, R26 review record | Live deployed version/DB/migration unverified |
+| F12-NFR-009 / F12-NFR-007 / release contract | Workflow wildcard executes R26 negative-path test under PHP 8.1, 8.3 and 8.4 with deterministic ZIP | Final exact R26 workflow run is required; older green R25 run cannot certify R26 | Staging schema migration/restore/rollback and Founder sign-off outstanding |
+
+The additional R26 review does not move canonical identity, global ranking, messages, learning or AI output from Files 00/26/17/05/16. It changes only File12 rights-aware delivery authorization and documents the verified source condition.
