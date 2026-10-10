@@ -76,3 +76,13 @@ Automated presence/negative-boundary checks are implemented in `tests/test-futur
 ## Truth boundary
 
 This traceability establishes implementation presence and automated repository evidence. It does **not** claim Hostinger staging acceptance, external provider configuration, real backup/restore proof, browser/device/accessibility/offline-vault acceptance, production deployment or live operational correctness.
+
+## R27 scoped cross-plan correction — 2026-10-10
+
+| Governing IDs | Canonical implementation | Evidence | Scope limitation |
+|---|---|---|---|
+| F12-FR-009, F12-NFR-001; CEN-OWN-001/CEN-PRI-001 | File12 `PLDR_Access::deliver()` now rechecks a signed PDF object against current `edition.object_id` or current **available** derivative association, fail-closed if relation changed or DB cannot be read | `tests/test-twenty-round-review-r27.php`; `docs/TWENTY-ROUND-REVIEW-2026-10-10-R27.md` | WordPress DB/races/rights/HTTP range and actual encrypted storage require staging acceptance |
+| F12-FR-007/009; CV-154/155 | `PLDR_Ingest::generate_thumbnail_batch()` can regenerate/replace a derivative; prior signed URLs now cannot serve the detached prior object | Existing thumbnail generator + new delivery binding check and regression | Real thumbnail re-generation, in-flight requests, CDN/cache/revocation need staging |
+| CEN-STATUS-001; F12-NFR-009 | `1.1.0-rc.6` code/docs/manifest/workflow/package identity; `1.1.0` schema/contract unchanged | Exact R27 HEAD CI required; historical PR #13 green belongs only to prior commit | Staging/live deployment and DB migration state unverified |
+
+See the R27 report for the twenty separate scoped source reviews; these do not constitute twenty independent runtime test passes.
