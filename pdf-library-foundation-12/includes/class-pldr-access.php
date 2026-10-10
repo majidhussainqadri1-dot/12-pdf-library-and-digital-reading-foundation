@@ -10,20 +10,25 @@ final class PLDR_Access {
         // A negative sentinel means an explicitly anonymous/public authorization check.
         // Zero keeps the historical caller contract of resolving the current user.
         $user_id = $user_id < 0 ? 0 : ($user_id ?: get_current_user_id());
-        if (isset($edition['status']) && 'published' !== $edition['status'] && !PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id) && !PLDR_Core::authorize('rights',(int)$edition['document_id'],$user_id)) return false;
+        // PLDR_Core::authorize() interprets user_id=0 as the current session.
+        // For anonymous grants, bypass that fallback entirely at every privilege check.
+        $may = static function (string $capability) use ($user_id, $edition): bool {
+            return $user_id > 0 && PLDR_Core::authorize($capability, (int) $edition['document_id'], $user_id);
+        };
+        if (isset($edition['status']) && 'published' !== $edition['status'] && !$may('manage') && !$may('rights')) return false;
         if (!in_array($edition['document_status'], array('published', 'restricted'), true)) {
-            if (!PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id) && !PLDR_Core::authorize('rights', (int) $edition['document_id'], $user_id)) return false;
+            if (!$may('manage') && !$may('rights')) return false;
         }
-        if ('restricted' === $edition['document_status'] && !PLDR_Core::authorize('read_private', (int) $edition['document_id'], $user_id)) return false;
+        if ('restricted' === $edition['document_status'] && !$may('read_private')) return false;
         $policy = PLDR_Core::policy((int) $edition['document_id']);
         if (!$policy) return false;
         if(!empty($edition['rights_expires_at'])){
             $rights_raw=(string)$edition['rights_expires_at'];$rights_ts=strtotime($rights_raw);
-            $curator=PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id)||PLDR_Core::authorize('rights',(int)$edition['document_id'],$user_id);
+            $curator=$may('manage')||$may('rights');
             if(false===$rights_ts){PLDR_Core::audit('edition',$edition_id,'rights_expiry_invalid',array('document_id'=>(int)$edition['document_id']),$user_id);if(!$curator)return false;}
             elseif($rights_ts<=time()&&!$curator)return false;
         }
-        if (!empty($policy['embargo_until']) && strtotime((string) $policy['embargo_until']) > time() && !PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id)) return false;
+        if (!empty($policy['embargo_until']) && strtotime((string) $policy['embargo_until']) > time() && !$may('manage')) return false;
         if ('download' === $operation && empty($policy['download_allowed'])) return false;
         if ('print' === $operation && empty($policy['print_allowed'])) return false;
         if ('offline' === $operation && empty($policy['offline_allowed'])) return false;
@@ -46,7 +51,7 @@ final class PLDR_Access {
             PLDR_Core::audit('edition',$edition_id,'entitlement_provider_failed',array('audience'=>$audience,'provider_failure'=>true),$user_id);
             return false;
         }
-        return PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id);
+        return $may('manage');
     }
 
     public static function update_policy(int $document_id,array $changes,int $actor_id=0,int $expected_version=0) {
