@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.5`
+Candidate: `1.1.0-rc.6`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -53,7 +53,7 @@ Canonical plugin directory: `pdf-library-foundation-12/`
 
 ## QA/docs
 
-- `tests/` — cryptographic/tamper/range, plan-contract, Future-24 contract, secret and retained corrective-review regressions through R26.
+- `tests/` — cryptographic/tamper/range, plan-contract, Future-24 contract, secret and retained corrective-review regressions through R27.
 - `docs/FUTURE-24.md` — approved Future-24 requirement register and ownership boundaries.
 - `docs/TRACEABILITY.md` — requirement-to-code traceability.
 - `docs/STAGING-ACCEPTANCE.md` — runtime/staging acceptance boundary.
@@ -62,3 +62,5 @@ Canonical plugin directory: `pdf-library-foundation-12/`
 - `tests/test-twenty-round-review-r26.php` — executable anonymous bearer grant regression under privileged browser context.
 
 Large PDF/book binaries, secrets, private runbooks and external corpus payloads are intentionally **not** embedded in GitHub or the plugin package.
+
+- R27 source review: `docs/TWENTY-ROUND-REVIEW-2026-10-10-R27.md`; permanent regression: `tests/test-twenty-round-review-r27.php`.
