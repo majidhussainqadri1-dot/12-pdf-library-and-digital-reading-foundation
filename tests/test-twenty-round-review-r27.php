@@ -27,7 +27,7 @@ final class PLDR_Core {
     public static function edition(int $id):?array {
         global $wpdb;
         if(self::$edition_read_failed){$wpdb->last_error='simulated edition read failure';return null;}
-        return self::$edition;
+        return self::$edition && $id===(int)self::$edition['id'] ? self::$edition : null;
     }
     public static function table(string $name):string {return 'wp_pldr_'.$name;}
     public static function machine_error(string $code,string $message,int $status=400,array $extra=array()):WP_Error {return new WP_Error($code);}
