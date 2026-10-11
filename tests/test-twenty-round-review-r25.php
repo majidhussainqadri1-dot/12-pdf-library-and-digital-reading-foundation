@@ -32,8 +32,14 @@ $must($admin,"array('search_text'=>\$text)",'derived search-index repair still l
 $forbid($admin,"array('search_text'=>\$text,'updated_at'=>PLDR_Core::now())",'derived search-index repair still rewrites canonical document updated_at');
 $must($access,'public static function cleanup_tokens(): array','token cleanup does not return truthful bounded outcome');
 $must($admin,"array_merge(array('operation'=>'tokens'),\$result)",'token repair still fabricates success');
-$must($main,'Version: 1.1.0-rc.20','R25 release-candidate marker missing');
-$must($main,"define('PLDR_VERSION', '1.1.0-rc.20')",'R25 runtime release-candidate constant missing');
+// Preserve the R25 minimum release boundary without freezing all later
+// release candidates to R41's version. Current header and runtime MUST agree.
+if(!preg_match('/Version:\\s*(1\\.1\\.0-rc\\.[0-9]+)/',$main,$release)
+    || version_compare($release[1],'1.1.0-rc.20','<')){
+    fwrite(STDERR,"R25 regression: release-candidate marker missing or downgraded\\n");exit(1);
+}
+$must($main,"define('PLDR_VERSION', '".$release[1]."')",
+    'R25 runtime release-candidate constant does not match the plugin header');
 $must($main,"define('PLDR_DB_VERSION', '1.1.0')",'R25 unexpectedly changed DB version');
 $must($main,"define('PLDR_CONTRACT_VERSION', '1.1.0')",'R25 unexpectedly changed integration contract version');
 
