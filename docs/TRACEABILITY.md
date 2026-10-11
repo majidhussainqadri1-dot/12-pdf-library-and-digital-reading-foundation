@@ -241,3 +241,15 @@ All twenty new focused source/plan reviews: `docs/TWENTY-ROUND-REVIEW-2026-10-11
 | Central File00/01/05/06/16/17/19/20/21/23/24/25/26/CF04 ownership and privacy contracts | File12 source adapters alone are not installed module parity evidence | No cross-module ownership moved, no DB schema or interface migration, source candidate rc.19 | Installed native owner version/contract, Feed/Search/Preview/Reader and rollback integration in staging outstanding |
 
 Detailed twenty distinct scoped source-to-plan inspections: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R40.md`. Source presence/green CI never certifies live production behavior.
+
+
+## R41 — File12 amended, consolidated central and companion-owner traceability (2026-10-11)
+
+| Governing requirement | Proven R40 source gap | Exact R41 correction and test scope | Release gate |
+|---|---|---|---|
+| File12 `F12-FR-001` / `F12-NFR-004`, central bounded lawful discovery | WordPress REST route `sanitize_callback=absint` converted `page=-2` to 2 **before** strict `PLDR_Search::search` validation | Remove early route coercion. Actual `PLDR_REST::register` callback metadata and `PLDR_REST::library` wrong-pagination requests tested, no DB side effects | Genuine HTTP WordPress REST testing, File20 shell, File26 federated catalog, PHP deployment parity not verified |
+| File12 `F12-FR-010` reader, `NFR-001` field/object auth | `PLDR_REST::reader_manifest` still accepted bad nested/negative/decimal edition shape through `absint`, unlike R38 GET endpoints | Invoke same canonical query-shape validator before DB and native access checks; actual handler malformed requests tested | Browser navigation, signed delivery/guardian/anonymous/RTL/a11y staging unverified |
+| File12 `F12-FR-012`, `NFR-002` private tag correctness | PHP associative `json_decode(...,true)` collapses forbidden empty JSON map `{}` and valid list `[]` to same PHP [] | Decode to preserve JSON type, reject map and allow indexed bounded string-list; actual `PLDR_Reading::items` + `PLDR_REST::reading_items` regression | Existing physical historical DB rows, File00 identity, privacy export/erase and cache/index leakage acceptance unverified |
+| Central and File05/06/16/17/19/20/21/23/24/25/26/CF04 canonical ownership | File12 source-side consumer adapters cannot certify actual companion plugin deployment and contract versions | No canonical foreign source moved into File12 and no schema upgrade; R41 unique rc.20 package candidate only | Founder-approved installed parity audit, backups, two staging cycles, rollback and live retest pending |
+
+Twenty distinct scoped source-to-plan review paths and limits recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R41.md`. Neither passing CI nor a source anchor establishes Production readiness.
