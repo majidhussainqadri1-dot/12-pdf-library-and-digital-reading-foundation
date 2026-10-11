@@ -192,3 +192,15 @@ See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`. No GitHub CI result is a subst
 
 
 | `F12-FR-008/009` signed grants, rights updates and `F12-NFR-001` no implicit object-field conversions | Reader-access, download-session, approve-document, policy-update and repair REST routes accepted nested IDs/TTL/version/operation values via PHP casts before the native owner gates | R36-D04: shared strict REST mutation input gate before DB/lookups/idempotency plus explicitly checking JSON `expected_version` shape | Actual REST method malformed inputs in R36 PHP fixture; full Hostinger HTTP/permissions/IDOR acceptance still outstanding |
+
+
+## R37 (11 October 2026) — File12 canonical private deletion and consumer rights display truth
+
+| Plan/owner rule | Confirmed R36 source mismatch | Exact R37 source fix | Test and remaining gate |
+|---|---|---|---|
+| File12 FR-012 private bookmarks/notes delete + NFR-002 owner privacy | `PLDR_Reading::delete_item` returned true when WordPress DB deleted 0 rows and accepted invalid IDs | Reject nonpositive ID/user; only exactly-one affected owner-scoped row can report success | Actual native reader method with 0, 1, false DB result and invalid IDs in `tests/test-r37-reader-permission-delete.php`; installed DB and restore unverified |
+| File12 FR-008/010 + File25 UI access presentation | HTML/JS reader config used `!empty()` on persisted permission flags; legacy 'false'/'off' shown true although `PLDR_Access` denied | `PLDR_Reader::document_html` `canDownload/canPrint/canOffline` based on exact `PLDR_Core::policy_flag(...)===1` | Source boot-config invariant only; real JS/RTL/browser acceptance not yet performed |
+| File12 FR-008/010 REST reader and central consumer DTO truth | `PLDR_REST::reader_manifest` exposed incorrect truthy string download/print/offline | REST manifest uses same canonical binary rights parser as actual Access and `PLDR_Core::public_document_dto` | Actual REST method/Core parser assertions with prior false/off/no/invalid/null stored values; staging access/IDOR pending |
+| Central release source vs live separation | R36 PR30 and PR31 both rc.15 but different code | Unique R37 rc.16 based on PR31 with explicit PR30 native deletion reconciliation; no unverified main merge | Exact SHA QA on R37 only; installed File12 and File05/06/16/17/19/20/21/23/24/25/26 and CF04 contract parity unverified |
+
+R37 twenty distinct scoped audit ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R37.md`. Static requirement presence/green CI does not establish production acceptance.
