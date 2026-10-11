@@ -122,6 +122,8 @@ jobs:
         run: php tests/test-r39-rights-calendar-policy.php
       - name: R40 actual ingest dates, calendar parity and catalog numeric parameter integrity
         run: php tests/test-r40-ingest-date-catalog-pagination.php
+      - name: R41 real REST registration and private reading tag list integrity
+        run: php tests/test-r41-rest-route-private-tags.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
