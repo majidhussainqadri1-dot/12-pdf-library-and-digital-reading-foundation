@@ -71,6 +71,14 @@ final class PLDR_Access {
     public static function update_policy(int $document_id,array $changes,int $actor_id=0,int $expected_version=0) {
         global $wpdb; $actor_id=$actor_id?:get_current_user_id();
         if(!PLDR_Core::authorize('manage',$document_id,$actor_id)&&!PLDR_Core::authorize('rights',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_policy_forbidden','Document access-policy authority is required.',403);
+        // Rights API accepts JSON; nested arrays/objects must never be
+        // string-coerced into a different audience, entitlement or embargo.
+        foreach(array('audience','entitlement_key','embargo_until') as $field){
+            if(!array_key_exists($field,$changes))continue;
+            if(null!==$changes[$field] && (!is_scalar($changes[$field]) || is_bool($changes[$field]))){
+                return PLDR_Core::machine_error('pldr_policy_input_shape','Access-policy metadata must be a scalar field.',400,array('field'=>$field));
+            }
+        }
         // Stored rights must never treat the nonempty string "false"
         // as an enabled download, print, or offline permission.
         foreach(array('download_allowed','print_allowed','offline_allowed') as $flag){
