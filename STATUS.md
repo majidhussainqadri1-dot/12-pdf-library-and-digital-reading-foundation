@@ -1,33 +1,31 @@
-# File 12 — R28 Corrective Source Candidate — 2026-10-11
+# File 12 — R29 Revised Plan/Source Candidate — 11 October 2026
 
-| Independent evidence gate | Current grounded state |
+| Evidence gate | Exact current statement |
 |---|---|
-| Governing text | Latest File 12 v1.1 Future-24 amended, three central governing plans, cross-linked File 05,06,21,23,25, and other canonical owner boundaries |
-| `main` truth | `2b369ef2d609247896e1ab32118f1dc498407f51` (bootstrap README only) |
-| Audited exact R27-A parent | `0c9ba8ba4091234183e057145d0f9a21bcaff7b9` / PR #15 |
-| Independently divergent R27-B candidate | `a369a8525d01d7bfdf82c794d1d2cc60510beeea` (had distinct detached derivative binding fix) |
-| R28 draft PR | #16, branch `review/file-12-r28-twenty-complete-plan-passes-2026-10-11` |
-| Twenty-pass matrix | `tests/test-r28-twenty-full-plan-sweeps.php`: twenty complete automated **static** 53-requirement+12-adapter matrix passes, plus 20 targeted invariants. Not 20 independent line-by-line/live tests |
-| Found and corrected source issues | R28-D01: port lost R27-B detached-thumbnail signed-grant ownership recheck. R28-D02: HTML reader pregrant state/policy ordering. R28-D03: divergent R27 candidate collision at rc.6. R28-D04: root README still rc.3 |
-| New executable regressions | `tests/test-r28-detached-grant-binding.php`, `tests/test-r28-reader-html-pregrant.php`, `tests/test-r28-twenty-full-plan-sweeps.php`; existing R27/earlier suites retained |
-| Candidate software version | `1.1.0-rc.7` |
-| DB schema/integration contract candidate | `1.1.0` / `1.1.0`; no schema change |
-| Exact-final-head CI | **Verify the last unchanged R28 SHA from GitHub Actions after this status commit**. Older green CI is not evidence for a changed HEAD |
-| Planned package folder | Written File 12 plan `12-pdf-library-foundation`; candidate `pdf-library-foundation-12`. Change control / compatibility and staged migration remains pending |
-| Real Hostinger staging, browser/roles/rights/OCR/CF-04 consumers | Not verified |
-| Physical deployed DB version/schema/migration and private storage/keys | Not verified |
-| Restore/rollback, Founder acceptance, production deployment and live retest | Not verified |
+| Governing documents | Uploaded File 12 v1.1 amended Future-24, Three Central Plans Consolidated Master Plan and actual companion File 05/06/21/23/25 plans |
+| Source `main` HEAD | `2b369ef2d609247896e1ab32118f1dc498407f51` (bootstrap README only) |
+| Parent audited candidate | R28 PR #16 `cac343ecae14b8cff08be56c83cc6d32761426d3`; CI #410 green only for that SHA |
+| Current candidate | R29 Draft PR #19, branch `review/file-12-r29-twenty-source-plan-audit-2026-10-11` |
+| Source audit | 20 different focused code/source-vs-governing-plan review domains, plus Future-24 source-anchors; not 20 full live WordPress journeys |
+| Proven code gaps | R29-D01 F12-FR-001/013 missing author/source/edition/license/ISBN/year/access-mode facets in search + REST; R29-D02 public Library had no Next link although signed cursor returned |
+| Source corrections | Current canonical edition facets, access-safe projection, strict bounded invalid-filter denial, signed cursor binding to every selected facet/user, REST args, accessible filters and Next/First links |
+| Executable regression | `tests/test-r29-catalog-facets.php` actual real `PLDR_Search` on isolated DB fixture with private entitlement and signed cursor test; earlier R28 full static matrix and R1–R27 tests retained |
+| Audit evidence | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R29.md` |
+| Software/plugin/ZIP candidate | `1.1.0-rc.8` |
+| Source DB schema + interface contract | `1.1.0` / `1.1.0` — unchanged |
+| Exact final R29 CI | Must be checked against final unchanged PR HEAD and deterministic ZIP SHA after the last file update |
+| Owner boundary | File 12 owns document/edition/object/reading; File05 learning, File06 knowledge, File16 AI, File21 feed, File23 dashboard projections, File20 shell, File25 UI tokens remain native |
+| Naming conflict | Written plan package top-level `12-pdf-library-foundation`; code ZIP uses `pdf-library-foundation-12` — formal change control and migration required, no silent rename |
+| Hostinger staging/external consumers | Unverified, including installed File00/01/05/06/16/17/19/20/21/23/24/25/26 and CF-04 counterparts |
+| Deployed DB migration/physical schema | Unverified |
+| Restore/rollback, RTL/a11y/offline, Founder signoff | Unverified |
+| Production/live verification | NOT DONE |
 
-## Exact review record
-
-See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md` for the per-round defect/clean accounting, actual test scope and cross-file acceptance gaps.
-
-## Production-truth five fields
-
-**Repository HEAD:** R28 PR branch final commit; main `2b369ef...`.  
-**Deployed Version:** Unverified.  
-**DB Version:** Unverified (candidate source 1.1.0 only).  
-**Migration State:** Unverified.  
-**Live Verification Status:** Not tested.
+## Mandatory production truth
+Repository HEAD: final R29 Draft PR SHA (main remains bootstrap).  
+Deployed Version: UNVERIFIED.  
+DB Version: UNVERIFIED (1.1.0 is source target only).  
+Migration State: UNVERIFIED.  
+Live Verification Status: NOT VERIFIED.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**

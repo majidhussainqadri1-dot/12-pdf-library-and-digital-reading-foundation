@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.7`
+Candidate: `1.1.0-rc.8`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -72,3 +72,10 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `tests/test-r28-reader-html-pregrant.php`: direct HTML reader must check private state and policy before grant issuance.
 - `tests/test-r28-twenty-full-plan-sweeps.php`: 20 repeated 53-ID + 12 companion anchor source sweeps (1,300 presence checks) and one additional invariant per pass.
 - Competing R27 branch security corrections unified into R28; software candidate rc.7, DB/contract still 1.1.0.
+
+
+## R29 plan-to-code completion evidence
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R29.md` — 20 scoped comparisons to the actual File 12/central/companion written plans, exact two source defects and remediation boundaries.
+- `tests/test-r29-catalog-facets.php` — actual `PLDR_Search` fixtures for author/source/edition/ISBN/license/year/access facets, invalid values, private-result denial, cursor query binding and REST/HTML parity.
+- File 12 FR-001 / FR-013: add seven bounded bibliographic facets, plus accessible signed Next/First navigation. Existing owner authorization and signed cursor invariants retained. R28 earlier 20-source-matrix and prior corrective suites preserved.
+- Candidate `1.1.0-rc.8`; DB/schema and interface contract stay `1.1.0`. Package folder rename remains a separate unapproved change-control gate.
