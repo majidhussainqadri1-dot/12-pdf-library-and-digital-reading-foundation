@@ -1,3 +1,15 @@
+# File12 R45 — private W3C Annotation export integrity; source-only 1.1.0-rc.24
+
+- Exact frozen parent R44 PR #39 HEAD `59b7e8e73c139a8444fa3aa50a345af28e989c79`; its green CI does NOT prove this R45 source change.
+- Twenty distinct bounded requirement/source foci across amended File12, central plans and File05/06/21/23/25; 19 source paths found, one actual R45-D01 cross-API private tags consistency defect found and patched after reviews. No claim of 20 independent exhaustive E2E inspections.
+- `PLDR_Future_Annotations::export` now checks every historic `tags_json` with canonical `PLDR_Reading::parse_stored_tags` before projected export; malformed rows return auditable error with **zero partial private export**. Test: `tests/test-r45-annotation-export-integrity.php` on PHP matrix.
+- Candidate software 1.1.0-rc.24; source DB schema and integration contract still 1.1.0; no physical migration. Exact R45 HEAD QA, package checksum pending final GitHub Actions run.
+- GitHub `main` still bootstrap-only; inner package folder mismatch, actual installed companion versions, Hostinger deployed plugin/DB/wp_options/migrations/key backup/staging/live acceptance unverified.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R44 — offline rights law and short-lived grants, source-only 1.1.0-rc.23
 
 - Exact immutable parent: R43 Draft #38 HEAD `1695592dc350ecd77fd4211244ee99b8b70588f9`; R44 HEAD/CI not inherited.
