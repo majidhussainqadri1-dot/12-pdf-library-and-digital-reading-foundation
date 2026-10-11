@@ -2,9 +2,15 @@
 
 This branch contains the **R31 source-only corrective candidate** for File 12, based on the exact-green R30 rc.9 lineage. It retains R28's reconciliation of divergent R27 security fixes (reader/IIIF pregrant checks and current derivative binding revalidation), tightens the direct HTML reader, and retains canonical ownership across the platform. R31 additionally rejects malformed PDF-ingest metadata and uploaded PDF/cover file structures before any database or private-storage side effects. Source/CI/package truth is not staging/live truth.
 
+## R32 access-rights flag correction (11 October 2026)
+
+A fresh twenty-focus File12 plan and central/companion contract review found that PHP truthy strings such as `false`, `off` and `no` could silently enable download/print/offline permissions and bypass a requested duplicate-scan confirmation; patient-case confirmation was likewise interpreted via truthiness before the independent clearance gate. The real `PLDR_Core::policy_flag` parser is now reused by `PLDR_Ingest::ingest` and `PLDR_Access::update_policy`, fail-closed on invalid values and persistently distinguishing explicit false from true. R32 actual-class regression verifies the shared parser, both write entrypoints, persisted rights, and patient consent. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`.
+
+This is an **unmerged source candidate only**. Hostinger deployed code, database, migration, and live verification remain separate gates.
+
 ## Candidate identity
 
-- Software: `1.1.0-rc.10`
+- Software: `1.1.0-rc.11`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`

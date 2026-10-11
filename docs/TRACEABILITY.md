@@ -130,3 +130,11 @@ R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot pro
 | F12-NFR-001/007 and central owner law | Not an excuse to alter schema or other owners | Source-only `1.1.0-rc.10`; same `1.1.0` DB/contract; all canonical owners preserved | Hostinger exact artifact/DB/migration, external File00/05/06/16/20/24/25 and CF04 integration, backup/rollback and Founder acceptance |
 
 R31 is a source QA candidate, not proof of operational resolution. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`.
+
+## R32 access policy scalar flags and patient consent (2026-10-11)
+
+| Governing requirements | Implementation & actual code evidence | Independent acceptance |
+|---|---|---|
+| F12-FR-008, F12-NFR-001: explicit enable/disable in PDF ingest/access policies | `PLDR_Core::policy_flag` canonical 1/0/null; `PLDR_Ingest::ingest` and `PLDR_Access::update_policy` call before later `empty()`/persistence; `tests/test-r32-policy-flags.php` | Real WordPress REST API, authenticated/suspended roles, DB transaction, revoke, and browser requests pending |
+| F12-FR-002/005 and F12-NFR-002: patient consent and distinct scan acknowledgment | `patient_case_consent` and `confirm_distinct_scan` share canonical false/true parser; independent patient-case provider clearance remains mandatory | Actual File00/24 clinical consent and legally verified clearance + real distinct scan workflow pending |
+| Central release & NFR-009 | Unique rc.11 software and exact-HEAD PHP/JS/deterministic ZIP required; source schema stays 1.1.0 | Physical deployed plugin SHA, schema/migration and live retest not yet verified |
