@@ -4,13 +4,19 @@ This branch contains the **R28 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.7`
+- Software: `1.1.0-rc.8`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
 - Canonical install folder: `pdf-library-foundation-12/`
 - WordPress slug/text domain: `pdf-library-digital-reading`
 - PHP namespace prefix: `PLDR_`
+
+## R29 governing rights-policy safety review — 11 October 2026
+
+R29 preserves the R28 candidate's signed-original/derivative binding, reader HTML and REST/IIIF pregrant checks. Persisted access policies with malformed `embargo_until` no longer silently authorize public delivery: the existing manager exception is retained while anonymous and ordinary readers fail closed. Unknown policy audiences are rejected before external entitlement adapters are consulted. `tests/test-r29-policy-fail-closed.php` verifies the real access method; the existing 20-pass 53-ID+12-contract static matrix is rerun as part of exact-HEAD CI.
+
+This remains source/repository truth, not evidence of the active Hostinger plugin, DB or migration state. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R29.md`.
 
 ## Core plan scope
 
