@@ -84,6 +84,14 @@ foreach(array('audience','entitlement_key','embargo_until') as $field){
         $check($before===$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries,'invalid policy '.$field.' touched database');
     }
 }
+// R35: null audience/key is not a valid explicit rights change; only
+// embargo_until may be null to clear an embargo.
+foreach(array('audience','entitlement_key') as $field){
+    $before=$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries;
+    $result=PLDR_Access::update_policy(5,array($field=>null),77,2);
+    $check(is_wp_error($result)&&$result->code==='pldr_policy_input_shape','null '.$field.' must fail closed');
+    $check($before===$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries,'null '.$field.' touched DB');
+}
 // Real policy update persists the canonical 0 for previously dangerous text
 // "false" and "off", but still accepts truly enabled access flags.
 $ok=PLDR_Access::update_policy(5,array('download_allowed'=>'false','print_allowed'=>'off','offline_allowed'=>'no'),77,2);
