@@ -96,6 +96,8 @@ jobs:
         run: php tests/test-r28-detached-grant-binding.php
       - name: R28 direct HTML reader pregrant invariant
         run: php tests/test-r28-reader-html-pregrant.php
+      - name: R28 twenty repeated full plan-to-code matrix sweeps
+        run: php tests/test-r28-twenty-full-plan-sweeps.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
