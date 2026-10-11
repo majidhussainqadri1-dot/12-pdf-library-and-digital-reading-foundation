@@ -164,3 +164,16 @@ See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`; do not mistake exact-head gree
 | Central plan + File05/06/16/17/19/20/21/23/24/25/26/CF04 owner contracts | Source-side references don't prove deployed other owners | No foreign data ownership moved to File12; source/schema contract 1.1.0 unchanged | Installed cross-file contracts, events/roles and staging E2E unverified |
 
 The R34 source audit and twenty scoped checks are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R34.md`. The retained 20-repeat static plan matrix is not a staging or Live test.
+
+## R35 (2026-10-11): File12 FR-012 / NFR-001/002 private reader state and central owner integrity
+
+| Governing plan | Confirmed R34 code gap | R35 correction | Real source QA and acceptance gate |
+|---|---|---|---|
+| FR-012, NFR-001/002 private Page/Note/Anchor | `PLDR_Reading::add_item` array/object/bool casts and noninteger page could store synthesized/corrupted owner state | Strict scalar/type, integer page, note length checks before insert; legitimate actions still accepted | `tests/test-r35-reading-item-input-shapes.php`, real add_item; actual WP REST/browser input and export/erasure unverified |
+| FR-012 private tags | Associative/nested/malformed JSON and oversized tags could be silently coerced or dropped on write | Valid bounded indexed arrays, legitimate JSON and CSV; reject nested/map before insert | Actual PHP negative/positive test; WordPress DB and cross-device storage pending |
+| FR-012 / NFR-002 legacy data integrity | `PLDR_Reading::items` accepted any decoded JSON array including maps/nested and oversized user-private tag structures | Enforce indexed list max 30 string values, audit failure, return non-partial error | Actual historical-tag DB fixture tests corrupt and valid stored data; real migration reconciliation pending |
+| FR-008 rights/embargo, NFR-001 request contracts | Explicit null audience/entitlement could inherit stored value without explicit normalized validation | Deny before DB read, preserve approved `embargo_until:null` clear | Extended actual R33 Access policy fixture; staging malformed REST cases pending |
+| Central release exact artifact identity | R34 PR #26 and #27 both `1.1.0-rc.13` despite different bytes | New linear R35 rc.14 candidate includes private note fixes plus prior rights/anonymous grants | Only exact final R35 SHA/Actions/ZIP hash can prove source; live deployed checksum unknown |
+| File05/06/16/17/19/20/21/23/24/25/26/CF04 owners | Source adapter checks are not native consumer deployment truth | No cross-file ownership change, source DB/contract stays 1.1.0 | Real installed version and staging provider acceptance mandatory |
+
+See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`. Source-only; no merge/live claims.
