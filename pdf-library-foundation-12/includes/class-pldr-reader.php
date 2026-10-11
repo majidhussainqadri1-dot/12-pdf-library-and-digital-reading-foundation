@@ -239,6 +239,46 @@ final class PLDR_Reading {
         $edition = PLDR_Core::edition($edition_id);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_item_edition_read','Private reading-item edition state could not be read reliably.',503,array('degraded'=>true));
         if (!$edition) return PLDR_Core::machine_error('pldr_edition_missing', 'Document edition not found.', 404);
+        // Notes/bookmarks are private canonical state. Reject malformed
+        // REST JSON values before coercion can persist synthetic "Array" text,
+        // truncate a nested note, or silently drop invalid tags.
+        foreach(array('type','page','note','anchor') as $field){
+            if(!array_key_exists($field,$data))continue;
+            if(!is_scalar($data[$field]) || is_bool($data[$field])){
+                return PLDR_Core::machine_error('pldr_item_input_shape','Private reading item field requires a scalar value.',400,array('field'=>$field));
+            }
+        }
+        if(array_key_exists('page',$data) && !preg_match('/^[0-9]+$/',(string)$data['page'])){
+            return PLDR_Core::machine_error('pldr_item_input_shape','Reading-item page must be a positive integer.',400,array('field'=>'page'));
+        }
+        if(isset($data['note']) && strlen((string)$data['note'])>16000){
+            return PLDR_Core::machine_error('pldr_item_input_size','Private reading note exceeds the accepted input size.',400,array('field'=>'note'));
+        }
+        if(array_key_exists('tags',$data)){
+            $raw_tags=$data['tags'];
+            if(is_array($raw_tags)){
+                if(!array_is_list($raw_tags)||count($raw_tags)>100){
+                    return PLDR_Core::machine_error('pldr_item_tags_shape','Private reading tags require a bounded indexed list.',400);
+                }
+                foreach($raw_tags as $tag)if(!is_string($tag)&&!is_int($tag)&&!is_float($tag)){
+                    return PLDR_Core::machine_error('pldr_item_tags_shape','Private reading tags contain a nested or invalid item.',400);
+                }
+            }elseif(is_string($raw_tags)){
+                if(strlen($raw_tags)>16000)return PLDR_Core::machine_error('pldr_item_tags_shape','Private reading tags exceed the input size.',400);
+                $trimmed=ltrim($raw_tags);
+                if('['===substr($trimmed,0,1)||'{'===substr($trimmed,0,1)){
+                    $decoded=json_decode($raw_tags,true);
+                    if(!is_array($decoded)||!array_is_list($decoded)||count($decoded)>100){
+                        return PLDR_Core::machine_error('pldr_item_tags_shape','Private reading JSON tags require a bounded indexed list.',400);
+                    }
+                    foreach($decoded as $tag)if(!is_string($tag)&&!is_int($tag)&&!is_float($tag)){
+                        return PLDR_Core::machine_error('pldr_item_tags_shape','Private reading JSON tags contain a nested item.',400);
+                    }
+                }
+            }else{
+                return PLDR_Core::machine_error('pldr_item_tags_shape','Private reading tags require a list or text.',400);
+            }
+        }
         $type = sanitize_key((string) ($data['type'] ?? 'bookmark'));
         if (!in_array($type, array('bookmark','note','highlight'), true)) return PLDR_Core::machine_error('pldr_item_type', 'Unsupported private reading item type.', 400);
         $page = absint($data['page'] ?? 0);
@@ -272,7 +312,16 @@ final class PLDR_Reading {
             $row['page_number']=(int)$row['page_number'];
             $row['version']=(int)$row['version'];
             $tags=json_decode((string)$row['tags_json'],true);
-            if(!is_array($tags)){
+            // Historical/partial DB writes may predate input validation.
+            // The private reader contract is a bounded list of string tags,
+            // never a JSON map or nested values passed through to clients.
+            $tags_valid=is_array($tags)&&array_is_list($tags)&&count($tags)<=30;
+            if($tags_valid){
+                foreach($tags as $stored_tag){
+                    if(!is_string($stored_tag)){ $tags_valid=false;break; }
+                }
+            }
+            if(!$tags_valid){
                 PLDR_Core::audit('reading_item',(int)$row['id'],'reading_item_tags_corrupt',array('edition_id'=>$edition_id),$user_id);
                 return array('error'=>PLDR_Core::machine_error('pldr_items_corrupt','Stored private reading-item tags failed integrity validation; no partial item list was returned.',500,array('item_id'=>(int)$row['id'])));
             }

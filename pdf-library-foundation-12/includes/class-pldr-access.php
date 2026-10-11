@@ -86,7 +86,7 @@ final class PLDR_Access {
         // string-coerced into a different audience, entitlement or embargo.
         foreach(array('audience','entitlement_key','embargo_until') as $field){
             if(!array_key_exists($field,$changes))continue;
-            if(null!==$changes[$field] && (!is_scalar($changes[$field]) || is_bool($changes[$field]))){
+            if(($field!=='embargo_until' && null===$changes[$field]) || (null!==$changes[$field] && (!is_scalar($changes[$field]) || is_bool($changes[$field])))){
                 return PLDR_Core::machine_error('pldr_policy_input_shape','Access-policy metadata must be a scalar field.',400,array('field'=>$field));
             }
         }
