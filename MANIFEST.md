@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.21`
+Candidate: `1.1.0-rc.22`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -178,3 +178,10 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Future_REST`: remove pre-handler numeric/cursor sanitization, early typed checks for 10 Future GET endpoints; prevents negative/decimal/structured query coercion and protects private shelves, File16 corpus and File05/06 context adapters.
 - `tests/test-r42-future-rest-query-shapes.php`: real route registration and method input-shape negative tests (isolated WP fixture, not E2E).
 - Source DB and versioned integration contract remain 1.1.0. No staging or deployed code/DB parity evidence; folder migration decision outstanding.
+
+
+## R43 source and test evidence
+- 20 scoped checks ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R43.md`.
+- `class-pldr-future-rest.php`: typed mutation preflight for 18 REST entrypoints, avoiding `absint`/string/array coercion of malformed request bodies before owner, File00 entitlement and File05/06/16/21/23 adapter boundaries.
+- `tests/test-r43-future-mutation-shapes.php`: actual PHP method negative-input tests under isolated WP/DB stubs. Runs along with all previous regression suites.
+- Software 1.1.0-rc.22; source DB/schema and integration contract unchanged 1.1.0, no DB migration. Source-only; no staging/live claim.

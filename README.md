@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.21`
+- Software: `1.1.0-rc.22`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -93,3 +93,7 @@ R41 source-only software candidate `1.1.0-rc.20` closes three implementation gap
 
 ## R42 — Future-24 REST query integrity (11 October 2026)
 Source-only corrective candidate rc.21; the 20 source/requirement owner checks are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R42.md`. Future reflow, private shelves and File16 corpus routes no longer pre-sanitize page/limit/offset/cursor, and ten Future GET handlers reject malformed numeric/text values before private reads or provider callbacks. Regression: `tests/test-r42-future-rest-query-shapes.php`. The inner folder mismatch, companion installed contract versions, staging, actual DB, deployment and live parity remain unresolved/unverified.
+
+
+## R43 (11 October 2026): Future mutation shape protection
+The R43 **source-only** candidate 1.1.0-rc.22 retains the original File12 FR001–019, NFR001–010 and Future-24 contracts and performs twenty distinct bounded plan-to-source checks, detailed in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R43.md`. Four groups of malformed POST/DELETE request coercion were identified in Future-24 handlers. New `PLDR_Future_REST::validate_mutation_shape` protects eighteen native-authorized mutation entrypoints before source reads, idempotency and provider operations. New executable isolated fixture: `tests/test-r43-future-mutation-shapes.php`. DB schema and integration contract remain 1.1.0. Real staging and Hostinger live parity are unverified.

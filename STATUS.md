@@ -1,3 +1,16 @@
+# File12 R43 — Future mutation raw input validation; software 1.1.0-rc.22
+
+- Exact source parent: R42 PR#37 `35780dacdc0bb83ca40aa547b1b42752c40eff49` (previous exact green CI is not R43 evidence).
+- 20 topic-scoped governing File12/central/companion owner-source inspections, **not** 20 exhaustive E2E/production reviews. 19 core owner paths present, 20th uncovered four groups of typed request-coercion defects, corrected as a batch.
+- Applied strict JSON/form mutation numeric/text/array/boolean validation to 18 Future-24 handlers *before* owner lookup, provider calls, idempotency and SQL; not an authorization replacement.
+- Added `tests/test-r43-future-mutation-shapes.php` to PHP 8.1/8.3/8.4 workflow; final immutable R43 HEAD, CI/package SHA pending verification.
+- Candidate software 1.1.0-rc.22; source DB version/integration contract 1.1.0 unchanged, physical DB/migration unverified.
+- Main still bootstrap-only; installed File12/other File00/01/05/06/16/17/19/20/21/23/24/25/26/CF04 versions, deployed checksum, backup/key recovery, Hostinger staged/live state UNVERIFIED. Written plan inner folder vs built package mismatch remains founder-controlled decision.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R42 — Future REST raw query guard; repository candidate 1.1.0-rc.21 (11 October 2026)
 
 - **Exact parent:** R41 PR #36 head `125be12011d727b85d659ce273d19843533dc0b4` (previous CI does not prove R42).
