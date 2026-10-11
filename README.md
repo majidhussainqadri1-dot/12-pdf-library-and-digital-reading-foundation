@@ -1,16 +1,22 @@
 # File 12 — PDF Library and Digital Reading
 
-This branch contains the **File 12 Future Digital Reading Intelligence 24 candidate** for the Sabri Social Homeopathy Platform. It starts from the exact-green R23 candidate and includes the R24 fresh twenty-round corrective hardening without transferring canonical ownership from companion files.
+This R28 candidate combines independent R27 source corrections from Draft PRs #14 and #15 without transferring canonical ownership from companion files.
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.3`
+- Software: `1.1.0-rc.7`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
 - Canonical install folder: `pdf-library-foundation-12/`
 - WordPress slug/text domain: `pdf-library-digital-reading`
 - PHP namespace prefix: `PLDR_`
+
+## R28 unified correction (11 October 2026)
+
+Signed PDF/thumbnail grants are rechecked against the CURRENT edition/object attachment at delivery. Reader and IIIF preflight validation remains before bearer grant issuance. Regression tests from both correction branches are retained; no live deployment is claimed.
+
+See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md`.
 
 ## Core plan scope
 
