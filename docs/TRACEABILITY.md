@@ -153,3 +153,12 @@ See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`; do not mistake exact-head gree
 | File05/06/16/17/19/20/21/23/24/25/26 & CF04 | Source-side adapters do not establish matching deployed code | No replacement of foreign canonical owners; retained static adapter checks | Fetch and test real external install versions, provider contracts and coupled journeys |
 
 **20-area audit:** `docs/TWENTY-ROUND-REVIEW-2026-10-11-R33.md`. Do not classify static presence/green CI as production acceptance.
+
+## R34 FR-012 private reading source and exact release gate (2026-10-11)
+
+| Governing source | File12 code / executable evidence | Outside-repository limit |
+|---|---|---|
+| F12-FR-012: page anchors, private notes, tags, no public-by-default | `PLDR_Reading::add_item` rejects nested/coerced type/page/note/anchor; `tests/test-r34-reading-item-input-shapes.php` actual method tests | Actual WordPress IDs, File00 claims, browser/REST and erasure/export require staging |
+| F12-NFR-001/002 and central safe API | Bounded tag lists, valid JSON list/CSV, malformed arrays/objects denied before write | Live DB record cleanup and native File24 privacy assurance require deployed evidence |
+| F12-FR-008 and existing R33 rights-contract | Policy update explicit null audience/key rejected; null embargo remains clearable; R33 executable fixture extended | Real active entitlement providers and rights role tests outstanding |
+| Release and DB parity | New `1.1.0-rc.13`, unchanged source schema/contract `1.1.0`, exact HEAD PHP 8.1/8.3/8.4 CI and deterministic package expected | Physical installed plugin checksum, migration/wp_options and live re-test unknown |

@@ -74,6 +74,16 @@ foreach(array('download_allowed','print_allowed','offline_allowed') as $name){
         $check($before===$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries,'invalid policy update touched DB for '.$name);
     }
 }
+// Explicit null audience/key is not an omitted field: it must be rejected
+// before current-policy DB reads; null embargo still intentionally clears a date.
+foreach(array('audience','entitlement_key') as $field){
+    $before=$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries;
+    $result=PLDR_Access::update_policy(5,array($field=>null),77,2);
+    $check(is_wp_error($result)&&$result->code==='pldr_policy_input_shape',
+        'explicit null '.$field.' should not inherit an unrelated policy');
+    $check($before===$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries,
+        'explicit null '.$field.' reached DB unexpectedly');
+}
 // Rights API must reject non-scalar current-policy fields before any DB
 // read/write; these inputs can be sent by malformed JSON REST clients.
 foreach(array('audience','entitlement_key','embargo_until') as $field){
