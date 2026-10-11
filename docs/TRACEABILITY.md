@@ -162,3 +162,13 @@ See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`; do not mistake exact-head gree
 | F12-NFR-001/002 and central safe API | Bounded tag lists, valid JSON list/CSV, malformed arrays/objects denied before write | Live DB record cleanup and native File24 privacy assurance require deployed evidence |
 | F12-FR-008 and existing R33 rights-contract | Policy update explicit null audience/key rejected; null embargo remains clearable; R33 executable fixture extended | Real active entitlement providers and rights role tests outstanding |
 | Release and DB parity | New `1.1.0-rc.13`, unchanged source schema/contract `1.1.0`, exact HEAD PHP 8.1/8.3/8.4 CI and deterministic package expected | Physical installed plugin checksum, migration/wp_options and live re-test unknown |
+
+## R35 canonical permission enforcement, DTO and anonymous token parity — 2026-10-11
+
+| Governing source | File12 owner code + executable evidence | Independent evidence still needed |
+|---|---|---|
+| FR008, NFR001, central no-unauthorized-grant law | `PLDR_Access::can_access_edition` read-time canonical permission parser on legacy stored values; `tests/test-r35-access-grants.php` | Installed File00 guardian/roles, real legacy DB rows and actual browser endpoints |
+| FR008, central owner projection | `PLDR_Core::public_document_dto` agrees with access-policy parser for download/print/offline; R35 fixture | Actual File21/25 public cards and File26 index projections |
+| FR009, signed delivery audience/object/operation binding | `PLDR_Access::issue_token` separates anonymous -1 authorization from public 0 persisted token/hash; real fixture | Hostinger GET/HEAD/range, browser session and revoked token race |
+| FR012 and NFR002 private reader | R34 actual malformed private note/tag tests retained | File24 erasure and File00 ownership with physical WordPress roles |
+| NFR007 release | Unique rc.14 package; repository schema 1.1.0 unchanged; exact-head CI required | real deployed file hash, wp_options/migrations and rollback/Founder approval |

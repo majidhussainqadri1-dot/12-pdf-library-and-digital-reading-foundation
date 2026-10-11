@@ -1,27 +1,31 @@
-# File 12 — R34 Private Reading & Rights-Policy Source Candidate
+# File 12 — R35 reconciled source candidate, 11 October 2026
 
-| Reality field | Verified source truth or pending gate |
+| Evidence gate | Status |
 |---|---|
-| Governed input | Actual File12 amended v1.1 DOCX FR-012 & NFR-001/002, three consolidated central plans and File05/06/21/23/25 native-owner plans |
-| Frozen source base | R33 Draft PR #24 SHA `f7b1828ceb932837f9031e65f4d1dc44cc43b9e7`; distinct R33 PR #25 SHA `370bfa70972cd37eb31c3b09d0ad03653574f24a` |
-| Audit | 20 focused source/plan inspections in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R34.md`; not 20 WordPress E2E tests |
-| R34-D01 | Private notes/page/type/anchor inputs allowed coercion of structured request data |
-| R34-D02 | Private item tags allowed malformed/nested JSON and associative tag shapes |
-| R34-D03 | Explicit null audience/entitlement could silently inherit current access policy |
-| Code corrections | `PLDR_Reading::add_item` strict typed private data and tags; `PLDR_Access::update_policy` explicit null denial |
-| New runnable regression | `tests/test-r34-reading-item-input-shapes.php`, actual PLDR_Reading behavior and no writes for invalid inputs |
-| Extended regression | R33 actual Core/Ingest/Access fixture tests null metadata and preserved explicit flags |
-| Retained | R32 physical upload size/crypto/cover, R31 shape, R30 embargo, R29 facet, R28 static 20×65 checks |
-| Candidate version | `1.1.0-rc.13` new build identity |
-| Repository schema and contract | `1.1.0` unchanged; no R34 SQL migration |
-| Exact R34 final SHA and CI | Await newest completed GitHub Actions on exact final R34 HEAD |
-| Written ZIP root vs plugin folder | `12-pdf-library-foundation` vs `pdf-library-foundation-12`; Founder-approved upgrade/change control outstanding |
-| Repository main | `2b369ef2d609247896e1ab32118f1dc498407f51` not source candidate |
-| Deployed Version | UNVERIFIED |
-| DB Version | UNVERIFIED |
-| Migration State | UNVERIFIED |
+| Baseline | Draft R34 PR #27 exact HEAD `79ef7659ba816f7959313ddf4ded047236685202` |
+| Divergent R34 candidate | PR #26 exact HEAD `335952e2f7b47cd7bf95cd184cfa6de7059917ea` — different source under same rc.13 |
+| Governing basis | File12 v1.1 amended Future24 + three consolidated master plans + companion File05/06/21/23/25; other File00/01/16/17/19/20/24/26/CF04 only source-side |
+| Audit | 20 separate source/plan focus checks, `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`, plus existing 20×65 **static** requirements presence matrix |
+| R35-D01 | Legacy persisted download/print/offline strings could be misread as enabled: read-time canonical `policy_flag` enforcement restored |
+| R35-D02 | DTO advertised legacy false/string rights as true: DTO synchronized with actual grant enforcement |
+| R35-D03 | Explicit anonymous -1 signed grant persisted with mismatched public/user audience hash: canonical user_id 0 token + -1 authorization kept |
+| R35-D04 | Differing R34 rc.13 builds reconciled; distinct release identity `1.1.0-rc.14` |
+| Kept | PR27 private notes/tag structures + policy explicit-null input guards and previous R1–R34 fixes |
+| Actual regression | `tests/test-r35-access-grants.php` actual Core/Access and signed grants, plus prior `test-r34-reading-item-input-shapes.php` |
+| Candidate software | `1.1.0-rc.14` |
+| Repository schema / integration contract | `1.1.0` / `1.1.0`, no new SQL migration |
+| Final R35 exact-HEAD GitHub CI | PENDING |
+| Plan vs plugin ZIP root folder | `12-pdf-library-foundation` vs `pdf-library-foundation-12` controlled migration and Founder decision required |
+| Hostinger deployed plugin/version/checksum | UNVERIFIED |
+| DB physical schema/options & migration | UNVERIFIED |
+| Installed counterpart services, Staging, backup/rollback | UNVERIFIED |
 | Live Verification Status | NOT PERFORMED |
+| Approved merge/deployment | NONE |
 
-No merge, live deploy, staging/rollback or founder release approval is claimed.
+**Repository HEAD:** confirm final R35 SHA separately.  
+**Deployed Version:** unverified.  
+**DB Version:** unverified.  
+**Migration State:** unverified.  
+**Live Verification Status:** not performed.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**

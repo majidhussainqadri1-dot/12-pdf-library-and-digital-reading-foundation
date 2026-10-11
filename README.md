@@ -6,9 +6,13 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 Source-only 20-focus audit against File12 amended FR-012 (page anchors, private note text, tags and export/delete) and central API/privacy requirements identified silent array/object conversion and malformed nested JSON tag storage in `PLDR_Reading::add_item`. It now rejects invalid types and oversized/structured notes/tags before writing private state. A real PHP fixture covers invalid and ordinary bookmark/note inputs. R34 also rejects explicit null `audience` and `entitlement_key` on access-policy updates, while retaining null embargo as an intentional date-clear. These are repository candidate fixes, **not** live confirmation. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R34.md`.
 
+## R35 reconciled authorization, DTO and private-reader review (11 October 2026)
+
+Two divergent Draft R34 PRs #26/#27 carried different security changes while both labelled rc.13. R35 is based on PR #27 and integrates PR #26's legacy policy grant canonicalization, equivalent public-DTO permissions, explicit supported operation allowlist, and anonymous signed grant parity with the delivery verifier. PR #27's private notes/tags input safety and explicit null policy metadata rejection remain. The new executable `tests/test-r35-access-grants.php` directly invokes Core DTO, Access::can_access_edition and token issuance. The existing `tests/test-r34-reading-item-input-shapes.php` is retained. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`. This is not staging or live truth.
+
 ## Candidate identity
 
-- Software: `1.1.0-rc.13`
+- Software: `1.1.0-rc.14`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
