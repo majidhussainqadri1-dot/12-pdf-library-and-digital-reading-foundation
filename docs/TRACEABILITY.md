@@ -89,3 +89,12 @@ This traceability establishes implementation presence and automated repository e
 | Versioned release | Candidate software `1.1.0-rc.6` / DB `1.1.0` / contract `1.1.0`, package checksum controlled separately | CI exact-head build | Deployed parity + staging/live acceptance |
 
 R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot prove deployed source checksum, actual schema/migration, live UI, backup/restore, rollback, or installed companion owner contracts.
+
+## R28 unified signed-delivery contract and release gate (2026-10-11)
+
+| Requirement / native owner | Actual source | Evidence / boundary |
+|---|---|---|
+| F12-FR-009 and F12-NFR-001; CEN-PRI-001 | PLDR_Access::deliver checks PLDR_Access::current_delivery_binding for edition current original or still-available derivative; DB failure denies service | Actual PHP fixture tests/test-twenty-round-review-r28.php, only repository/CI proof |
+| F12-FR-009/010, Future IIIF | Reader and IIIF preflight DB/policy/accessibility/thumbnail source before bearer token issue | Preserved R27 static test and separate R28 exact-HEAD workflow required |
+| CEN-STATUS/REL, F12-NFR-009 | Distinct 1.1.0-rc.7 candidate; no DB contract migration version change | GitHub artifact is distinct from divergent rc.6 PR14/15; live runtime unverified |
+| Canonical owner/ZIP folder | Legacy code folder pdf-library-foundation-12 vs plan 12-pdf-library-foundation | Founder decision and staged upgrade/migration required before any rename |
