@@ -189,3 +189,6 @@ See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`. Source-only; no merge/live cla
 | Central File05/06/16/17/19/20/21/23/24/25/26/CF04 domain ownership and separation | Static File12 adapters do not prove matching external deployments | No canonical owner moved to File12, no new schema or cross-domain DB joins | Deployed owner version and coupled workflow parity remain unverified |
 
 See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`. No GitHub CI result is a substitute for live deployed-code/DB/migration freeze.
+
+
+| `F12-FR-008/009` signed grants, rights updates and `F12-NFR-001` no implicit object-field conversions | Reader-access, download-session, approve-document, policy-update and repair REST routes accepted nested IDs/TTL/version/operation values via PHP casts before the native owner gates | R36-D04: shared strict REST mutation input gate before DB/lookups/idempotency plus explicitly checking JSON `expected_version` shape | Actual REST method malformed inputs in R36 PHP fixture; full Hostinger HTTP/permissions/IDOR acceptance still outstanding |
