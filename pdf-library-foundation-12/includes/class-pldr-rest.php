@@ -226,7 +226,7 @@ final class PLDR_REST {
             'thumbnails'=>$thumbs,
             'thumbnails_meta'=>array('limit'=>self::READER_THUMB_LIMIT,'returned'=>count($thumbs),'total'=>$thumb_total,'truncated'=>$thumb_total>self::READER_THUMB_LIMIT,'preview_grant_limit'=>self::READER_PREVIEW_GRANT_LIMIT,'preview_grants_issued'=>$preview_grants_issued,'preview_grants_failed'=>$preview_grants_failed,'preview_grants_deferred'=>$preview_grants_deferred+max(0,count($thumb_rows)-$preview_grants_issued-$preview_grants_failed-$preview_grants_deferred)),
             'reading'=>$reading,
-            'permissions'=>array('download'=>!empty($policy['download_allowed']),'print'=>!empty($policy['print_allowed']),'offline'=>!empty($policy['offline_allowed'])),
+            'permissions'=>array('download'=>1===PLDR_Core::policy_flag($policy['download_allowed']??null),'print'=>1===PLDR_Core::policy_flag($policy['print_allowed']??null),'offline'=>1===PLDR_Core::policy_flag($policy['offline_allowed']??null)),
             'accessibility'=>$accessibility,
         ));
     }
