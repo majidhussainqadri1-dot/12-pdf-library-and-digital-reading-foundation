@@ -141,3 +141,12 @@ R31 is a source QA candidate, not proof of operational resolution. See `docs/TWE
 | Central owner and File05/06/21/23/25 contracts | No new external source defect proven in the File12 static owner adapters | No duplicate foreign domain owner and no DB-schema changes created | Real companion source, versions and operational API/event delivery remain unverified |
 
 See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`; do not mistake exact-head green CI for live deployment/DB parity.
+
+## R33 Physical PDF integrity × Explicit Rights Flag reconciliation (2026-10-11)
+
+| Governing rule | Owner/code and regression | Outside-repository evidence |
+|---|---|---|
+| F12-FR-002/006/007 and NFR-003/007 | R32 PR22 physical filesize, encrypted temp eager cleanup and cover preflight retained in `PLDR_Ingest`; `tests/test-r32-pdf-physical-integrity.php` | Real multipart Hostinger uploads, scanner, keys, backup and rollback pending |
+| F12-FR-008, NFR-001/002 | `PLDR_Core::policy_flag` 1/0/null canonical parser, `PLDR_Ingest::ingest`, `PLDR_Access::update_policy` and actual regression `tests/test-r33-policy-flags.php` | Real File00 ownership/suspension, clinical consent, outbox/rights/legacy DB pending |
+| F12-NFR-001, central safe API | Nested/boolean `audience`, `entitlement_key`, `embargo_until` denied before DB by `pldr_policy_metadata_shape`, real R33 fixture | Real WordPress REST request and dynamic provider failure tests pending |
+| Governing release/QA and NFR-007 | Unique `rc.12`, prior PR22 and PR23 `rc.11` cannot be treated as identical; 20 static requirements matrix and new CI require exact HEAD | Active deployed plugin/hash/schema, staging, migration, Founder approval, live re-test pending |
