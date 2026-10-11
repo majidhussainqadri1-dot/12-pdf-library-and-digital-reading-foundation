@@ -116,3 +116,12 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Access::update_policy`: explicitly nullable embargo clear permitted, null audience/entitlement now denied.
 - `tests/test-r35-reading-item-input-shapes.php`: actual add_item and items PHP integration fixture; `tests/test-r33-policy-flags.php` extended null audience/entitlement test; PHP 8.1/8.3/8.4 QA jobs.
 - No source DB/schema contract migration (still 1.1.0). Plan inner plugin root discrepancy and installed companion owner/version/real Hostinger state require staged founder-controlled parity and rollback.
+
+
+## R36 package v1.1.0-rc.15 — private REST/rights mutation guard
+- Actual File12 `F12-FR-011/012/017`, `F12-NFR-001/002/007`; central Master Plan private C2–C5 owner data and versioned File00/17/19/20/24/25 boundaries.
+- `PLDR_Reading::parse_stored_tags`: canonical strict JSON string-list parser, shared by native `items` and private REST paginated `reading_items`; legacy corrupted maps/nested/tag-limit data fail closed, no partial private DTO.
+- `PLDR_REST::validate_mutation_shape`: strict REST scalar/page/edition/version/rights-evidence preflight before any private reads/idempotency/mutations for `save_progress`, `add_reading_item`, `delete_reading_item`, `rights_case`, `rights_decision`, and `rights_appeal`.
+- `tests/test-r36-rest-privacy-mutation.php`: actual REST PHP fixture with legacy private map/nested/bad JSON, valid items, malformed progress and rights changes, fake DB no-side-effect assertions; on PHP8.1/8.3/8.4 quality gate.
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`: 20 scoped Source/Plan checks, three classes of proven source issues, strict source/staging/live demarcation.
+- Software `1.1.0-rc.15` differs from previous rc.14; source DB/schema and interface contract `1.1.0` unchanged; original plan/plugin ZIP root naming incompatibility remains unapproved change control.
