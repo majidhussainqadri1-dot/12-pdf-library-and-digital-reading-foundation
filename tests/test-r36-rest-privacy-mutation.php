@@ -109,7 +109,17 @@ $negative=array(
     array('rights_appeal',array('id'=>array(5),'reason'=>'appeal','expected_version'=>1)),
     array('rights_appeal',array('id'=>5,'reason'=>array('appeal'),'expected_version'=>1)),
     array('rights_appeal',array('id'=>5,'reason'=>'appeal','expected_version'=>true)),
-    array('rights_appeal',array('id'=>5,'reason'=>'appeal','evidence'=>'string','expected_version'=>1))
+    array('rights_appeal',array('id'=>5,'reason'=>'appeal','evidence'=>'string','expected_version'=>1)),
+    array('reader_access',array('edition_id'=>array(42),'operation'=>'read')),
+    array('reader_access',array('edition_id'=>42,'operation'=>array('read'))),
+    array('reader_access',array('edition_id'=>42,'object_id'=>array(3),'operation'=>'read')),
+    array('reader_access',array('edition_id'=>42,'ttl'=>array(600),'operation'=>'read')),
+    array('download_session',array('edition_id'=>array(42))),
+    array('approve_document',array('id'=>array('uuid'),'expected_version'=>1)),
+    array('approve_document',array('id'=>'uuid','expected_version'=>array(1))),
+    array('access_policy',array('id'=>array('uuid'),'expected_version'=>1)),
+    array('access_policy',array('id'=>'uuid','expected_version'=>array(1))),
+    array('repair',array('operation'=>array('health')))
 );
 foreach($negative as [$fn,$data]){
     $before=$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->writes;
