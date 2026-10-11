@@ -118,6 +118,22 @@ final class PLDR_Core {
         return false;
     }
 
+    /**
+     * Parse an explicit access/consent flag without PHP's truthy-string rules.
+     * A literal "false" or "off" must never turn downloads, offline grants or
+     * duplicate-scan confirmations on. Null signals an invalid value to callers.
+     */
+    public static function policy_flag($value): ?int {
+        if (is_bool($value)) return $value ? 1 : 0;
+        if (is_int($value)) return (0 === $value || 1 === $value) ? $value : null;
+        if (!is_string($value)) return null;
+        switch (strtolower(trim($value))) {
+            case '1': case 'true': case 'yes': case 'on': return 1;
+            case '0': case 'false': case 'no': case 'off': case '': return 0;
+        }
+        return null;
+    }
+
     public static function sanitize_json_list($value): array {
         if (is_string($value)) {
             $decoded = json_decode($value, true);
