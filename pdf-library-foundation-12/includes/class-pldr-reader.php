@@ -312,7 +312,16 @@ final class PLDR_Reading {
             $row['page_number']=(int)$row['page_number'];
             $row['version']=(int)$row['version'];
             $tags=json_decode((string)$row['tags_json'],true);
-            if(!is_array($tags)){
+            // Historical/partial DB writes may predate input validation.
+            // The private reader contract is a bounded list of string tags,
+            // never a JSON map or nested values passed through to clients.
+            $tags_valid=is_array($tags)&&array_is_list($tags)&&count($tags)<=30;
+            if($tags_valid){
+                foreach($tags as $stored_tag){
+                    if(!is_string($stored_tag)){ $tags_valid=false;break; }
+                }
+            }
+            if(!$tags_valid){
                 PLDR_Core::audit('reading_item',(int)$row['id'],'reading_item_tags_corrupt',array('edition_id'=>$edition_id),$user_id);
                 return array('error'=>PLDR_Core::machine_error('pldr_items_corrupt','Stored private reading-item tags failed integrity validation; no partial item list was returned.',500,array('item_id'=>(int)$row['id'])));
             }
