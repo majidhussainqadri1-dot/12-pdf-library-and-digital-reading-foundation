@@ -108,6 +108,8 @@ jobs:
         run: php tests/test-r32-pdf-physical-integrity.php
       - name: R33 real rights consent and download policy flag regression
         run: php tests/test-r33-policy-flags.php
+      - name: R34 real persisted permission, public DTO and anonymous delivery grant regression
+        run: php tests/test-r34-access-grants.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
