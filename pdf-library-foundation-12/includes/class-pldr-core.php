@@ -332,9 +332,11 @@ final class PLDR_Core {
                 'version' => (int) $edition['version'],
             ) : null,
             'permissions' => array(
-                'download' => !empty($policy['download_allowed']),
-                'print' => !empty($policy['print_allowed']),
-                'offline' => !empty($policy['offline_allowed']),
+                // Public projections must describe the same effective
+                // permissions enforced by PLDR_Access, including legacy data.
+                'download' => 1 === self::policy_flag($policy['download_allowed'] ?? null),
+                'print' => 1 === self::policy_flag($policy['print_allowed'] ?? null),
+                'offline' => 1 === self::policy_flag($policy['offline_allowed'] ?? null),
             ),
         );
     }
