@@ -315,13 +315,7 @@ final class PLDR_Reading {
             // Historical/partial DB writes may predate input validation.
             // The private reader contract is a bounded list of string tags,
             // never a JSON map or nested values passed through to clients.
-            $tags_valid=is_array($tags)&&array_is_list($tags)&&count($tags)<=30;
-            if($tags_valid){
-                foreach($tags as $stored_tag){
-                    if(!is_string($stored_tag)){ $tags_valid=false;break; }
-                }
-            }
-            if(!$tags_valid){
+            if(!self::valid_stored_tags($tags)){
                 PLDR_Core::audit('reading_item',(int)$row['id'],'reading_item_tags_corrupt',array('edition_id'=>$edition_id),$user_id);
                 return array('error'=>PLDR_Core::machine_error('pldr_items_corrupt','Stored private reading-item tags failed integrity validation; no partial item list was returned.',500,array('item_id'=>(int)$row['id'])));
             }
@@ -332,6 +326,19 @@ final class PLDR_Reading {
         return $rows ?: array();
     }
 
+    /**
+     * Historical private reading-item rows may predate current writer guards.
+     * Both the internal reader and paginated REST endpoint must use the exact
+     * same bounded, flat string-only tags contract before returning any item.
+     */
+    public static function valid_stored_tags($tags): bool {
+        if(!is_array($tags)||!array_is_list($tags)||count($tags)>30)return false;
+        foreach($tags as $tag){
+            if(!is_string($tag))return false;
+        }
+        return true;
+    }
+
     private static function limit_text(string $value,int $length):string {
         return function_exists('mb_substr')?mb_substr($value,0,$length,'UTF-8'):substr($value,0,$length);
     }
@@ -339,7 +346,10 @@ final class PLDR_Reading {
     public static function delete_item(int $item_id, int $user_id = 0): bool {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
-        return false !== $wpdb->delete(PLDR_Core::table('reading_items'), array('id' => $item_id, 'user_id' => $user_id), array('%d','%d'));
+        if($item_id<1||$user_id<1)return false;
+        // wpdb::delete returns 0 on a missing/foreign-owned item. Only a
+        // confirmed one-row deletion is evidence that private data was erased.
+        return 1 === $wpdb->delete(PLDR_Core::table('reading_items'), array('id' => $item_id, 'user_id' => $user_id), array('%d','%d'));
     }
 
     public static function clear(int $user_id): void {
