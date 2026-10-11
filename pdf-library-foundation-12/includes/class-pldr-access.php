@@ -148,7 +148,7 @@ final class PLDR_Access {
      * for bare date/time strings. Rights must be deterministic UTC when no
      * explicit offset is provided and must never silently roll a calendar date.
      */
-    private static function strict_rights_timestamp($value) {
+    public static function strict_rights_timestamp($value) {
         if(!is_string($value) && !is_int($value))return false;
         $raw=trim((string)$value);
         if(!preg_match('/^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{2}):(\\d{2})(?::(\\d{2}))?(Z|[+\\-]\\d{2}:\\d{2})?)?$/D',$raw,$m))return false;
