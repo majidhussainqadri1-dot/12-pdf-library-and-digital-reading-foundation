@@ -345,7 +345,10 @@ final class PLDR_Reading {
     public static function delete_item(int $item_id, int $user_id = 0): bool {
         global $wpdb;
         $user_id = $user_id ?: get_current_user_id();
-        return false !== $wpdb->delete(PLDR_Core::table('reading_items'), array('id' => $item_id, 'user_id' => $user_id), array('%d','%d'));
+        // Zero deleted rows is NOT proof that a private note was erased.
+        // Never attempt a direct delete for missing/anonymous owner identity.
+        if($item_id<1||$user_id<1)return false;
+        return 1 === $wpdb->delete(PLDR_Core::table('reading_items'), array('id' => $item_id, 'user_id' => $user_id), array('%d','%d'));
     }
 
     public static function clear(int $user_id): void {
@@ -480,7 +483,7 @@ final class PLDR_Reader {
         $thumbs = self::thumbnail_tokens((int)$edition['id']);
         $config = array(
             'editionId'=>(int)$edition['id'],'publicId'=>$public_id,'title'=>(string)$doc['title'],'pages'=>(int)$edition['pages'],'url'=>$grant['url'],'expiresAt'=>$grant['expires_at'],'startPage'=>max(1,(int)$state['page']),'progressRevision'=>(string)($state['updated_at']??''),
-            'rest'=>esc_url_raw(rest_url('pldr/v1/')),'nonce'=>wp_create_nonce('wp_rest'),'thumbnails'=>$thumbs,'canDownload'=>!empty($policy['download_allowed']),'canPrint'=>!empty($policy['print_allowed']),'canOffline'=>!empty($policy['offline_allowed']),
+            'rest'=>esc_url_raw(rest_url('pldr/v1/')),'nonce'=>wp_create_nonce('wp_rest'),'thumbnails'=>$thumbs,'canDownload'=>1===PLDR_Core::policy_flag($policy['download_allowed']??null),'canPrint'=>1===PLDR_Core::policy_flag($policy['print_allowed']??null),'canOffline'=>1===PLDR_Core::policy_flag($policy['offline_allowed']??null),
             'strings'=>array('loading'=>__('Loading document…','pdf-library-digital-reading'),'error'=>__('The reader could not load this document. Retry or use the accessible fallback.','pdf-library-digital-reading'),'saved'=>__('Reading position saved privately.','pdf-library-digital-reading')),
         );
         wp_enqueue_style('pldr-reader'); wp_enqueue_script('pldr-reader');
