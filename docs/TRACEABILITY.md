@@ -277,3 +277,12 @@ These checks do not prove staging, production, actual physical DB schema/migrati
 | F12-FUT-019/022/023 + File05/06/16 owner boundaries | `reading_room`, `derive_text`, `a11y_verify`, `preservation_refresh`, `authority`: validated shape before provider/native operations; flag bool/0/1 only | Same direct handler test | Real File05/06 knowledge adapter, File16 AI/safety and File21/23 interaction contracts |
 
 R43 20-check source ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R43.md`. Software `1.1.0-rc.22`; source schema/contract `1.1.0`. Neither HEAD nor green CI proves installed code, DB, migrations or live acceptance.
+
+
+## R44 — File12 offline rights legal boundary / central and companion parity
+| Owner requirement | Actual R44 implementation | Automated source proof | Still outstanding |
+|---|---|---|---|
+| F12-FUT-012, F12-FR-003/008/009; F12-NFR-001/010; central current-rights law | `PLDR_Future_REST::offline_rights_expiry` uses `PLDR_Access::strict_rights_timestamp`; both offline-grant and reconnect fail closed on invalid historical dates and expired rights | `tests/test-r44-offline-rights-window.php`, existing R39 calendar/access fixture | Actual Hostinger MySQL legacy row, File00 entitlement, timezone and revoked rights HTTP tests |
+| F12-FUT-012, FR-009; File24 privacy/security | `PLDR_Future_REST::offline_delivery_token_ttl` prevents native 60-second-minimum tokens from running beyond impending rights expiry | Same R44 real helper test and source wiring assertion | Real token-generation, reconnection, expiry/revocation races, offline browser and key backup/restore |
+
+Version software 1.1.0-rc.23; schema/interface 1.1.0 unchanged. 20 checks/source limitations: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R44.md`. Not live/staging acceptance.
