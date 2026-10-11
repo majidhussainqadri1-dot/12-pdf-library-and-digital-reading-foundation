@@ -94,6 +94,8 @@ jobs:
         run: php tests/test-twenty-round-review-r27.php
       - name: R28 detached derivative binding executable regression
         run: php tests/test-r28-detached-grant-binding.php
+      - name: R28 direct HTML reader pregrant invariant
+        run: php tests/test-r28-reader-html-pregrant.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
