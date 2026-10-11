@@ -1,29 +1,28 @@
-# File 12 — R31 source candidate 1.1.0-rc.10 (11 October 2026)
+# File 12 — R32 policy/consent flags corrective source candidate (2026-10-11)
 
-| Independent evidence | Exact fact |
+| Evidence gate | Verifiable status |
 |---|---|
-| Governing authority | Attached File12 v1.1 amended Future-24, Three Consolidated Central Plans, companion File05/06/21/23/25, and File12/native owner interface boundaries |
-| Main repository HEAD | `2b369ef2d609247896e1ab32118f1dc498407f51`; bootstrap README only |
-| Reviewed source baseline | R30 Draft PR #20 exact green SHA `715fa30f1f63bbe34aa05eb148a6434f355e5145` |
-| R31 audit | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`, twenty distinct focused source-plan inspections, not twenty full live/staging/test-suite runs |
-| Confirmed R31 source defects | D01 invalid nested scalar document metadata could be cast to `Array`; D02 malformed subjects/collections lists incl nested JSON were not rejected; D03 invalid nested PDF/cover upload shape could reach `is_uploaded_file` |
-| R31 code corrections | `PLDR_Ingest::ingest` validates scalar metadata, privacy/rights flags, bounded list/JSON structure and upload fields before any file/DB side effects |
-| New actual-code test | `tests/test-r31-ingest-input-shapes.php`: 40+ invalid/valid real PHP ingest-entrypoint cases with DB side effects forbidden |
-| Retained tests | 20 × full 53-FR/NFR/Future + 12 cross-owner static source matrix, real R29 catalog fixtures, R30 policy regression, R1–R28 crypto/range/tamper and historical suites |
-| Candidate software ZIP | `1.1.0-rc.10` — not deployed |
-| DB/source schema + contract | `1.1.0` / `1.1.0`, unchanged |
-| Exact final R31 CI | **Must be checked only at final unchanged R31 SHA after this status/review commit** |
-| Staging + real consumers | UNVERIFIED; companion installed versions/roles/providers unverified |
-| Source-vs-plan package folder | Plan `12-pdf-library-foundation`; historical code `pdf-library-foundation-12`; Founder-approved staging migration decision pending |
-| Backup, restoration, offline/RTL/rights/live-role acceptance | NOT VERIFIED |
-| Production deploy/live parity | NOT DONE |
+| Governing plans | File 12 v1.1 Future-24 amended, 3 central consolidated master plans, File 05/06/21/23/25 and native File 00/01/16/17/19/20/24/26 interfaces |
+| Exact source baseline | R31 Draft PR #21 HEAD `55005aef64841ab2f23254051f1db44e14594163`, previously green only for its own SHA |
+| Twenty-round audit | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`; twenty separate focused source/contract checks, not 20 live/staging tests |
+| Code defect | R32-01 PHP `empty()` interpreted explicit 'false' flags as enabled in PDF ingest and policy updates, also affected patient-case and duplicate-scan confirmations |
+| Corrective source | `PLDR_Core::policy_flag` used by `PLDR_Ingest::ingest` and `PLDR_Access::update_policy`; malformed values reject before mutation |
+| New PHP regression | `tests/test-r32-policy-flags.php`, actual Core/Ingest/Access class with private DB fixture and positive/negative rights persistence assertions |
+| Preserved prior source | R26 explicit anonymous rights, R27/R28 pregrants/object binding, R29 catalog, R30 malformed embargo/audience, R31 ingest shapes |
+| Repeated static requirement matrix | R28: 20 × (53 governing IDs + 12 source companion adapters) plus supplemental checks |
+| Candidate plugin/package | `1.1.0-rc.11`, new source identity, not deployed |
+| Repository DB / integration contract | `1.1.0` / `1.1.0`, no new schema migration |
+| R32 exact final HEAD CI | Await **new workflow result on final changed HEAD**; prior CI cannot substitute |
+| WordPress plugin folder conflict | Plan ZIP root `12-pdf-library-foundation` vs candidate `pdf-library-foundation-12`: founder-controlled staged change/rollback required |
+| Hostinger deployed version/checksum | UNVERIFIED |
+| Physical DB, options and migration state | UNVERIFIED |
+| Real companion providers, keys, browser/RTL/a11y/offline, rollback | UNVERIFIED |
+| Founder release approval, production deploy, live re-test | NOT PERFORMED |
 
-## Five-field live-first truth
-
-**Repository HEAD:** R31 exact final SHA in Draft PR after review; `main` initial README `2b369ef...`.  
-**Deployed Version:** Unverified.  
-**DB Version:** Unverified (source target `1.1.0` only).  
-**Migration State:** Unverified.  
-**Live Verification Status:** Not performed.
+**Repository HEAD:** confirm final R32 SHA; GitHub main remains separately scoped.  
+**Deployed Version:** unverified.  
+**DB Version:** unverified.  
+**Migration State:** unverified.  
+**Live Verification Status:** not performed.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
