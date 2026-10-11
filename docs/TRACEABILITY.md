@@ -99,3 +99,15 @@ R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot pro
 - **File 05/06/16/17/19/20/21/23/24/25/26 and CF-04:** only File 12 source adapters inspected. External source/deployed contracts, native roles, version parity, File 23 native edit-route status and CF-04 secure-media activation must be independently tested. No duplicate domain ownership authorized.
 - **Release identity:** distinct source candidate `1.1.0-rc.7`, schema & contract still `1.1.0`; root/plugin README and package markers aligned. Written planned ZIP folder vs longstanding candidate folder discrepancy is intentionally a dated change-control blocker, not silently rewritten.
 - **Evidence boundary:** 20 automated repeated static source checks + specific executable PHP regressions are repository claims, not complete running-product/staging/live validation. Full details in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md`.
+
+
+## R29 (2026-10-11): actual File 12 written-plan catalog/search and shared UI correction
+
+| Plan provision | Previously verified gap | R29 exact code remedy | New test | Remaining live gate |
+|---|---|---|---|---|
+| F12-FR-001, clause 2.1: title, author, source, edition, license and access-mode catalog search | `PLDR_Search` handled only q/type/category/language | Canonical-current-edition author/source/edition/ISBN/license/year and authorized DTO access_mode facets; bounded/invalid input fail-closed | `tests/test-r29-catalog-facets.php` | Real rights/large-catalog/role journeys in staging |
+| F12-FR-013, File26 search contract | Missing filters and cursor query binding | All selected filters + actor ID hashed into signed catalog cursor context; prevent incompatible filter replay | same fixture test, cursor query mismatch denial | File26 real consumer and index freshness |
+| F12-NFR-004 / File20/25 accessible public navigation | `next_cursor` existed in source but `/library` page gave no Next navigation | UI filters and accessible `First results`/`Next eligible documents` links keeping only safe scalar facets | same test HTML/REST parity | RTL, keyboard, 320–1920px, very long multilingual strings |
+| File 05, File 06, File 21, File 23, File 25 owner boundaries | Source adapter only; counterpart versions and real deployment not established | No duplicate course/knowledge/feed/dashboard/visual owner created; File 12 remains source document owner | Retained static R28 owner contract suite | Versioned connected provider/consumer journey |
+
+**Unverified dependencies:** Auth File00 claims, real WordPress staging, File26 indexing, privacy/guardian/rights providers and all cross-repository deployments. Package directory name conflict remains change-control, not fixed by unrelated source patches. No live-resolution claim.
