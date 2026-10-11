@@ -3,7 +3,7 @@
 Founder-approved change request for **File 12 — PDF Library and Digital Reading**.
 
 - Change set: `F12-FUT-001` through `F12-FUT-024`
-- Current repository candidate: `1.1.0-rc.17`
+- Current repository candidate: `1.1.0-rc.18`
 - DB/contract: `1.1.0`
 - Change date: 11 August 2026; repository review alignment through R27 on 10 October 2026
 - Governing law: latest Founder instruction > latest consolidated central plan > File 12 plan > verified implementation evidence.

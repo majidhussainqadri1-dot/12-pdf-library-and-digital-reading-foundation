@@ -1,27 +1,27 @@
-# File 12 — R38 source-only read-query/citation candidate, 11 October 2026
+# File12 — R39 strict rights dates / imported-policy flags (11 October 2026)
 
-| Requirement/source fact | Verified evidence |
+| Evidence category | Fact |
 |---|---|
-| Frozen base | R37 Draft PR #32 `8f7f140c3686f228ef4c6656cc3b4d7e27b2912a`, exact Actions #468 green |
-| Governing materials | Uploaded amended File12 v1.1 Future24, three consolidated central governing plans, File05/06/21/23/25 and source-side File00/01/16/17/19/20/24/26/CF04 owner boundaries |
-| R38 20 different focused inspections | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R38.md`; manual source/plan foci not 20 full end-to-end deployed trials |
-| R38-D01 | GET `PLDR_REST::reading_items` malformed edition_id/limit/offset/cursor previously coerced before private authorization and DB; now strict fail-closed query shape |
-| R38-D02 | GET `PLDR_REST::ocr_search` array/bool/cursor/limit/edition values previously coerced; same early query-shape validation |
-| R38-D03 | GET `PLDR_REST::citation` negative/float/nested page could become wrong page; unsupported Chicago/RIS/BibTeX/CSL style could return misnamed Sabri citation; strictly deny malformed and unsupported basic styles |
-| R38-D04 | `PLDR_Reader::citation` now includes immutable edition ID in actual Sabri/APA/MLA outputs. Canonical document URI is unchanged; edition-specific text no longer ambiguous when labels repeat |
-| New actual executable fixture | `tests/test-r38-rest-read-shapes-citation.php`: real Reading/OCR/Citation REST methods; real citation formatter and two same-document editions, negative cases pre-DB/auth, legitimate requests |
-| Existing source QA | R37 real reader permissions/private delete 153 +3 JS source checks; R36 76 real REST/rights; R35 61 native notes; R34 66 grants; R33 109 flags; R31 50 ingest; R32 5 actual physical PDF; R28 20×(53 FR/NFR/FUT+12 source-side adapters)=1300 static presence checks+20 invariants, prior crypto/range/search/future suites |
-| Software candidate | `1.1.0-rc.17`; source DB/schema/interface contract `1.1.0` unchanged; no new migrations |
-| Final evidence gate | Latest last R38 PR #33 immutable HEAD and matching SUCCESS PHP 8.1/8.3/8.4/package with exact inner ZIP checksum; earlier green is not final proof |
-| Plugin root release blocker | Written master plan `12-pdf-library-foundation` vs build `pdf-library-foundation-12`, requires Founder-approved compatibility plan/staging/backup/rollback, not silently modified |
-| Actual installed counterpart File00/01/05/06/16/17/19/20/21/23/24/25/26/CF04 | UNVERIFIED |
-| Real Hostinger file checksum/version, physical DB/wp_options/migrations, runtime logs/keys, browser/staging/rollback | UNVERIFIED; no Founder-authorized merge or deploy |
+| Frozen source baseline | R38 Draft PR #33 exact HEAD `186095b1febe3d795798c5bcdb7a2f09f93fa380`, Actions #474 SUCCESS |
+| Governing master plans | Actual uploaded File12 amended v1.1 Future24, three consolidated central plans, File05/06/21/23/25 companions |
+| R39 plan/source reviews | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R39.md`, 20 separately scoped source comparisons, not 20 exhaustive WordPress/staging/live E2E runs |
+| R39-D01 (fixed) | Rights embargo mutation: strict ISO calendar/clock/timezone rejects impossible February 31 and clock/offset overflow before policy write |
+| R39-D02 (fixed) | Persisted imported malformed embargo: real reader authorization audits/fails closed rather than `strtotime` silently rolling date |
+| R39-D03 (fixed) | Imported edition `rights_expires_at`: real access-time parser denies invalid calendar expiry to noncurators |
+| R39-D04 (fixed) | Versioning an unrelated access-policy field no longer converts historic saved `'true'/'on'/'yes'` download/print/offline to 0; malformed legacy rights are not enabled |
+| R39 actual fixture | `tests/test-r39-rights-calendar-policy.php` uses actual `PLDR_Access::update_policy/can_access_edition`, `PLDR_Core`, isolated fake WP/DB, invalid real calendar dates, explicit timezone, legacy data and flag preservation; PHP 8.1/8.3/8.4 matrix |
+| Prior actual QA | R38 264 GET/citations, R37 153 reader rights+delete +3 source UI invariants, R36 76 REST mutations, R35 61 private notes, R34 66 access/grants, R33 109 policy, R31 50 ingest, R32 5 true PDF, R28 20×(53 FR/NFR/FUT +12 source adapters)=1300 static anchors +20 invariants and older crypto/search/range tests |
+| Software candidate | `1.1.0-rc.18`, source database/schema/interface contract still `1.1.0` (no R39 schema migration) |
+| Exact QA | Only last immutable R39 PR #34 SHA with matching completed Actions and inner ZIP digest is final evidence |
+| Deploy naming conflict | Plan plugin root `12-pdf-library-foundation`; source/build root `pdf-library-foundation-12`. No silent folder change without Founder-approved backup, migration and rollback |
+| Companion native deployments | File00/01/05/06/16/17/19/20/21/23/24/25/26 and CF04: UNVERIFIED |
+| Hostinger physical PHP/JS versions/checksums + DB/options/rows/schema/migration/logs/keys/consumers, WordPress staging/browser/a11y/backups/rollback | UNVERIFIED, NOT TESTED OR DEPLOYED |
 
-## Five mandatory separate live-first facts
+## Five live-first reality fields
 
-**Repository HEAD:** R38 Draft PR #33 last exact immutable SHA after matching final CI. GitHub `main` remains bootstrap README `2b369ef2d609247896e1ab32118f1dc498407f51`.  
+**Repository HEAD:** R39 Draft PR #34 last exact SHA; GitHub `main` still bootstrap `2b369ef2d609247896e1ab32118f1dc498407f51`.  
 **Deployed Version:** UNVERIFIED.  
-**DB Version:** UNVERIFIED, source target 1.1.0 only.  
+**DB Version:** UNVERIFIED (source target 1.1.0 only).  
 **Migration State:** UNVERIFIED.  
 **Live Verification Status:** NOT PERFORMED.
 

@@ -21,7 +21,7 @@ final class PLDR_Access {
         $policy = PLDR_Core::policy((int) $edition['document_id']);
         if (!$policy) return false;
         if(!empty($edition['rights_expires_at'])){
-            $rights_raw=(string)$edition['rights_expires_at'];$rights_ts=strtotime($rights_raw);
+            $rights_raw=(string)$edition['rights_expires_at'];$rights_ts=self::strict_rights_timestamp($rights_raw);
             $curator=PLDR_Core::authorize('manage',(int)$edition['document_id'],$user_id)||PLDR_Core::authorize('rights',(int)$edition['document_id'],$user_id);
             if(false===$rights_ts){PLDR_Core::audit('edition',$edition_id,'rights_expiry_invalid',array('document_id'=>(int)$edition['document_id']),$user_id);if(!$curator)return false;}
             elseif($rights_ts<=time()&&!$curator)return false;
@@ -30,7 +30,7 @@ final class PLDR_Access {
             // Historical/imported records are not guaranteed to have passed the
             // modern policy-update validator. Unparseable embargoes must not
             // turn a restricted source into a freely readable publication.
-            $embargo_ts = strtotime((string) $policy['embargo_until']);
+            $embargo_ts = self::strict_rights_timestamp((string) $policy['embargo_until']);
             $manager = PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id);
             if (false === $embargo_ts) {
                 PLDR_Core::audit('edition', $edition_id, 'embargo_until_invalid', array('document_id' => (int) $edition['document_id']), $user_id);
@@ -119,9 +119,9 @@ final class PLDR_Access {
             'document_id'=>$document_id,
             'audience'=>$audience,
             'entitlement_key'=>$entitlement_key,
-            'download_allowed'=>array_key_exists('download_allowed',$changes)?(empty($changes['download_allowed'])?0:1):(int)$current['download_allowed'],
-            'print_allowed'=>array_key_exists('print_allowed',$changes)?(empty($changes['print_allowed'])?0:1):(int)$current['print_allowed'],
-            'offline_allowed'=>array_key_exists('offline_allowed',$changes)?(empty($changes['offline_allowed'])?0:1):(int)$current['offline_allowed'],
+            'download_allowed'=>array_key_exists('download_allowed',$changes)?(empty($changes['download_allowed'])?0:1):(1===PLDR_Core::policy_flag($current['download_allowed']??null)?1:0),
+            'print_allowed'=>array_key_exists('print_allowed',$changes)?(empty($changes['print_allowed'])?0:1):(1===PLDR_Core::policy_flag($current['print_allowed']??null)?1:0),
+            'offline_allowed'=>array_key_exists('offline_allowed',$changes)?(empty($changes['offline_allowed'])?0:1):(1===PLDR_Core::policy_flag($current['offline_allowed']??null)?1:0),
             'embargo_until'=>$embargo,
             'version'=>(int)$current['version']+1,
             'created_at'=>PLDR_Core::now(),
@@ -142,13 +142,39 @@ final class PLDR_Access {
         return array('document_id'=>$doc['public_id'],'policy_version'=>$row['version'],'audience'=>$audience);
     }
 
+    /**
+     * Calendar-validated rights timestamp. strtotime() silently normalizes
+     * impossible dates (e.g. Feb 31 -> March 3) and uses a host-local timezone
+     * for bare date/time strings. Rights must be deterministic UTC when no
+     * explicit offset is provided and must never silently roll a calendar date.
+     */
+    private static function strict_rights_timestamp($value) {
+        if(!is_string($value) && !is_int($value))return false;
+        $raw=trim((string)$value);
+        if(!preg_match('/^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{2}):(\\d{2})(?::(\\d{2}))?(Z|[+\\-]\\d{2}:\\d{2})?)?$/D',$raw,$m))return false;
+        $year=(int)$m[1];$month=(int)$m[2];$day=(int)$m[3];
+        if($year<1000 || !checkdate($month,$day,$year))return false;
+        if(isset($m[4])&&$m[4]!==''){
+            if((int)$m[4]>23||(int)$m[5]>59||(isset($m[6])&&$m[6]!==''&&(int)$m[6]>59))return false;
+        }
+        $zone=$m[7]??'';
+        if($zone!==''&&$zone!=='Z'){
+            $hours=(int)substr($zone,1,2);$minutes=(int)substr($zone,4,2);
+            if($hours>14||$minutes>59||($hours===14&&$minutes!==0))return false;
+        }
+        try{
+            $parsed=new DateTimeImmutable($raw,new DateTimeZone('UTC'));
+            $errors=DateTimeImmutable::getLastErrors();
+            if($errors!==false&&($errors['warning_count']>0||$errors['error_count']>0))return false;
+            return $parsed->getTimestamp();
+        }catch(Throwable $e){return false;}
+    }
+
     private static function parse_embargo($value) {
         if(null===$value||''===trim((string)$value))return null;
-        $raw=trim((string)$value);
-        if(!preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?(?:Z|[+\-]\d{2}:\d{2})?)?$/',$raw))return PLDR_Core::machine_error('pldr_policy_embargo','Embargo date must be an explicit ISO-style date/time, not a relative or malformed value.',400);
-        $ts=strtotime($raw);
-        if(false===$ts)return PLDR_Core::machine_error('pldr_policy_embargo','Embargo date could not be parsed safely.',400);
-        return gmdate('Y-m-d H:i:s',$ts);
+        $timestamp=self::strict_rights_timestamp($value);
+        if(false===$timestamp)return PLDR_Core::machine_error('pldr_policy_embargo','Embargo requires a real ISO calendar date/time with a valid timezone.',400);
+        return gmdate('Y-m-d H:i:s',$timestamp);
     }
 
     public static function issue_token(int $edition_id, int $object_id, string $operation, int $user_id = 0, int $ttl = 600) {

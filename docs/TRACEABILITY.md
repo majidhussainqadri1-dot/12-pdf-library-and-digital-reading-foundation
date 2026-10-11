@@ -217,3 +217,15 @@ R37 twenty distinct scoped audit ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R3
 | Central ownership/trace: File05/06/16/17/19/20/21/23/24/25/26 and CF04 | Static File12 adapter does not prove native plugin installed or contract-compatible | No foreign owner or source DB contract moved; rc.17 is separate signed source candidate | Live deployed File12 checksum, actual DB/options/schema/migration, other installed owner versions and all staged workflow tests unverified |
 
 All twenty new focused source/plan reviews: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R38.md`. A 20x static matrix is a source-presence check, not an end-to-end or Live certification.
+
+
+## R39 (2026-10-11) — Real calendar-date rights authority and legacy policy preservation
+
+| Governing source | Proven R38 source gap | Exact R39 fix and actual test | Production acceptance not yet performed |
+|---|---|---|---|
+| `F12-FR-008` embargo and `F12-NFR-001/002` strict rights | `PLDR_Access::parse_embargo` accepted impossible calendar date via `strtotime('2026-02-31')` → March 3 | Strict ISO calendar, leap-year, clock/timezone offset and UTC validator before update; executable Access mutation regression | Hostinger rights calendar/approved timezone convention, WP policy migration and rollback unverified |
+| `F12-FR-003/008` source rights expiry, historic imported data | `PLDR_Access::can_access_edition` parsed malformed stored `rights_expires_at` and `embargo_until` permissively, extending rights if day rolled | Same strict timestamp parser applied on actual access read; malformed date audits/denies ordinary reader, existing rights/manager override remains | Live imported rows, role/guardian parity, new token issuance/HTTP revocation and real staging denial unverified |
+| Central canonical rights truth, `F12-FR-008` versioned access policy | `update_policy` used `(int)$current[flag]`; legacy true/on/yes values became 0 during unrelated policy updates | Parse untouched flags via canonical `PLDR_Core::policy_flag`, preserve true=1/deny malformed; real versioned access policy write fixture | Real installed historic policy data, key/provider/companion consumers, transactional rollback unverified |
+| File05/06/16/17/19/20/21/23/24/25/26/CF04 split canonical owners | File12 source adapters are not evidence all consumer modules run with same version | No other canonical owner moved or source DB contract changed, rc.18 is separate QA target | Deployed plugin ZIP/DB/other File runtime parity unknown, Founder approval required |
+
+20 separately scoped plan/code foci and limits: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R39.md`.
