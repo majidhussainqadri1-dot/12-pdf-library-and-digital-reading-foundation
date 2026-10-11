@@ -120,6 +120,8 @@ jobs:
         run: php tests/test-r38-rest-read-shapes-citation.php
       - name: R39 actual rights calendar, embargo, expiry and legacy flag regression
         run: php tests/test-r39-rights-calendar-policy.php
+      - name: R40 actual ingest dates, calendar parity and catalog numeric parameter integrity
+        run: php tests/test-r40-ingest-date-catalog-pagination.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
