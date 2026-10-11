@@ -62,7 +62,7 @@ $check(($answer['rights_valid_until']??null)===gmdate('c',(int)strtotime($future
     'expiry projection differs from canonical UTC date under Asia/Karachi timezone');
 PLDR_Future_Data::$fixture=array('id'=>42,'object_id'=>9,'rights_expires_at'=>null);
 $answer=PLDR_Future_REST::offline_authorization(new WP_REST_Request(array('edition'=>42)));
-$check(is_array($answer)&&($answer['rights_valid_until']??false)===null,
+$check(is_array($answer)&&array_key_exists('rights_valid_until',$answer)&&$answer['rights_valid_until']===null,
     'lawfully unbounded rights incorrectly given an expiry');
 foreach(array(-1,0,10,60,90,119,120) as $seconds){
     $answer=$ttl->invoke(null,time()+$seconds);
