@@ -84,3 +84,9 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`: new 20 distinct focused source/plan inspections, frozen D01-D03 finding ledger and staged/live evidence limits.
 - `tests/test-r31-ingest-input-shapes.php`: actual PHP ingest entrypoint under malformed scalar/JSON-list/PDF-cover upload fixtures; invalid data cannot touch DB or file operations.
 - `class-pldr-ingest.php`: metadata schema and upload shape strict gates before canonical lookup or upload handling. Candidate `1.1.0-rc.11`, DB/contract `1.1.0`, no migration.
+
+## R32 new source audit, integrity tests and release truth
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`: 20 scoped plan/owner/source inspections, frozen source defects R32-D01/D02/D03 and unverified staging/live prerequisites.
+- `tests/test-r32-pdf-physical-integrity.php`: exercises real `PLDR_Ingest::validate_pdf` on correctly-sized and mismatched PDF file bytes, modified source, appended polyglot; source invariants for Crypto failure immediate private-temp deletion and supplied cover precommit acceptance.
+- `tests/test-r31-ingest-input-shapes.php`: three actual ingest-entrypoint bad cover/HTTP path tests added to existing 47 R31 fixtures.
+- Version 1.1.0-rc.11 is *software/package only*; source DB/schema/interface contract still 1.1.0, no R32 migration. Package internal-folder naming conflict remains a separate unapproved change-control matter.
