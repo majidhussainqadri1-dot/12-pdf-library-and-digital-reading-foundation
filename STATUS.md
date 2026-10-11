@@ -1,3 +1,16 @@
+# File12 R42 — Future REST raw query guard; repository candidate 1.1.0-rc.21 (11 October 2026)
+
+- **Exact parent:** R41 PR #36 head `125be12011d727b85d659ce273d19843533dc0b4` (previous CI does not prove R42).
+- **Twenty checks:** 20 distinct requirement/source owner foci, **not** twenty exhaustive E2E reviews. All anchor paths present; only R42 future GET raw query defect groups D01–D03 newly proven. Full ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R42.md`.
+- **Corrective batch after all checks:** remove premature Future-24 WordPress numeric/cursor sanitizers and validate ten GET handlers before access/provider/SQL. New actual route/handler fixture `tests/test-r42-future-rest-query-shapes.php`.
+- **Candidate:** software `1.1.0-rc.21`, source DB `1.1.0`, source contract `1.1.0`; exact final CI/package digest pending.
+- **Deployment parity:** GitHub `main` bootstrap-only `2b369ef2d609247896e1ab32118f1dc498407f51`; active Hostinger plugin, DB, wp_options, migration and companion versions **UNVERIFIED**. Live verification **NOT PERFORMED**. No approved deploy.
+- **Known unresolved release blocker:** original File12 inner ZIP folder `12-pdf-library-foundation` versus source `pdf-library-foundation-12`; change-control and staging required.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 — R41 REST request integrity and private tag list truth (11 October 2026)
 
 | Source/release dimension | Verified scope |
