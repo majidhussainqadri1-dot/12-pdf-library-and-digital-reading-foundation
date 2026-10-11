@@ -177,3 +177,15 @@ The R34 source audit and twenty scoped checks are recorded in `docs/TWENTY-ROUND
 | File05/06/16/17/19/20/21/23/24/25/26/CF04 owners | Source adapter checks are not native consumer deployment truth | No cross-file ownership change, source DB/contract stays 1.1.0 | Real installed version and staging provider acceptance mandatory |
 
 See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`. Source-only; no merge/live claims.
+
+
+## R36 — File12 and consolidated central source-to-code correction (11 October 2026)
+
+| Plan/owner condition | Confirmed R35 code gap | R36 correction | Test and operational limit |
+|---|---|---|---|
+| `F12-FR-012`, `F12-NFR-001/002`; user-private tags must be a bounded list, not a public or malformed DTO | `PLDR_Reading::items` had strict checks, but separate REST `/pldr/v1/reading/items` only checked `is_array(json_decode)`, accepting historic map/nested/mixed/oversized tags | Add one `PLDR_Reading::parse_stored_tags` and invoke on direct and paginated REST path; fail closed and audit entire response | Actual `PLDR_REST::reading_items` PHP fixtures; real WP/host DB legacy-data migration still pending |
+| `F12-FR-011`, `F12-NFR-001`: correct optimistic private reading progress | `PLDR_REST::save_progress` converted Array/Boolean/decimal page and edition_id to int before authorization and private transaction | `PLDR_REST::validate_mutation_shape` before any DB/precondition; legitimate simple/empty expected revision retained | Actual malformed REST method cases, no DB reads/writes; real simultaneous cross-device updates need staging |
+| `F12-FR-017`, `F12-NFR-001/002`: safe rights reports, review notes/evidence and appeals | `PLDR_REST` cast nested reason/note/evidence to strings/arrays, nondecimal version to `absint` before rights/idempotent mutation | Same strict preflight for rights_case/decision/appeal and private add/delete ID/version | Executable malformed POST REST cases, pre-read/write denial; native File00 role and File19/21 event consumer staging pending |
+| Central File05/06/16/17/19/20/21/23/24/25/26/CF04 domain ownership and separation | Static File12 adapters do not prove matching external deployments | No canonical owner moved to File12, no new schema or cross-domain DB joins | Deployed owner version and coupled workflow parity remain unverified |
+
+See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`. No GitHub CI result is a substitute for live deployed-code/DB/migration freeze.
