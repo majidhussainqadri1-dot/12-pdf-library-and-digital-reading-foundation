@@ -229,3 +229,15 @@ All twenty new focused source/plan reviews: `docs/TWENTY-ROUND-REVIEW-2026-10-11
 | File05/06/16/17/19/20/21/23/24/25/26/CF04 split canonical owners | File12 source adapters are not evidence all consumer modules run with same version | No other canonical owner moved or source DB contract changed, rc.18 is separate QA target | Deployed plugin ZIP/DB/other File runtime parity unknown, Founder approval required |
 
 20 separately scoped plan/code foci and limits: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R39.md`.
+
+
+## R40 — File12 v1.1 Future24 + central owner source requirements (11 October 2026)
+
+| Original governing rule | R39 source gap observed | R40 source correction and evidence | Release gap |
+|---|---|---|---|
+| `F12-FR-003` author/source/rights expiry, `F12-FR-008` lawful access, `F12-NFR-010` time-zone correctness | PDF Ingest `date_or_null` still used `strtotime`, different from R39 strict permission/embargo parser; impossible dates and local timezone rollover could be accepted at ingestion | Reuse exact `PLDR_Access::strict_rights_timestamp`, reject invalid dates before upload/DB, normalize UTC. Actual `PLDR_Ingest::ingest` fixture validates malformed/valid inputs | True PHP/WordPress media uploads, deployed keyring, schema/calendar parity remain unverified |
+| `F12-FR-004/008` edition version and no nonpublished policy mutation | Pending edition comparison mapped omitted download/print/offline to false and omitted embargo to empty, generating false positive mismatch against existing valid rights | Inherit current canonical grant for absent fields; compare embargo only when supplied. Source behavior invariants explicitly tested. | Actual post-upload pending HTTP path untested; needs real WordPress staging |
+| `F12-FR-001` governed catalog, `F12-NFR-004` bounded pagination/performance | `PLDR_Search::search` `absint` silently transformed `page=-2` to `2`, decimals, zero, and oversized numeric strings | Explicit whole-positive numeric guard before DB; actual `PLDR_Search::search` malformed and positive fixtures. Existing booleans rejected through earlier general filter error. | Measured p75/p95 and real catalog loaded-query performance remain unverified |
+| Central File00/01/05/06/16/17/19/20/21/23/24/25/26/CF04 ownership and privacy contracts | File12 source adapters alone are not installed module parity evidence | No cross-module ownership moved, no DB schema or interface migration, source candidate rc.19 | Installed native owner version/contract, Feed/Search/Preview/Reader and rollback integration in staging outstanding |
+
+Detailed twenty distinct scoped source-to-plan inspections: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R40.md`. Source presence/green CI never certifies live production behavior.
