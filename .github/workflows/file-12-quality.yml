@@ -112,6 +112,8 @@ jobs:
         run: php tests/test-r34-access-grants.php
       - name: R35 actual private bookmark/note/tag JSON and null rights-change regression
         run: php tests/test-r35-reading-item-input-shapes.php
+      - name: R36 real paginated private REST and malformed progress/rights mutations
+        run: php tests/test-r36-rest-privacy-mutation.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
