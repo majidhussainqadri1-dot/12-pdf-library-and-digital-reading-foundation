@@ -11,10 +11,32 @@ final class PLDR_Search {
         $type = sanitize_key((string) ($args['type'] ?? ''));
         $category = sanitize_key((string) ($args['category'] ?? ''));
         $language = sanitize_text_field((string) ($args['language'] ?? ''));
+        // File 12 plan FR-001/013: bibliographic facets must be queryable as well as displayed.
+        // Scalar-only, bounded inputs prevent unbounded work and invalid query objects.
+        $facet = static function(string $key) use ($args): string {
+            $raw = $args[$key] ?? '';
+            return is_scalar($raw) ? trim(sanitize_text_field((string)$raw)) : '';
+        };
+        $author=$facet('author'); $source=$facet('source'); $edition_filter=$facet('edition');
+        $license=$facet('license'); $isbn=$facet('isbn'); $access_mode=sanitize_key($facet('access_mode'));
+        $year_raw=$facet('year'); $year=$year_raw!==''?absint($year_raw):0;
+        foreach (array($language,$author,$source,$edition_filter,$license,$isbn,$access_mode,$year_raw) as $filter_value) {
+            $length=function_exists('mb_strlen')?mb_strlen($filter_value,'UTF-8'):strlen($filter_value);
+            if($length>120)return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_filter_long','PDF Library filter exceeds 120 characters.',400));
+        }
+        if(($type&&!isset(PLDR_Core::DOCUMENT_TYPES[$type]))||($category&&!isset(PLDR_Core::CATEGORIES[$category]))
+            ||($access_mode&&!in_array($access_mode,array('public','account','education-entitled','assigned'),true))
+            ||($year_raw!==''&&(!preg_match('/^[0-9]{1,4}$/',$year_raw)||$year<1))) {
+            return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_filter_invalid','The requested PDF Library filter is invalid.',400));
+        }
+        $facet_matches=static function(string $value,string $expected):bool {
+            if(''===$expected)return true;
+            return function_exists('mb_stripos') ? false!==mb_stripos($value,$expected,0,'UTF-8') : false!==stripos($value,$expected);
+        };
         $page = max(1, absint($args['page'] ?? 1));
         $per_page = min(48, max(1, absint($args['per_page'] ?? 24)));
         $cursor_token=trim((string)($args['cursor']??''));
-        $cursor_context=hash('sha256',implode('|',array($term,$type,$category,$language,(string)$user_id)));
+        $cursor_context=hash('sha256',wp_json_encode(array($term,$type,$category,$language,$author,$source,$edition_filter,$license,$isbn,$access_mode,$year,(int)$user_id)));
         $cursor=self::decode_catalog_cursor($cursor_token,$cursor_context);
         if(is_wp_error($cursor))return array('items'=>array(),'error'=>$cursor);
         $logical_offset=$cursor_token?absint($cursor['skip']??0):(($page-1)*$per_page);
@@ -41,11 +63,19 @@ final class PLDR_Search {
                 $wpdb->last_error='';$edition=PLDR_Core::current_edition((int)$doc['id']);
                 if(''!==(string)$wpdb->last_error)return array('items'=>array(),'page'=>$page,'per_page'=>$per_page,'has_more'=>false,'error'=>PLDR_Core::machine_error('pldr_catalog_edition_read','PDF Library edition state could not be read reliably during catalog filtering.',503,array('degraded'=>true)),'degraded'=>true);
                 if(!$edition)continue;
+                // Filter only the current canonical edition; never join unrelated historic editions.
+                if(!$facet_matches((string)($edition['author_name']??''),$author)
+                    ||!$facet_matches((string)($edition['source_name']??''),$source)
+                    ||!$facet_matches((string)($edition['edition_label']??''),$edition_filter)
+                    ||!$facet_matches((string)($edition['isbn']??''),$isbn)
+                    ||($license!==''&&strcasecmp((string)($edition['license_code']??''),$license)!==0)
+                    ||($year>0&&(int)($edition['publication_year']??0)!==$year))continue;
                 $wpdb->last_error='';$allowed=PLDR_Access::can_access_edition((int)$edition['id'],'read',$user_id);
                 if(''!==(string)$wpdb->last_error)return array('items'=>array(),'page'=>$page,'per_page'=>$per_page,'has_more'=>false,'error'=>PLDR_Core::machine_error('pldr_catalog_access_read','PDF Library authorization state could not be verified reliably during catalog filtering.',503,array('degraded'=>true)),'degraded'=>true);
                 if(!$allowed)continue;
                 $wpdb->last_error='';$dto=PLDR_Core::public_document_dto($doc,$edition);
                 if(''!==(string)$wpdb->last_error)return array('items'=>array(),'page'=>$page,'per_page'=>$per_page,'has_more'=>false,'error'=>PLDR_Core::machine_error('pldr_catalog_projection_read','PDF Library access-policy projection could not be read reliably.',503,array('degraded'=>true)),'degraded'=>true);
+                if($access_mode!==''&&(string)($dto['access_mode']??'')!==$access_mode)continue;
                 $eligible[]=$dto;
                 if(count($eligible)===$logical_offset+$per_page)$page_cursor=array('created_at'=>$after_created,'id'=>$after_id);
                 if(count($eligible)>=$target){$stop=true;break;}
