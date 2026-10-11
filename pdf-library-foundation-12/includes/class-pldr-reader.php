@@ -5,6 +5,14 @@ defined('ABSPATH') || exit;
 final class PLDR_Search {
     public static function search(array $args, int $user_id = 0): array {
         global $wpdb;
+        // Do not silently drop malformed list/object filters: doing so broadens
+        // a restricted query into an unfiltered catalogue request. Type validation
+        // must precede any casts, pagination arithmetic, or cursor decoding.
+        foreach (array('q','type','category','language','author','source','edition','license','isbn','access_mode','year','cursor','page','per_page') as $key) {
+            if (array_key_exists($key, $args) && (null === $args[$key] || !is_scalar($args[$key]) || is_bool($args[$key]))) {
+                return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_filter_invalid','The requested PDF Library filter is invalid.',400));
+            }
+        }
         $term = PLDR_Core::normalize_search((string) ($args['q'] ?? ''));
         $term_len=function_exists('mb_strlen')?mb_strlen($term,'UTF-8'):strlen($term);
         if($term_len>160)return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_query_long','PDF Library search query is too long.',400,array('max_characters'=>160)));

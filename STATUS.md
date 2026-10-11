@@ -1,31 +1,29 @@
-# File 12 — R29 Revised Plan/Source Candidate — 11 October 2026
+# File 12 — R30 reconciled source candidate — 11 October 2026
 
-| Evidence gate | Exact current statement |
+| Truth gate | Grounded status |
 |---|---|
-| Governing documents | Uploaded File 12 v1.1 amended Future-24, Three Central Plans Consolidated Master Plan and actual companion File 05/06/21/23/25 plans |
-| Source `main` HEAD | `2b369ef2d609247896e1ab32118f1dc498407f51` (bootstrap README only) |
-| Parent audited candidate | R28 PR #16 `cac343ecae14b8cff08be56c83cc6d32761426d3`; CI #410 green only for that SHA |
-| Current candidate | R29 Draft PR #19, branch `review/file-12-r29-twenty-source-plan-audit-2026-10-11` |
-| Source audit | 20 different focused code/source-vs-governing-plan review domains, plus Future-24 source-anchors; not 20 full live WordPress journeys |
-| Proven code gaps | R29-D01 F12-FR-001/013 missing author/source/edition/license/ISBN/year/access-mode facets in search + REST; R29-D02 public Library had no Next link although signed cursor returned |
-| Source corrections | Current canonical edition facets, access-safe projection, strict bounded invalid-filter denial, signed cursor binding to every selected facet/user, REST args, accessible filters and Next/First links |
-| Executable regression | `tests/test-r29-catalog-facets.php` actual real `PLDR_Search` on isolated DB fixture with private entitlement and signed cursor test; earlier R28 full static matrix and R1–R27 tests retained |
-| Audit evidence | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R29.md` |
-| Software/plugin/ZIP candidate | `1.1.0-rc.8` |
-| Source DB schema + interface contract | `1.1.0` / `1.1.0` — unchanged |
-| Exact final R29 CI | Must be checked against final unchanged PR HEAD and deterministic ZIP SHA after the last file update |
-| Owner boundary | File 12 owns document/edition/object/reading; File05 learning, File06 knowledge, File16 AI, File21 feed, File23 dashboard projections, File20 shell, File25 UI tokens remain native |
-| Naming conflict | Written plan package top-level `12-pdf-library-foundation`; code ZIP uses `pdf-library-foundation-12` — formal change control and migration required, no silent rename |
-| Hostinger staging/external consumers | Unverified, including installed File00/01/05/06/16/17/19/20/21/23/24/25/26 and CF-04 counterparts |
-| Deployed DB migration/physical schema | Unverified |
-| Restore/rollback, RTL/a11y/offline, Founder signoff | Unverified |
-| Production/live verification | NOT DONE |
+| Governing sources | File12 v1.1 amended Future24; Three Central Consolidated Master Plans; Files05/06/21/23/25; native Files00/01/16/17/19/20/24/26 interfaces |
+| Frozen parent | Draft PR #19 at `8ee7f4246ae90980291c031022d5adfdb40717ae` |
+| Divergent safety branch | Draft PR #18 at `b2a8455685ce0aa47fce941512c36b0e7232f55c`, not automatically in PR19 |
+| Audit | 20 different focused source-to-plan checks; see `docs/TWENTY-ROUND-REVIEW-2026-10-11-R30.md` |
+| New/reconciled defects | R30-D01 invalid structured search filter broadening; R30-D02 malformed embargo fail-open; R30-D03 undefined audience entitlements |
+| Corrections | Catalog pre-parse input typing; approved embargo/audience fail-closed code copied from PR18 |
+| CI tests | 20× full 53+12 plan source matrix, R29 catalog fixture with 17 new malformed cases, R30 actual policy fixture with 23 assertions, and historical R1–R28 tests |
+| Source candidate | `1.1.0-rc.9` (separate from divergent rc.8 builds) |
+| Source schema/contract | `1.1.0` / `1.1.0`; no R30 schema change |
+| Exact final HEAD CI | PENDING fresh evidence |
+| Folder name incompatibility | Plan: `12-pdf-library-foundation`; repo ZIP: `pdf-library-foundation-12`; controlled Founder decision/upgrade test required |
+| Deployed Version | UNVERIFIED |
+| DB Version | UNVERIFIED |
+| Migration State | UNVERIFIED |
+| Live Verification Status | NOT PERFORMED |
+| Actual staging integration/rollback | UNVERIFIED |
+| Production approval and deployment | NOT PERFORMED |
 
-## Mandatory production truth
-Repository HEAD: final R29 Draft PR SHA (main remains bootstrap).  
-Deployed Version: UNVERIFIED.  
-DB Version: UNVERIFIED (1.1.0 is source target only).  
-Migration State: UNVERIFIED.  
-Live Verification Status: NOT VERIFIED.
+Repository HEAD: confirm latest R30 PR SHA after final commit.
+Deployed Version: unverified.
+DB Version: unverified (source declares 1.1.0).
+Migration State: unverified.
+Live Verification Status: not performed.
 
-**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔

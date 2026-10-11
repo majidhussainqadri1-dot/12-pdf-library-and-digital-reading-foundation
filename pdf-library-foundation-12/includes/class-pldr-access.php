@@ -23,13 +23,31 @@ final class PLDR_Access {
             if(false===$rights_ts){PLDR_Core::audit('edition',$edition_id,'rights_expiry_invalid',array('document_id'=>(int)$edition['document_id']),$user_id);if(!$curator)return false;}
             elseif($rights_ts<=time()&&!$curator)return false;
         }
-        if (!empty($policy['embargo_until']) && strtotime((string) $policy['embargo_until']) > time() && !PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id)) return false;
+        if (!empty($policy['embargo_until'])) {
+            // Historical/imported records are not guaranteed to have passed the
+            // modern policy-update validator. Unparseable embargoes must not
+            // turn a restricted source into a freely readable publication.
+            $embargo_ts = strtotime((string) $policy['embargo_until']);
+            $manager = PLDR_Core::authorize('manage', (int) $edition['document_id'], $user_id);
+            if (false === $embargo_ts) {
+                PLDR_Core::audit('edition', $edition_id, 'embargo_until_invalid', array('document_id' => (int) $edition['document_id']), $user_id);
+                if (!$manager) return false;
+            } elseif ($embargo_ts > time() && !$manager) {
+                return false;
+            }
+        }
         if ('download' === $operation && empty($policy['download_allowed'])) return false;
         if ('print' === $operation && empty($policy['print_allowed'])) return false;
         if ('offline' === $operation && empty($policy['offline_allowed'])) return false;
         if ('preview' === $operation) $operation = 'read';
 
         $audience = (string) $policy['audience'];
+        // A corrupt/legacy policy must not grant access through an arbitrary
+        // external entitlement adapter for an undefined access audience.
+        if (!in_array($audience, array('public', 'account', 'education-entitled', 'assigned'), true)) {
+            PLDR_Core::audit('edition', $edition_id, 'policy_audience_invalid', array('document_id' => (int) $edition['document_id']), $user_id);
+            return false;
+        }
         if ('public' === $audience) return true;
         // An anonymous grant may read public material only. Never call entitlement adapters with -1.
         if ($user_id <= 0) return false;
