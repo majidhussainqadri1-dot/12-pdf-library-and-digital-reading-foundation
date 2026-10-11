@@ -7,7 +7,9 @@ final class PLDR_REST {
     private const READER_PREVIEW_GRANT_LIMIT = 50;
 
     public static function register(): void {
-        register_rest_route('pldr/v1','/library',array('methods'=>'GET','callback'=>array(__CLASS__,'library'),'permission_callback'=>'__return_true','args'=>array('q'=>array('sanitize_callback'=>'sanitize_text_field'),'type'=>array('sanitize_callback'=>'sanitize_key'),'category'=>array('sanitize_callback'=>'sanitize_key'),'language'=>array('sanitize_callback'=>'sanitize_text_field'),'author'=>array('sanitize_callback'=>'sanitize_text_field'),'source'=>array('sanitize_callback'=>'sanitize_text_field'),'edition'=>array('sanitize_callback'=>'sanitize_text_field'),'license'=>array('sanitize_callback'=>'sanitize_text_field'),'isbn'=>array('sanitize_callback'=>'sanitize_text_field'),'year'=>array('sanitize_callback'=>'sanitize_text_field'),'access_mode'=>array('sanitize_callback'=>'sanitize_key'),'page'=>array('sanitize_callback'=>'absint'),'per_page'=>array('sanitize_callback'=>'absint'),'cursor'=>array('sanitize_callback'=>'sanitize_text_field'))));
+        // Do not coerce negative/decimal page filters via absint in WP REST.
+        // PLDR_Search::search performs the strict source-of-truth check first.
+        register_rest_route('pldr/v1','/library',array('methods'=>'GET','callback'=>array(__CLASS__,'library'),'permission_callback'=>'__return_true','args'=>array('q'=>array('sanitize_callback'=>'sanitize_text_field'),'type'=>array('sanitize_callback'=>'sanitize_key'),'category'=>array('sanitize_callback'=>'sanitize_key'),'language'=>array('sanitize_callback'=>'sanitize_text_field'),'author'=>array('sanitize_callback'=>'sanitize_text_field'),'source'=>array('sanitize_callback'=>'sanitize_text_field'),'edition'=>array('sanitize_callback'=>'sanitize_text_field'),'license'=>array('sanitize_callback'=>'sanitize_text_field'),'isbn'=>array('sanitize_callback'=>'sanitize_text_field'),'year'=>array('sanitize_callback'=>'sanitize_text_field'),'access_mode'=>array('sanitize_callback'=>'sanitize_key'),'page'=>array(),'per_page'=>array(),'cursor'=>array('sanitize_callback'=>'sanitize_text_field'))));
         register_rest_route('pldr/v1','/document/(?P<id>[a-f0-9\-]{36})',array('methods'=>'GET','callback'=>array(__CLASS__,'document'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1','/ingest',array('methods'=>'POST','callback'=>array(__CLASS__,'ingest'),'permission_callback'=>array(__CLASS__,'can_publish')));
         register_rest_route('pldr/v1','/documents/(?P<id>[a-f0-9\-]{36})/approve',array('methods'=>'POST','callback'=>array(__CLASS__,'approve_document'),'permission_callback'=>array(__CLASS__,'can_rights')));
@@ -199,6 +201,8 @@ final class PLDR_REST {
     }
 
     public static function reader_manifest(WP_REST_Request $request) {
+        $shape=self::validate_query_shape($request,array(),array('edition'));
+        if(is_wp_error($shape))return $shape;
         global $wpdb;
         $edition_id=absint($request['edition']);
         $edition=PLDR_Core::edition($edition_id);
