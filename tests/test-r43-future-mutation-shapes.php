@@ -46,7 +46,12 @@ foreach($cases as [$name,$base,$numbers,$texts,$arrays,$flags]){
             foreach($invalid as $bad){
                 $input=$base;$input[$field]=$bad;
                 $before=$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->writes;
-                $result=PLDR_Future_REST::$name(new WP_REST_Request($input));
+                $request=new WP_REST_Request($input);
+                $reflection=new ReflectionMethod(PLDR_Future_REST::class,'validate_mutation_shape');
+                $checked=$reflection->invoke(null,$request,$texts,$numbers,$arrays,$flags);
+                $assertR43(is_wp_error($checked)&&$checked->code==='pldr_future_mutation_input_shape',
+                    'common validator accepted '.$name.'/'.$field.' '.get_debug_type($bad));
+                $result=PLDR_Future_REST::$name($request);
                 $assertR43(is_wp_error($result) && $result->code==='pldr_future_mutation_input_shape',
                     $name.'/'.$field.' accepted invalid '.$kind.' '.get_debug_type($bad));
                 $assertR43($before===$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->writes,
