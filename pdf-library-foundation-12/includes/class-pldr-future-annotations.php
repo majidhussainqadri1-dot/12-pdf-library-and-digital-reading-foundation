@@ -21,6 +21,18 @@ final class PLDR_Future_Annotations {
         $has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
         $source=self::canonical_source($edition,$edition_id);$annotations = array();
         foreach ($rows as $item) {
+            // A portable export is another projection of the SAME account-private
+            // record as PLDR_Reading::items() and the paginated REST reader.
+            // Reject legacy corrupt JSON maps/lists rather than exporting a
+            // plausible W3C annotation from an invalid canonical row.
+            $stored_tags=$item['tags_json']??null;
+            if(!is_string($stored_tags) || null===PLDR_Reading::parse_stored_tags($stored_tags)){
+                PLDR_Core::audit('reading_item',(int)($item['id']??0),'annotation_export_tags_corrupt',
+                    array('edition_id'=>$edition_id),$uid);
+                return array('error'=>PLDR_Core::machine_error('pldr_annotation_export_corrupt',
+                    'Stored private annotation tags failed canonical integrity validation; no partial portable export was returned.',
+                    500,array('item_id'=>(int)($item['id']??0))));
+            }
             $target = array('source' => $source, 'selector' => array(array('type'=>'FragmentSelector','conformsTo'=>'https://www.w3.org/TR/media-frags/','value'=>'page='.(int)$item['page_number'])));
             $anchor = (string) $item['anchor_text'];$decoded = json_decode($anchor, true);
             if (is_array($decoded)) $target['selector'][] = $decoded;elseif ('' !== $anchor) $target['selector'][] = array('type'=>'TextQuoteSelector','exact'=>self::limit($anchor,500));

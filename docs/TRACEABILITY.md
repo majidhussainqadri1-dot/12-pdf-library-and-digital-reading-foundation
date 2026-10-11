@@ -286,3 +286,11 @@ R43 20-check source ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R43.md`. Softwa
 | F12-FUT-012, FR-009; File24 privacy/security | `PLDR_Future_REST::offline_delivery_token_ttl` prevents native 60-second-minimum tokens from running beyond impending rights expiry | Same R44 real helper test and source wiring assertion | Real token-generation, reconnection, expiry/revocation races, offline browser and key backup/restore |
 
 Version software 1.1.0-rc.23; schema/interface 1.1.0 unchanged. 20 checks/source limitations: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R44.md`. Not live/staging acceptance.
+
+
+## R45 — F12-FUT-009 portable annotation private reader parity
+| Written requirement/owner | Implementation | Executable evidence | Remaining acceptance |
+|---|---|---|---|
+| F12-FUT-009; F12-FR-012; central C1 private data, File05 learning bookmark separation, File06 citation domain, File25 public visualization | `PLDR_Future_Annotations::export` validates persisted tags via `PLDR_Reading::parse_stored_tags` before preparing private W3C JSON-LD; R41 direct/private REST consumers already use the same parser | `tests/test-r45-annotation-export-integrity.php` tests valid lists, rejected invalid JSON objects, nested/wrong typed tags, oversize and no partial export after corrupt row | Real WordPress with existing legacy rows, File00 account access, W3C import/export round-trip, auth/IDOR tests and approved staging/live parity |
+
+Twenty bounded source checks: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R45.md`. Software rc.24; source schema/interface 1.1.0 unchanged. Repository source truth is not deployed proof.

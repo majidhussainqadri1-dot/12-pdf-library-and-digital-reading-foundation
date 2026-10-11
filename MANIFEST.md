@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.23`
+Candidate: `1.1.0-rc.24`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -193,3 +193,10 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Future_REST::offline_delivery_token_ttl` accounts for immutable native 60-second grant minimum and keeps a 60-second buffer before rights expiry; too-short windows are denied.
 - `tests/test-r44-offline-rights-window.php` exercises real parser + Future reauthorization/TTL, isolated WordPress fixtures only.
 - Source schema/integration version still 1.1.0, runtime Hostinger state/backup/staging/live unverified.
+
+
+## R45 — private annotation portable export cross-API parity (software 1.1.0-rc.24)
+- Twenty source/plan foci: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R45.md`.
+- `class-pldr-future-annotations.php` export of private W3C JSON-LD now refuses invalid historical `tags_json` via the canonical `PLDR_Reading::parse_stored_tags` parser; no partial output on corrupt row.
+- `tests/test-r45-annotation-export-integrity.php` real export and parser fixture added to PHP CI quality gate; source DB/schema/interface 1.1.0 unchanged, no migration.
+- Live server/backend/installed owners and plugin directory-naming conflict remain unverified for production approval.

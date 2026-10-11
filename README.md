@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.23`
+- Software: `1.1.0-rc.24`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -101,3 +101,7 @@ The R43 **source-only** candidate 1.1.0-rc.22 retains the original File12 FR001�
 
 ## R44 — offline rights expiry/grant-time correctness
 Source-only rc.23: twenty bounded requirement/source inspections are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R44.md`. Two defects fixed: Future offline authorization/grant now use canonical strict File12 rights calendar interpretation rather than lenient `strtotime`; near-expiring rights no longer generate a native minimum-60s delivery token that outlasts rights. New `tests/test-r44-offline-rights-window.php` and exact-HEAD GitHub Actions gate. DB and interface source contract remain 1.1.0; staging/deployed Hostinger/plugin folder incompatibility/live parity all unverified.
+
+
+## R45 — portable private annotations integrity (11 October 2026)
+Twenty scoped File12/central/companion source checks are documented in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R45.md` (not 20 full browser E2E reviews). The portable Web Annotation export now reuses `PLDR_Reading::parse_stored_tags` so historical invalid private bookmark/note/highlight tag JSON is denied consistently across direct, REST and Future-24 export paths, without partial export or tag leakage. Regression: `tests/test-r45-annotation-export-integrity.php`. Software source candidate 1.1.0-rc.24; schema/contract 1.1.0 unchanged; live/staging unverified.
