@@ -9,6 +9,7 @@ class WP_Error {
 }
 function is_wp_error($v):bool{return $v instanceof WP_Error;}
 function get_current_user_id():int{return 77;}
+function absint($v):int{return abs((int)$v);}
 function get_option($name,$default=false){return $name==='spf_founder_user_id'?77:$default;}
 function user_can($uid,$cap):bool{return false;}
 function apply_filters($filter,$default,...$args){return $default;}
