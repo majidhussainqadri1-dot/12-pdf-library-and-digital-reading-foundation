@@ -58,6 +58,15 @@ foreach(array(
     array('cover'=>array('tmp_name'=>array('tmp'))),
     array('cover'=>array('error'=>array(0)))
 ) as $files)$cases[]=array('malformed upload file structure',$good,$files,'pldr_ingest_upload_shape');
+// New R32 cover precommit acceptance: a supplied-but-failed cover is never
+// silently skipped while the PDF itself is committed.
+foreach(array(
+    array('error'=>UPLOAD_ERR_PARTIAL,'tmp_name'=>'/tmp/incomplete-cover.jpg','name'=>'cover.jpg'),
+    array('error'=>UPLOAD_ERR_OK,'tmp_name'=>'/tmp/not-an-http-upload.jpg','name'=>'cover.jpg'),
+    array('error'=>UPLOAD_ERR_NO_FILE,'tmp_name'=>'','name'=>'unexpected.jpg')
+) as $cover){
+    $cases[]=array('R32 cover precommit failure',$good,array('cover'=>$cover),'pldr_cover_upload_preflight');
+}
 $checks=0;
 foreach($cases as [$label,$input,$files,$code]){
     $res=PLDR_Ingest::ingest($input,$files,19);
