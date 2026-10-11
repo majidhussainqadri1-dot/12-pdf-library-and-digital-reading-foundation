@@ -130,3 +130,14 @@ R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot pro
 | F12-NFR-001/007 and central owner law | Not an excuse to alter schema or other owners | Source-only `1.1.0-rc.10`; same `1.1.0` DB/contract; all canonical owners preserved | Hostinger exact artifact/DB/migration, external File00/05/06/16/20/24/25 and CF04 integration, backup/rollback and Founder acceptance |
 
 R31 is a source QA candidate, not proof of operational resolution. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`.
+
+## R32 (2026-10-11): physical PDF integrity and precommit failure recovery
+
+| Governing master plan | Proven prior code defect | R32 source correction | Regression / acceptance boundary |
+|---|---|---|---|
+| F12-FR-002 genuine PDF size + signature/EOF | Declared `pdf.size` was used to validate/read/store but not checked against actual `filesize(tmp_name)` | `PLDR_Ingest::validate_pdf` fail-closed `pldr_pdf_size_mismatch`, prior to examining the PDF or processing source | `tests/test-r32-pdf-physical-integrity.php` actual PDF validator; real multipart upload staging outstanding |
+| F12-FR-006 AES-GCM and F12-NFR-003/007 safe failure cleanup | Ingest false/exception encryption failed without **immediate** private-temp deletion, although Storage has a shutdown cleanup fallback | `PLDR_Storage::delete($temp)` on both failure paths; privacy-safe exception audit | R32 source-flow checks; live file permissions + disk-full / key failure injections outstanding |
+| F12-FR-007 cover/derived media and F12-NFR-007 no silent data loss | Explicit bad/partial/spoofed cover could be skipped or only reconciled after PDF commit | Pre-commit cover upload status+HTTP path gate, preserve valid absent-cover behavior | Actual `PLDR_Ingest::ingest` fixture covers three bad covers; browser/multipart staging still outstanding |
+| Central owner and File05/06/21/23/25 contracts | No new external source defect proven in the File12 static owner adapters | No duplicate foreign domain owner and no DB-schema changes created | Real companion source, versions and operational API/event delivery remain unverified |
+
+See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`; do not mistake exact-head green CI for live deployment/DB parity.
