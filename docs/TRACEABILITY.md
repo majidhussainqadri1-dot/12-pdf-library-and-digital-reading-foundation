@@ -264,3 +264,16 @@ Twenty distinct scoped source-to-plan review paths and limits recorded in `docs/
 | F12-FUT-004/006/009/011/016/020; Files05/06 | `PLDR_Future_REST::compare/citation_export/annotations_export/heatmap/insights/context/preferences_get` raw text/numeric checks | same fixture, isolated WordPress stand-in | Valid positive reader/provider flows plus deny malformed values |
 
 These checks do not prove staging, production, actual physical DB schema/migration, external providers or installed companion plugin compatibility. Governing review ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R42.md`. Source software 1.1.0-rc.21, DB/schema/interface 1.1.0 unchanged.
+
+
+## R43 — Future-24 mutation input integrity and cross-owner safety (11 October 2026)
+| Governing requirement | Source implementation | Regression | Required external proof |
+|---|---|---|---|
+| F12-FUT-005 / FR-012 / NFR-001/002 | `PLDR_Future_REST::anchor` raw edition/page/selector/note guard | `tests/test-r43-future-mutation-shapes.php` | Live File00 owner/account/IDOR and note lifetime |
+| F12-FUT-008 / FR-007 | `ocr_correction`, `ocr_review`: typed original/corrected, page and expected_version | Same direct handler test | Installed File12/OCR policy, review ownership and DB |
+| F12-FUT-009 / FR-012 | `annotations_import`: typed bulk `items` (native annotation validator still authoritative) | Same direct handler test | Actual PDF edition/annotation reconciliation and privacy |
+| F12-FUT-012 / FR-008 | `offline_grant`: positive/nonnegative integer typed edition before rights lookup | Same direct handler test | Actual offline rights, entitlement, key purge and physical device |
+| F12-FUT-015/016/017 | `preferences_save`, `shelf_create/add/rename/delete/remove_item`, `insight_event`, `handoff_save`: field-shape and private optimistic version guards | Same direct handler test | Multiple users/devices, suspended/unauthorized/private cross-browser tests |
+| F12-FUT-019/022/023 + File05/06/16 owner boundaries | `reading_room`, `derive_text`, `a11y_verify`, `preservation_refresh`, `authority`: validated shape before provider/native operations; flag bool/0/1 only | Same direct handler test | Real File05/06 knowledge adapter, File16 AI/safety and File21/23 interaction contracts |
+
+R43 20-check source ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R43.md`. Software `1.1.0-rc.22`; source schema/contract `1.1.0`. Neither HEAD nor green CI proves installed code, DB, migrations or live acceptance.
