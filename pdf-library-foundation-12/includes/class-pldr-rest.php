@@ -57,6 +57,28 @@ final class PLDR_REST {
         return true;
     }
 
+    /**
+     * Read-only query parameters must be validated before WordPress/PHP
+     * scalar casts and before selecting a private edition or reading state.
+     * This is separate from the write/idempotency mutation guard above.
+     */
+    private static function validate_query_shape(WP_REST_Request $request,array $text=array(),array $integers=array()) {
+        foreach($text as $field){
+            $value=$request[$field];
+            if(null!==$value && (!is_scalar($value)||is_bool($value))){
+                return PLDR_Core::machine_error('pldr_query_input_shape','Query text or cursor must be a scalar.',400,array('field'=>$field));
+            }
+        }
+        foreach($integers as $field){
+            $value=$request[$field];
+            if(null===$value)continue;
+            if(!(is_int($value)&&$value>=0) && !(is_string($value)&&preg_match('/^[0-9]+$/D',$value))){
+                return PLDR_Core::machine_error('pldr_query_input_shape','Query pagination or page must be a nonnegative integer.',400,array('field'=>$field));
+            }
+        }
+        return true;
+    }
+
     public static function logged_in(): bool { return is_user_logged_in(); }
     public static function can_publish(): bool { return PLDR_Core::authorize('publish'); }
     public static function can_manage(): bool { return PLDR_Core::authorize('manage'); }
@@ -241,7 +263,13 @@ final class PLDR_REST {
         if(''!==(string)$wpdb->last_error)return array('error'=>PLDR_Core::machine_error('pldr_reader_a11y_thumbnail_read','Reader accessibility preview state could not be read reliably.',503,array('degraded'=>true)));
         return array('title'=>$edition['title'],'author'=>$edition['author_name'],'language'=>$edition['language'],'pages'=>(int)$edition['pages'],'ocr_status'=>$ocr['status']??'unknown','ocr_quality'=>isset($ocr['quality_score'])?(float)$ocr['quality_score']:0,'ocr_language'=>$ocr['language']??$edition['language'],'thumbnail_pages'=>$thumbs,'screen_reader_fallback'=>$ocr&&'available'===$ocr['status']?'ocr-text':'document-metadata');
     }
-    public static function ocr_search(WP_REST_Request $request) { $result=PLDR_Search::ocr(absint($request['edition']),(string)$request['q'],get_current_user_id(),(string)$request['cursor'],absint($request['limit']?:50));if(isset($result['error'])&&is_wp_error($result['error']))return $result['error'];return rest_ensure_response($result); }
+    public static function ocr_search(WP_REST_Request $request) {
+        $shape=self::validate_query_shape($request,array('q','cursor'),array('edition','limit'));
+        if(is_wp_error($shape))return $shape;
+        $result=PLDR_Search::ocr(absint($request['edition']),(string)$request['q'],get_current_user_id(),(string)$request['cursor'],absint($request['limit']?:50));
+        if(isset($result['error'])&&is_wp_error($result['error']))return $result['error'];
+        return rest_ensure_response($result);
+    }
     public static function save_progress(WP_REST_Request $request) {
         $shape=self::validate_mutation_shape($request,array('expected_updated_at'),array('edition_id','page'));
         if(is_wp_error($shape))return $shape;
@@ -250,6 +278,8 @@ final class PLDR_REST {
         return self::idempotent($request,'reading-progress',static fn()=>PLDR_Reading::save_progress($edition_id,absint($request['page']),0,sanitize_text_field((string)$request['expected_updated_at'])));
     }
     public static function reading_items(WP_REST_Request $request) {
+        $shape=self::validate_query_shape($request,array('cursor'),array('edition_id','limit','offset'));
+        if(is_wp_error($shape))return $shape;
         global $wpdb;
         $uid=get_current_user_id();$edition_id=absint($request['edition_id']);
         if(!$uid)return PLDR_Core::machine_error('pldr_items_forbidden','Private reading items are unavailable.',403);
@@ -329,7 +359,28 @@ final class PLDR_REST {
         if(is_wp_error($pre))return $pre;
         return self::idempotent($request,'reading-item-delete',static fn()=>self::delete_reading_item_owned($item_id,absint($request['expected_version'])));
     }
-    public static function citation(WP_REST_Request $request) { global $wpdb;$wpdb->last_error='';$edition=PLDR_Core::edition(absint($request['edition']));if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_edition_read','Citation edition state could not be read reliably.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$wpdb->last_error='';$allowed=PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id());if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_access_read','Citation authorization state could not be verified reliably.',503,array('degraded'=>true));if(!$allowed)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$page=absint($request['page']);if($page>(int)$edition['pages'])return PLDR_Core::machine_error('pldr_citation_page','Citation page is outside this document edition.',400,array('pages'=>(int)$edition['pages']));$style=sanitize_key((string)($request['style']?:'sabri'));return rest_ensure_response(array('citation'=>PLDR_Reader::citation($edition,$page,$style),'style'=>$style,'page'=>$page)); }
+    public static function citation(WP_REST_Request $request) {
+        $shape=self::validate_query_shape($request,array('style'),array('edition','page'));
+        if(is_wp_error($shape))return $shape;
+        // The current basic endpoint supports only these three actual styles.
+        // Future24's Chicago/BibTeX/RIS/CSL export belongs to its separate
+        // governed export pathway; do not relabel Sabri text as another style.
+        $style=sanitize_key((string)($request['style']?:'sabri'));
+        if(!in_array($style,array('sabri','apa','mla'),true)){
+            return PLDR_Core::machine_error('pldr_citation_style','This citation style is not supported by the basic endpoint.',400,array('style'=>$style));
+        }
+        global $wpdb;$wpdb->last_error='';
+        $edition=PLDR_Core::edition(absint($request['edition']));
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_edition_read','Citation edition state could not be read reliably.',503,array('degraded'=>true));
+        if(!$edition)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);
+        $wpdb->last_error='';
+        $allowed=PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id());
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_access_read','Citation authorization state could not be verified reliably.',503,array('degraded'=>true));
+        if(!$allowed)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);
+        $page=absint($request['page']);
+        if($page>(int)$edition['pages'])return PLDR_Core::machine_error('pldr_citation_page','Citation page is outside this document edition.',400,array('pages'=>(int)$edition['pages']));
+        return rest_ensure_response(array('citation'=>PLDR_Reader::citation($edition,$page,$style),'style'=>$style,'page'=>$page));
+    }
     public static function download_session(WP_REST_Request $request) {
         $shape=self::validate_mutation_shape($request,array(),array('edition_id'));
         if(is_wp_error($shape))return $shape;
