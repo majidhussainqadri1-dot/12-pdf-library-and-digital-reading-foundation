@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.20`
+- Software: `1.1.0-rc.21`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -89,3 +89,7 @@ R39 **source-only** `1.1.0-rc.20` hardens File12 FR-003/FR-008 and central right
 
 ## R41 — preserve catalog REST validation and private stored-tag integrity (2026-10-11)
 R41 source-only software candidate `1.1.0-rc.20` closes three implementation gaps: the WordPress REST catalog route no longer applies `absint` to `page/per_page` *before* the strict R40 search boundary; the reader-manifest endpoint validates its `edition` query shape before database reads; and the canonical private saved-tags parser now distinguishes a forbidden JSON object `{}` from a valid JSON array `[]` for native and paginated REST readers. Actual PHP fixture `tests/test-r41-rest-route-private-tags.php` exercises route registration, malformed handlers and direct/REST private notes. Original amended File12, central and companion plans compared across 20 distinct focused inspections in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R41.md`. No staging, Hostinger DB/deployed-source parity, owner plugins, Founder approval or live claims.
+
+
+## R42 — Future-24 REST query integrity (11 October 2026)
+Source-only corrective candidate rc.21; the 20 source/requirement owner checks are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R42.md`. Future reflow, private shelves and File16 corpus routes no longer pre-sanitize page/limit/offset/cursor, and ten Future GET handlers reject malformed numeric/text values before private reads or provider callbacks. Regression: `tests/test-r42-future-rest-query-shapes.php`. The inner folder mismatch, companion installed contract versions, staging, actual DB, deployment and live parity remain unresolved/unverified.
