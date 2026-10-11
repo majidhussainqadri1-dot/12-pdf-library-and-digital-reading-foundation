@@ -163,3 +163,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - F12-FR-004/008: pending-edition nonmutation of current access policy compares explicitly supplied fields, inherited omitted grant flags and embargo, preserving R39 canonical true/on/yes flags and conservative malformed values. Actual pending-version post-upload branch still requires genuine HTTP WordPress staging testing (two source invariants only).
 - Real `tests/test-r40-ingest-date-catalog-pagination.php` (PHP8.1/8.3/8.4): exercises actual ingest and catalog with invalid/valid dates and page numbers plus canonical timestamp helper. Retains all prior R28–R39 source QA.
 - Software package `1.1.0-rc.20`; source DB schema/integration interface `1.1.0`; no new migration. Existing ZIP inner folder mismatch and deployed/plugin/DB/live verification unmodified and remain release gates.
+
+
+## R41 rc.20 — catalog REST pre-sanitization, reader query and private historic tags
+- File12 `F12-FR-001` catalog / `F12-NFR-004` bounded numeric pagination: removed `sanitize_callback=absint` from actual WordPress REST `page/per_page` registration; source `PLDR_Search::search` now sees original invalid numeric values and fails closed before catalog queries.
+- File12 `F12-FR-010`, `NFR-001` reader manifest: call canonical `PLDR_REST::validate_query_shape` on edition before `PLDR_Core::edition` and object/authorization reads, no silent malformed/negative/decimal conversion.
+- File12 `F12-FR-012`, `NFR-002` private notes: canonical native+REST stored-tags decoder preserves JSON array/object type. Invalid `{}` rejects rather than being presented as valid `[]`; normal bounded string tag arrays retained.
+- Actual test `tests/test-r41-rest-route-private-tags.php` invokes REST registration, `PLDR_REST::library`, `reader_manifest`, `reading_items`, `PLDR_Reading::items`/parser on real methods with isolated WP DB mocks. PHP8.1/8.3/8.4 CI and retained R28–R40 suites.
+- Software version `1.1.0-rc.20`, schema/interface source contract `1.1.0` unchanged; plugin inner directory plan/source mismatch, staging/restore and active deployment unknown.
