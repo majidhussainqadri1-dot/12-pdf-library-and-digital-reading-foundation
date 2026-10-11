@@ -1,6 +1,6 @@
 # File 12 — PDF Library and Digital Reading
 
-This branch contains the **R29 source-only corrective candidate** for File 12, based on the prior R27 rc.6 lineage. It retains R28's reconciliation of divergent R27 security fixes (reader/IIIF pregrant checks and current derivative binding revalidation), tightens the direct HTML reader, and retains canonical ownership across the platform. Source/CI/package truth is not staging/live truth.
+This branch contains the **R31 source-only corrective candidate** for File 12, based on the exact-green R30 rc.9 lineage. It retains R28's reconciliation of divergent R27 security fixes (reader/IIIF pregrant checks and current derivative binding revalidation), tightens the direct HTML reader, and retains canonical ownership across the platform. R31 additionally rejects malformed PDF-ingest metadata and uploaded PDF/cover file structures before any database or private-storage side effects. Source/CI/package truth is not staging/live truth.
 
 ## Candidate identity
 
