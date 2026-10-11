@@ -209,7 +209,17 @@ final class PLDR_Ingest {
         if($existing_doc&&'published'!==$edition_status){
             $requested_entitlement=sanitize_text_field((string)($data['entitlement_key']??$current_policy['entitlement_key']));
             $canonical_changed=(string)$existing_doc['title']!==sanitize_text_field((string)$data['title'])||(string)$existing_doc['document_type']!==$type||(string)$existing_doc['category']!==$category||(string)$existing_doc['language']!==sanitize_text_field((string)$data['language']);
-            $policy_changed=(string)$current_policy['audience']!==$access_mode||(string)$current_policy['entitlement_key']!==$requested_entitlement||(int)$current_policy['download_allowed']!==(empty($data['download_allowed'])?0:1)||(int)$current_policy['print_allowed']!==(empty($data['print_allowed'])?0:1)||(int)$current_policy['offline_allowed']!==(empty($data['offline_allowed'])?0:1)||(string)($current_policy['embargo_until']??'')!==(string)($requested_embargo??'');
+            // A pending edition must not silently edit live rights. Equally,
+            // omitted fields MUST inherit the active policy, not be mistaken
+            // for an explicit request to turn an existing grant/embargo off.
+            $policy_changed=(string)$current_policy['audience']!==$access_mode||(string)$current_policy['entitlement_key']!==$requested_entitlement;
+            foreach(array('download_allowed','print_allowed','offline_allowed') as $flag){
+                $old_grant=1===PLDR_Core::policy_flag($current_policy[$flag]??null)?1:0;
+                $new_grant=array_key_exists($flag,$data)?(int)$data[$flag]:$old_grant;
+                if($new_grant!==$old_grant)$policy_changed=true;
+            }
+            if(array_key_exists('embargo_until',$data) &&
+               (string)($current_policy['embargo_until']??'')!==(string)($requested_embargo??''))$policy_changed=true;
             if($canonical_changed||$policy_changed)return PLDR_Core::machine_error('pldr_pending_edition_canonical_change','A pending edition cannot silently change the live document family or access policy. Keep canonical fields unchanged, or publish through the governed approval/policy workflow.',409,array('canonical_changed'=>$canonical_changed,'policy_changed'=>$policy_changed));
         }
 
@@ -561,10 +571,11 @@ final class PLDR_Ingest {
 
     private static function date_or_null($value,string $field='date'): ?string {
         if(null===$value||''===trim((string)$value))return null;
-        $raw=trim((string)$value);
-        if(!preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?(?:Z|[+\-]\d{2}:\d{2})?)?$/',$raw))throw new InvalidArgumentException($field.' must be an explicit ISO-style date/time.');
-        $timestamp=strtotime($raw);
-        if(false===$timestamp)throw new InvalidArgumentException($field.' could not be parsed safely.');
+        // Ingest and access-time rights must use ONE real ISO calendar parser.
+        // PHP strtotime() silently rolls invalid Feb 31 and uses process-local
+        // timezone for naive values; neither is acceptable for lawful expiry.
+        $timestamp=PLDR_Access::strict_rights_timestamp($value);
+        if(false===$timestamp)throw new InvalidArgumentException($field.' must be a real ISO calendar date/time with a valid timezone.');
         return gmdate('Y-m-d H:i:s',$timestamp);
     }
 

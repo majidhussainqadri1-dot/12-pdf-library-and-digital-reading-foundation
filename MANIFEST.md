@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.18`
+Candidate: `1.1.0-rc.19`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -78,18 +78,18 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R29.md` — 20 scoped comparisons to the actual File 12/central/companion written plans, exact two source defects and remediation boundaries.
 - `tests/test-r29-catalog-facets.php` — actual `PLDR_Search` fixtures for author/source/edition/ISBN/license/year/access facets, invalid values, private-result denial, cursor query binding and REST/HTML parity.
 - File 12 FR-001 / FR-013: add seven bounded bibliographic facets, plus accessible signed Next/First navigation. Existing owner authorization and signed cursor invariants retained. R28 earlier 20-source-matrix and prior corrective suites preserved.
-- Candidate `1.1.0-rc.18`; DB/schema and interface contract stay `1.1.0`. Package folder rename remains a separate unapproved change-control gate.
+- Candidate `1.1.0-rc.19`; DB/schema and interface contract stay `1.1.0`. Package folder rename remains a separate unapproved change-control gate.
 
 ## R31 corrective audit and test inventory
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`: new 20 distinct focused source/plan inspections, frozen D01-D03 finding ledger and staged/live evidence limits.
 - `tests/test-r31-ingest-input-shapes.php`: actual PHP ingest entrypoint under malformed scalar/JSON-list/PDF-cover upload fixtures; invalid data cannot touch DB or file operations.
-- `class-pldr-ingest.php`: metadata schema and upload shape strict gates before canonical lookup or upload handling. Candidate `1.1.0-rc.18`, DB/contract `1.1.0`, no migration.
+- `class-pldr-ingest.php`: metadata schema and upload shape strict gates before canonical lookup or upload handling. Candidate `1.1.0-rc.19`, DB/contract `1.1.0`, no migration.
 
 ## R32 new source audit, integrity tests and release truth
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`: 20 scoped plan/owner/source inspections, frozen source defects R32-D01/D02/D03 and unverified staging/live prerequisites.
 - `tests/test-r32-pdf-physical-integrity.php`: exercises real `PLDR_Ingest::validate_pdf` on correctly-sized and mismatched PDF file bytes, modified source, appended polyglot; source invariants for Crypto failure immediate private-temp deletion and supplied cover precommit acceptance.
 - `tests/test-r31-ingest-input-shapes.php`: three actual ingest-entrypoint bad cover/HTTP path tests added to existing 47 R31 fixtures.
-- Version 1.1.0-rc.18 is *software/package only*; source DB/schema/interface contract still 1.1.0, no R32 migration. Package internal-folder naming conflict remains a separate unapproved change-control matter.
+- Version 1.1.0-rc.19 is *software/package only*; source DB/schema/interface contract still 1.1.0, no R32 migration. Package internal-folder naming conflict remains a separate unapproved change-control matter.
 
 ## R33 unified candidate and new tests
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R33.md`: 20 focused source/plan checks and exact divergence reconciliation between separate R32 PR #22 and #23 green candidates. Both mistakenly carried rc.11 but had different source bytes.
@@ -99,7 +99,7 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `tests/test-r33-policy-flags.php`: live PHP class/method isolated fixture; retained R32 physical PDF validator suite, R31 malformed-ingest fixtures and earlier tests.
 - Software/package rc.12 is distinct; source schema and interface contract remain 1.1.0, no migration. Live deployed artifact and folder naming mismatch remain outside this release candidate.
 
-## R34: persisted rights/public delivery parity (software 1.1.0-rc.18)
+## R34: persisted rights/public delivery parity (software 1.1.0-rc.19)
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R34.md`: twenty new scoped source-plan reviews and three proven source defects (not 20 complete staging/live tests).
 - `PLDR_Access::can_access_edition`: strict five-operation allowlist, read/download/print/offline/preview; canonical `PLDR_Core::policy_flag` used on persisted rights for fail-closed historical corrupt values.
 - `PLDR_Core::public_document_dto`: displays permissions only if same canonical 1/0 parser explicitly grants; false/off/unknown values no longer advertise download/print/offline.
@@ -107,7 +107,7 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `tests/test-r34-access-grants.php`: actual Core and Access PHP fixture covering legacy policies, DTO and anonymous/user signed grants, in PHP 8.1/8.3/8.4 quality gate.
 - Source-only candidate: DB/schema and integration contract remain `1.1.0`; live installed versions and the plan/source folder name conflict are unverified and unchanged.
 
-## R35 private notes/bookmark + exact source unity (1.1.0-rc.18)
+## R35 private notes/bookmark + exact source unity (1.1.0-rc.19)
 - Governing plan: File12 `F12-FR-012` user-private bookmarks/notes/tags; NFR-001/002 object/field security and privacy, central canonical ownership/strict input/traceability.
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`: twenty distinct source/plan review foci; 5 source/release findings, implementation truth limits.
 - R34 PR #26 and #27 were **divergent code builds both named rc.13**. R35 uses #26 as parent (preserves its persisted-permission + anonymous signed token repairs), selectively incorporates #27 private read/write guards; new exact build identity rc.14.
@@ -118,13 +118,13 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - No source DB/schema contract migration (still 1.1.0). Plan inner plugin root discrepancy and installed companion owner/version/real Hostinger state require staged founder-controlled parity and rollback.
 
 
-## R36 package v1.1.0-rc.18 — private REST/rights mutation guard
+## R36 package v1.1.0-rc.19 — private REST/rights mutation guard
 - Actual File12 `F12-FR-011/012/017`, `F12-NFR-001/002/007`; central Master Plan private C2–C5 owner data and versioned File00/17/19/20/24/25 boundaries.
 - `PLDR_Reading::parse_stored_tags`: canonical strict JSON string-list parser, shared by native `items` and private REST paginated `reading_items`; legacy corrupted maps/nested/tag-limit data fail closed, no partial private DTO.
 - `PLDR_REST::validate_mutation_shape`: strict REST scalar/page/edition/version/rights-evidence preflight before any private reads/idempotency/mutations for `save_progress`, `add_reading_item`, `delete_reading_item`, `rights_case`, `rights_decision`, and `rights_appeal`.
 - `tests/test-r36-rest-privacy-mutation.php`: actual REST PHP fixture with legacy private map/nested/bad JSON, valid items, malformed progress and rights changes, fake DB no-side-effect assertions; on PHP8.1/8.3/8.4 quality gate.
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`: 20 scoped Source/Plan checks, three classes of proven source issues, strict source/staging/live demarcation.
-- Software `1.1.0-rc.18` differs from previous rc.14; source DB/schema and interface contract `1.1.0` unchanged; original plan/plugin ZIP root naming incompatibility remains unapproved change control.
+- Software `1.1.0-rc.19` differs from previous rc.14; source DB/schema and interface contract `1.1.0` unchanged; original plan/plugin ZIP root naming incompatibility remains unapproved change control.
 
 
 - R36-D04 source extension: strict pre-DB `reader_access` / `download_session` signed grant inputs, `approve_document` and `access_policy` IDs/version, and `repair` operation. Exercises actual methods with malformed inputs in the R36 REST fixture; core File00 authorization and staging/lifecycle acceptance remain separate release gates.
@@ -146,7 +146,7 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - R38-D03: strict citation page/edition/style GET inputs; basic endpoint allows Sabri/APA/MLA only, returns explicit 400 for unsupported export names rather than mislabeling Sabri output. FUT-006 advanced export remains distinct.
 - R38-D04: `PLDR_Reader::citation` embeds stable edition ID across Sabri/APA/MLA while retaining the existing document family URL and page.
 - `tests/test-r38-rest-read-shapes-citation.php` invokes actual REST and citation renderer methods with bad and legitimate controls; included PHP 8.1/8.3/8.4 gate, all R1–R37 tests retained.
-- No new DB/schema migration; source contract stays 1.1.0. Source-only package `1.1.0-rc.18`, no Hostinger deployed/source checksum/DB/schema parity proof.
+- No new DB/schema migration; source contract stays 1.1.0. Source-only package `1.1.0-rc.19`, no Hostinger deployed/source checksum/DB/schema parity proof.
 
 
 ## R39 rc.18 — File12 embargo and rights expiry as real calendars; legacy flag preservation
@@ -155,3 +155,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - R39-D04: untouched legacy `true/on/yes` stored grant rights are normalized to 1 on versioned audience/rights edits; bad/false flags to 0. Existing transaction, outbox and issued-token revocation pathways unchanged.
 - Actual `tests/test-r39-rights-calendar-policy.php`: execute Access/Core with fake WP DB; bad/valid dates, UTC/offset, legacy record fail-close and positive flag preservation. Included in PHP8.1/8.3/8.4 QA, prior R28–R38 source tests retained.
 - Software rc.18; source DB/schema/interface contract 1.1.0. No new DB migration. No changes to plan/source WordPress inner folder mismatch without Founder staging approval.
+
+
+## R40 rc.19 — rights calendar on ingest, pending version-policy inheritance, bounded catalog pagination
+- F12-FR-001: catalog `page/per_page` strict positive whole-numeric values before SQL authorization/filter scans; no negative/decimal/zero coercion.
+- F12-FR-003/008: fresh PDF `rights_expires_at` / `embargo_until` validated by same ISO checkdate/UTC/offset `PLDR_Access::strict_rights_timestamp` as read-time authorization/policy mutation. Malformed dates rejected before PDF/DB operations.
+- F12-FR-004/008: pending-edition nonmutation of current access policy compares explicitly supplied fields, inherited omitted grant flags and embargo, preserving R39 canonical true/on/yes flags and conservative malformed values. Actual pending-version post-upload branch still requires genuine HTTP WordPress staging testing (two source invariants only).
+- Real `tests/test-r40-ingest-date-catalog-pagination.php` (PHP8.1/8.3/8.4): exercises actual ingest and catalog with invalid/valid dates and page numbers plus canonical timestamp helper. Retains all prior R28–R39 source QA.
+- Software package `1.1.0-rc.19`; source DB schema/integration interface `1.1.0`; no new migration. Existing ZIP inner folder mismatch and deployed/plugin/DB/live verification unmodified and remain release gates.
