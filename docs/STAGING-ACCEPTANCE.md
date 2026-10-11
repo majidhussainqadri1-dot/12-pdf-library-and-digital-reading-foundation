@@ -1,4 +1,4 @@
-# File 12 staging acceptance checklist — 1.1.0-rc.19 (R27 candidate; NOT YET STAGING ACCEPTED)
+# File 12 staging acceptance checklist — 1.1.0-rc.20 (R27 candidate; NOT YET STAGING ACCEPTED)
 
 A release may not be called staging-accepted until all items below have fresh evidence on the actual Hostinger staging environment.
 
