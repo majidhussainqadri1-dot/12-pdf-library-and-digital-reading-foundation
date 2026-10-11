@@ -81,4 +81,4 @@ $assert($allow(12),'account audience denied named user');
 $reset();PLDR_R29_Core_Fixture::$policy['audience']='assigned';
 $assert(!$allow(-1),'assigned audience allowed anonymous');
 $assert($allow(12),'assigned authorized provider denied named user');
-echo "PASS R29: 20 valid/invalid embargo, audience, privilege and entitlement boundary assertions\n";
+echo "PASS R29: 23 valid/invalid embargo, audience, privilege and entitlement boundary assertions\n";
