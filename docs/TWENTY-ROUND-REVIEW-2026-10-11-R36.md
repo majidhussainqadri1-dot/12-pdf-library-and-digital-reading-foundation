@@ -64,3 +64,7 @@ Migration State: UNVERIFIED.
 Live Verification Status: NOT PERFORMED.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+
+### Additional R36-D04 follow-up within review passes 08, 09 and 20
+`PLDR_REST::reader_access` and `download_session` also created short-lived access grants after coercing invalid `edition_id`, `object_id`, `ttl` and `operation` request fields; `approve_document` / `access_policy` coerced malformed IDs/expected_version before owner lookup; `repair` coerced malformed admin operation strings. All these previously unguarded source paths now call the same strict pre-DB `validate_mutation_shape` helper (and `access_policy` separately validates its selected JSON payload version). R36-D04 is a fourth **source-input-boundary defect class**, part of the original 20 focus areas, not an additional purported full audit round. Their malformed requests have real REST method regression coverage in `tests/test-r36-rest-privacy-mutation.php`. Legitimate route authorization and native owner permission semantics remain unchanged.
