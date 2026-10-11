@@ -16,6 +16,8 @@ function apply_filters($name,$default,...$args){return $default;}
 function sanitize_key($s):string{return strtolower(preg_replace('/[^a-z0-9_-]/i','',(string)$s));}
 function sanitize_text_field($v):string{return trim(strip_tags((string)$v));}
 function sanitize_textarea_field($v):string{return sanitize_text_field($v);}
+function wp_strip_all_tags($v):string{return strip_tags((string)$v);}
+function remove_accents($v):string{return (string)$v;}
 function wp_json_encode($v,...$args){return json_encode($v);}
 function current_time($f,$utc=false):string{return '2026-10-11 08:00:00';}
 function wp_generate_uuid4():string{return 'f01b24ef-4a03-47b4-bc21-477400000001';}
