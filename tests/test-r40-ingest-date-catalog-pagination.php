@@ -88,8 +88,9 @@ foreach(array('page','per_page') as $field){
         $params=array('q'=>'','page'=>1,'per_page'=>24);$params[$field]=$value;
         $before=$GLOBALS['wpdb']->reads;
         $result=PLDR_Search::search($params,77);
+        $expected=is_bool($value)?'pldr_catalog_filter_invalid':'pldr_catalog_pagination_invalid';
         $check(is_array($result)&&is_wp_error($result['error']??null)
-            &&$result['error']->code==='pldr_catalog_pagination_invalid',
+            &&$result['error']->code===$expected,
             'malformed catalog '.$field.' silently normalized: '.var_export($value,true));
         $check($GLOBALS['wpdb']->reads===$before,
             'malformed catalog '.$field.' accessed DB');
