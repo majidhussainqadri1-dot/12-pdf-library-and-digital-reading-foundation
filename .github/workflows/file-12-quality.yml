@@ -124,7 +124,9 @@ jobs:
         run: php tests/test-r40-ingest-date-catalog-pagination.php
       - name: R41 real REST registration and private reading tag list integrity
         run: php tests/test-r41-rest-route-private-tags.php
-      - name: R42 actual Future REST input-shape guards\n        run: php tests/test-r42-future-rest-query-shapes.php\n      - name: Secret scan
+      - name: R42 actual Future REST input-shape guards
+        run: php tests/test-r42-future-rest-query-shapes.php
+      - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
         run: php tests/test-review-regressions.php
