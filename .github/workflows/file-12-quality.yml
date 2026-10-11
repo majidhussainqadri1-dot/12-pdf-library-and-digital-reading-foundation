@@ -118,6 +118,8 @@ jobs:
         run: php tests/test-r37-reader-permission-delete.php
       - name: R38 actual GET reading/OCR/citation shapes and stable edition identity
         run: php tests/test-r38-rest-read-shapes-citation.php
+      - name: R39 actual rights calendar, embargo, expiry and legacy flag regression
+        run: php tests/test-r39-rights-calendar-policy.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
