@@ -66,3 +66,6 @@ See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md`, `docs/FUTURE-24.md`, `docs/STA
 
 ## R36 — paginated private reader and rights/progress API integrity (2026-10-11)
 The R36 **source-only** software candidate `1.1.0-rc.15` addresses: (1) privacy-tag integrity in both direct `PLDR_Reading::items` and paginated `PLDR_REST::reading_items` via `PLDR_Reading::parse_stored_tags`; (2) strict form/JSON page, edition and optimistic marker shapes before reading-progress mutations; (3) early fail-closed scalar/positive-decimal/array evidence inputs for rights reports, decisions and appeals before DB/idempotency; plus guarded add/delete private item IDs. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md` and executable `tests/test-r36-rest-privacy-mutation.php`. Actual external installed owner contracts, staging and live parity are **unverified**; green source CI does not authorize a deploy.
+
+
+R36 also applies the same no-coercion input law to signed reader/download grants, rights approval and versioned access-policy updates, and repair command parameters. All four R36 source defect groups are recorded in the dated R36 review document; no live deployed proof exists.
