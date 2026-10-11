@@ -29,6 +29,34 @@ final class PLDR_REST {
         register_rest_route('pldr/v1','/repair',array('methods'=>'POST','callback'=>array(__CLASS__,'repair'),'permission_callback'=>array(__CLASS__,'can_repair')));
     }
 
+    /**
+     * Verify REST JSON/form input shapes BEFORE absint/string coercion,
+     * ownership lookups, idempotency claims, or private database operations.
+     * Preserve existing missing-field/precondition responses in native owners.
+     */
+    private static function validate_mutation_shape(WP_REST_Request $request,array $text=array(),array $integers=array(),array $arrays=array()) {
+        foreach($text as $field){
+            $v=$request[$field];
+            if(null!==$v && (!is_scalar($v)||is_bool($v))){
+                return PLDR_Core::machine_error('pldr_rest_input_shape','Mutation field requires a scalar value.',400,array('field'=>$field));
+            }
+        }
+        foreach($integers as $field){
+            $v=$request[$field];
+            if(null=== $v)continue;
+            if(!(is_int($v) && $v>=0) && !(is_string($v) && preg_match('/^[0-9]+$/D',$v))){
+                return PLDR_Core::machine_error('pldr_rest_input_shape','Mutation field requires a nonnegative integer.',400,array('field'=>$field));
+            }
+        }
+        foreach($arrays as $field){
+            $v=$request[$field];
+            if(null!==$v&&!is_array($v)){
+                return PLDR_Core::machine_error('pldr_rest_input_shape','Mutation evidence must be an array.',400,array('field'=>$field));
+            }
+        }
+        return true;
+    }
+
     public static function logged_in(): bool { return is_user_logged_in(); }
     public static function can_publish(): bool { return PLDR_Core::authorize('publish'); }
     public static function can_manage(): bool { return PLDR_Core::authorize('manage'); }
@@ -117,10 +145,31 @@ final class PLDR_REST {
     public static function library(WP_REST_Request $request) { $result=PLDR_Search::search($request->get_params(),get_current_user_id());if(isset($result['error'])&&is_wp_error($result['error']))return $result['error'];return rest_ensure_response($result); }
     public static function document(WP_REST_Request $request) { global $wpdb;$wpdb->last_error='';$doc=PLDR_Core::document_by_public_id((string)$request['id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_document_read','Document state could not be read reliably.',503,array('degraded'=>true));if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);$wpdb->last_error='';$edition=PLDR_Core::current_edition((int)$doc['id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_document_edition_read','Current edition state could not be read reliably.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_document_unavailable','Document is unavailable.',404);$wpdb->last_error='';$allowed=PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id());if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_document_access_read','Document authorization state could not be verified reliably.',503,array('degraded'=>true));if(!$allowed)return PLDR_Core::machine_error('pldr_document_unavailable','Document is unavailable.',404);$wpdb->last_error='';$dto=PLDR_Core::public_document_dto($doc,$edition);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_document_policy_read','Document access-policy state could not be projected reliably.',503,array('degraded'=>true));return rest_ensure_response($dto); }
     public static function ingest(WP_REST_Request $request) { return self::idempotent($request,'ingest',static fn()=>PLDR_Ingest::ingest($request->get_params(),$request->get_file_params())); }
-    public static function approve_document(WP_REST_Request $request) { global $wpdb;$doc=PLDR_Core::document_by_public_id((string)$request['id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_approve_document_read','Document state could not be read reliably before approval.',503,array('degraded'=>true));if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404); return self::idempotent($request,'approve-document',static fn()=>PLDR_Rights::approve_document((int)$doc['id'],0,absint($request['expected_version']))); }
-    public static function access_policy(WP_REST_Request $request) { global $wpdb;$doc=PLDR_Core::document_by_public_id((string)$request['id']);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_policy_document_read','Document state could not be read reliably before policy mutation.',503,array('degraded'=>true));if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);$data=$request->get_json_params()?:$request->get_params();return self::idempotent($request,'access-policy',static fn()=>PLDR_Access::update_policy((int)$doc['id'],$data,0,absint($data['expected_version']??0))); }
+    public static function approve_document(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array('id'),array('expected_version'));
+        if(is_wp_error($shape))return $shape;
+        global $wpdb;$doc=PLDR_Core::document_by_public_id((string)$request['id']);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_approve_document_read','Document state could not be read reliably before approval.',503,array('degraded'=>true));
+        if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);
+        return self::idempotent($request,'approve-document',static fn()=>PLDR_Rights::approve_document((int)$doc['id'],0,absint($request['expected_version'])));
+    }
+    public static function access_policy(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array('id'),array('expected_version'));
+        if(is_wp_error($shape))return $shape;
+        $data=$request->get_json_params()?:$request->get_params();
+        $v=$data['expected_version']??null;
+        if(null!==$v && !(is_int($v)&&$v>=0) && !(is_string($v)&&preg_match('/^[0-9]+$/D',$v))){
+            return PLDR_Core::machine_error('pldr_rest_input_shape','Mutation field requires a nonnegative integer.',400,array('field'=>'expected_version'));
+        }
+        global $wpdb;$doc=PLDR_Core::document_by_public_id((string)$request['id']);
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_policy_document_read','Document state could not be read reliably before policy mutation.',503,array('degraded'=>true));
+        if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);
+        return self::idempotent($request,'access-policy',static fn()=>PLDR_Access::update_policy((int)$doc['id'],$data,0,absint($data['expected_version']??0)));
+    }
 
     public static function reader_access(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array('operation'),array('edition_id','object_id','ttl'));
+        if(is_wp_error($shape))return $shape;
         $edition_id=absint($request['edition_id']);$operation=sanitize_key((string)($request['operation']?:'read'));
         $edition=self::delivery_edition_or_unavailable($edition_id,$operation);if(is_wp_error($edition))return $edition;
         $object_id=(int)$edition['object_id'];if(!empty($request['object_id']))$object_id=absint($request['object_id']);
@@ -193,7 +242,13 @@ final class PLDR_REST {
         return array('title'=>$edition['title'],'author'=>$edition['author_name'],'language'=>$edition['language'],'pages'=>(int)$edition['pages'],'ocr_status'=>$ocr['status']??'unknown','ocr_quality'=>isset($ocr['quality_score'])?(float)$ocr['quality_score']:0,'ocr_language'=>$ocr['language']??$edition['language'],'thumbnail_pages'=>$thumbs,'screen_reader_fallback'=>$ocr&&'available'===$ocr['status']?'ocr-text':'document-metadata');
     }
     public static function ocr_search(WP_REST_Request $request) { $result=PLDR_Search::ocr(absint($request['edition']),(string)$request['q'],get_current_user_id(),(string)$request['cursor'],absint($request['limit']?:50));if(isset($result['error'])&&is_wp_error($result['error']))return $result['error'];return rest_ensure_response($result); }
-    public static function save_progress(WP_REST_Request $request) { $edition_id=absint($request['edition_id']);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($request,'reading-progress',static fn()=>PLDR_Reading::save_progress($edition_id,absint($request['page']),0,sanitize_text_field((string)$request['expected_updated_at']))); }
+    public static function save_progress(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array('expected_updated_at'),array('edition_id','page'));
+        if(is_wp_error($shape))return $shape;
+        $edition_id=absint($request['edition_id']);
+        $pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;
+        return self::idempotent($request,'reading-progress',static fn()=>PLDR_Reading::save_progress($edition_id,absint($request['page']),0,sanitize_text_field((string)$request['expected_updated_at'])));
+    }
     public static function reading_items(WP_REST_Request $request) {
         global $wpdb;
         $uid=get_current_user_id();$edition_id=absint($request['edition_id']);
@@ -215,8 +270,10 @@ final class PLDR_REST {
         $rows=is_array($rows)?$rows:array();$has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
         foreach($rows as &$row){
             $row['id']=(int)$row['id'];$row['page_number']=(int)$row['page_number'];$row['version']=(int)$row['version'];
-            $tags=json_decode((string)$row['tags_json'],true);
-            if(!is_array($tags)){
+            // REST and direct private reading must enforce the same
+            // historical-tag structure and never expose malformed DTOs.
+            $tags=PLDR_Reading::parse_stored_tags((string)$row['tags_json']);
+            if(null===$tags){
                 PLDR_Core::audit('reading_item',(int)$row['id'],'reading_item_tags_corrupt',array('edition_id'=>$edition_id),$uid);
                 return PLDR_Core::machine_error('pldr_items_corrupt','Stored private reading-item tags failed integrity validation; no partial item page was returned.',500,array('item_id'=>(int)$row['id']));
             }
@@ -241,7 +298,13 @@ final class PLDR_REST {
         return array('page'=>absint($decoded['p']),'id'=>absint($decoded['i']));
     }
 
-    public static function add_reading_item(WP_REST_Request $request) { $edition_id=absint($request['edition_id']);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($request,'reading-item',static fn()=>PLDR_Reading::add_item($edition_id,$request->get_json_params()?:$request->get_params())); }
+    public static function add_reading_item(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array(),array('edition_id'));
+        if(is_wp_error($shape))return $shape;
+        $edition_id=absint($request['edition_id']);$pre=self::readable_edition_before_mutation($edition_id);
+        if(is_wp_error($pre))return $pre;
+        return self::idempotent($request,'reading-item',static fn()=>PLDR_Reading::add_item($edition_id,$request->get_json_params()?:$request->get_params()));
+    }
 
     private static function delete_reading_item_owned(int $item_id, int $expected_version) {
         global $wpdb;
@@ -259,9 +322,17 @@ final class PLDR_REST {
         return array('deleted'=>true,'id'=>$item_id);
     }
 
-    public static function delete_reading_item(WP_REST_Request $request) { $item_id=absint($request['id']);$pre=self::owned_reading_item_before_delete($item_id);if(is_wp_error($pre))return $pre;return self::idempotent($request,'reading-item-delete',static fn()=>self::delete_reading_item_owned($item_id,absint($request['expected_version']))); }
+    public static function delete_reading_item(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array(),array('id','expected_version'));
+        if(is_wp_error($shape))return $shape;
+        $item_id=absint($request['id']);$pre=self::owned_reading_item_before_delete($item_id);
+        if(is_wp_error($pre))return $pre;
+        return self::idempotent($request,'reading-item-delete',static fn()=>self::delete_reading_item_owned($item_id,absint($request['expected_version'])));
+    }
     public static function citation(WP_REST_Request $request) { global $wpdb;$wpdb->last_error='';$edition=PLDR_Core::edition(absint($request['edition']));if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_edition_read','Citation edition state could not be read reliably.',503,array('degraded'=>true));if(!$edition)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$wpdb->last_error='';$allowed=PLDR_Access::can_access_edition((int)$edition['id'],'read',get_current_user_id());if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_citation_access_read','Citation authorization state could not be verified reliably.',503,array('degraded'=>true));if(!$allowed)return PLDR_Core::machine_error('pldr_citation_forbidden','Citation is unavailable.',404);$page=absint($request['page']);if($page>(int)$edition['pages'])return PLDR_Core::machine_error('pldr_citation_page','Citation page is outside this document edition.',400,array('pages'=>(int)$edition['pages']));$style=sanitize_key((string)($request['style']?:'sabri'));return rest_ensure_response(array('citation'=>PLDR_Reader::citation($edition,$page,$style),'style'=>$style,'page'=>$page)); }
     public static function download_session(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array(),array('edition_id'));
+        if(is_wp_error($shape))return $shape;
         $edition=self::delivery_edition_or_unavailable(absint($request['edition_id']),'download');if(is_wp_error($edition))return $edition;
         return self::idempotent($request,'download-session',static function() use($edition){
             $grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'download',get_current_user_id(),900);if(is_wp_error($grant))return $grant;
@@ -269,10 +340,30 @@ final class PLDR_REST {
             return array('job_id'=>PLDR_Core::uuid(),'delivery'=>$grant,'range_bytes'=>2*MB_IN_BYTES,'checksum'=>'sha256:'.$grant['sha256'],'resume_supported'=>true,'revocation_rechecked'=>true);
         });
     }
-    public static function rights_case(WP_REST_Request $request) { global $wpdb;$doc=PLDR_Core::document_by_public_id(sanitize_text_field((string)$request['document_id']));if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_case_document_read','Rights-report document state could not be read reliably.',503,array('degraded'=>true));if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);return self::idempotent($request,'rights-case',static fn()=>PLDR_Rights::file_case((int)$doc['id'],(string)$request['reason'],(array)($request['evidence']?:array()))); }
-    public static function rights_decision(WP_REST_Request $request) { return self::idempotent($request,'rights-decision',static fn()=>PLDR_Rights::decide(absint($request['id']),(string)$request['decision'],(string)$request['note'],0,absint($request['expected_version']))); }
-    public static function rights_appeal(WP_REST_Request $request) { $case_id=absint($request['id']);$pre=self::appeal_target_before_mutation($case_id);if(is_wp_error($pre))return $pre;return self::idempotent($request,'rights-appeal',static fn()=>PLDR_Rights::appeal($case_id,(string)$request['reason'],(array)($request['evidence']?:array()),0,absint($request['expected_version']))); }
+    public static function rights_case(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array('document_id','reason'),array(),array('evidence'));
+        if(is_wp_error($shape))return $shape;
+        global $wpdb;$doc=PLDR_Core::document_by_public_id(sanitize_text_field((string)$request['document_id']));
+        if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_case_document_read','Rights-report document state could not be read reliably.',503,array('degraded'=>true));
+        if(!$doc)return PLDR_Core::machine_error('pldr_document_missing','Document not found.',404);
+        return self::idempotent($request,'rights-case',static fn()=>PLDR_Rights::file_case((int)$doc['id'],(string)$request['reason'],(array)($request['evidence']?:array())));
+    }
+    public static function rights_decision(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array('decision','note'),array('id','expected_version'));
+        if(is_wp_error($shape))return $shape;
+        return self::idempotent($request,'rights-decision',static fn()=>PLDR_Rights::decide(absint($request['id']),(string)$request['decision'],(string)$request['note'],0,absint($request['expected_version'])));
+    }
+    public static function rights_appeal(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array('reason'),array('id','expected_version'),array('evidence'));
+        if(is_wp_error($shape))return $shape;
+        $case_id=absint($request['id']);$pre=self::appeal_target_before_mutation($case_id);if(is_wp_error($pre))return $pre;
+        return self::idempotent($request,'rights-appeal',static fn()=>PLDR_Rights::appeal($case_id,(string)$request['reason'],(array)($request['evidence']?:array()),0,absint($request['expected_version'])));
+    }
     public static function book_pack(WP_REST_Request $request) { return self::idempotent($request,'book-pack',static fn()=>PLDR_Book_Packs::register($request->get_json_params()?:$request->get_params())); }
     public static function health(WP_REST_Request $request) { return rest_ensure_response(PLDR_Health::report()); }
-    public static function repair(WP_REST_Request $request) { return self::idempotent($request,'repair',static fn()=>PLDR_Health::repair(sanitize_key((string)$request['operation']))); }
+    public static function repair(WP_REST_Request $request) {
+        $shape=self::validate_mutation_shape($request,array('operation'));
+        if(is_wp_error($shape))return $shape;
+        return self::idempotent($request,'repair',static fn()=>PLDR_Health::repair(sanitize_key((string)$request['operation'])));
+    }
 }

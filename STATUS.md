@@ -1,30 +1,32 @@
-# File12 — R35 Private Reading-State Integrity + Divergent R34 Unified (11 October 2026)
+# File 12 — R36 strict REST privacy and mutation boundary candidate (11 October 2026)
 
-| Release fact | Evidence-bound status |
+| Verified item | Exact source/plan evidence |
 |---|---|
-| Frozen parent | R34 PR #26 HEAD `335952e2f7b47cd7bf95cd184cfa6de7059917ea`, CI #444 green |
-| Divergent source | R34 PR #27 HEAD `79ef7659ba816f7959313ddf4ded047236685202`, independently different `rc.13` with private-note shape correction — not contained in #26 |
-| Governing basis | Actual attached File12 v1.1 Future24 amended; three central consolidated plans; File05/06/21/23/25 companion owner plans |
-| Twenty focused new audits | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`. Distinct source/plan areas; not 20 full deployed WordPress end-to-end reviews |
-| Corrected R35-D01 | Two diverging `rc.13` candidates: integrated unique real code into new software/package `1.1.0-rc.14`, neither old branch silently assumed merged |
-| Corrected R35-D02/D03 | `PLDR_Reading::add_item`: bounded scalar type/page/note/anchor checks, valid positive integer page, strict tagged indexed array/JSON string list/CSV, no nested/associative item casts before private insert |
-| Corrected R35-D04 | `PLDR_Access::update_policy` rejects explicit `null` rights audience/entitlement key before DB; preserves supported null embargo clearing |
-| Corrected R35-D05 | `PLDR_Reading::items` validates even old persisted private tags as indexed max-30 string list; rejects map/nested/malformed/oversized values with audit and no partial item list |
-| Actual tests | `tests/test-r35-reading-item-input-shapes.php` executes actual add_item/items; `tests/test-r33-policy-flags.php` extended with null rights tests |
-| Retained tests | R34 66 Access/DTO/anonymous token, R33 105 rights flag, R32 5 physical PDF, R31 50 actual ingest, R29 catalog/cursor, R30 policy rights, R28 20x(53 FR/NFR/FUT +12 owner adapters)=1300 static source anchors +20 invariants; earlier crypto/range tests |
-| Software candidate | `1.1.0-rc.14`, DB/schema/interface contract still `1.1.0`, no new migration |
-| Exact final CI | Must reverify completed Actions on immutable last R35 PR head, not merely earlier green branches |
-| Plugin folder compatibility | Plan inner root `12-pdf-library-foundation` vs source ZIP `pdf-library-foundation-12`; still requires Founder-approved migration, staged restore and rollback |
-| Companion owner builds and installed contracts | UNVERIFIED: File00/01/05/06/16/17/19/20/21/23/24/25/26 and CF04 |
-| Real staging/browser/provider/keys/backup/live | NOT TESTED; Founder approval pending; Draft PR only |
+| Frozen source basis | R35 Draft PR #28 exact HEAD `90dd4768ded28842b93c3b953a48e0a747f32890` (Actions #451 green); GitHub main bootstrap-only `2b369ef2d609247896e1ab32118f1dc498407f51` |
+| Governing materials | Actual uploaded File12 amended v1.1 Future-24; three central consolidated master plans; companion File05/06/21/23/25, source-side owner contracts |
+| Twenty scoped manual checks | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`: twenty different source-plan focal checks, *not* twenty exhaustive WordPress or live checks |
+| R36-D01 confirmed & fixed | Paginated `PLDR_REST::reading_items` bypassed R35 private stored tag validation. Both direct and REST endpoints now use shared `PLDR_Reading::parse_stored_tags` for historic JSON map/nested/oversized malformed rows |
+| R36-D02 confirmed & fixed | REST `save_progress` coerced nested/bool/noninteger page/edition IDs and malformed version marker before current private state check; strict early mutation field type guard |
+| R36-D03 confirmed & fixed | REST rights report/decision/appeal silently cast nested evidence/reasons/notes/version; strict scalar/nonnegative decimal/evidence-array preflight before rights DB reads, event/outbox or idempotency |
+| Other guarded mutation routes | Private add/delete reading item ID and expected version protected from shape coercion |
+| Actual executable new test | `tests/test-r36-rest-privacy-mutation.php`: real paged `PLDR_REST::reading_items` malformed/valid tags, real malformed progress/rights/reading-item REST methods and no DB effects on rejected inputs |
+| Retained complete source QA | R35 native Reading 61 actual cases, R34 Access 66, R33 rights 109, R31 Ingest 50, R32 PDF validator 5; R28 20×(53 File12 FR/NFR/FUT IDs +12 source adapters)=1300 static presence asserts and 20 invariants, historic crypto/range/rights/search suites |
+| Software candidate | `1.1.0-rc.15`, **DB/schema/interface source contract still `1.1.0`**, no new DB migration |
+| Exact final source CI | Only final immutable R36 PR #31 HEAD counts; package inner ZIP hash needs match same run |
+| Install root mismatch | Plan `12-pdf-library-foundation`, source ZIP inner `pdf-library-foundation-12`; Founder-controlled compatibility/migration/rollback unresolved |
+| Native external owner installs | UNVERIFIED File00/01/05/06/16/17/19/20/21/23/24/25/26 and CF04, including claims/entitlements/cache/projections |
+| Staging/Hostinger/browser/provider/backup/rollback | NOT VERIFIED; no Founder authorization to merge/deploy |
 
-## Five truth fields
+## Mandatory live-first five separate truths
 
-**Repository HEAD:** R35 Draft PR #28 final immutable HEAD to be checked; main stays `2b369ef2d609247896e1ab32118f1dc498407f51` bootstrap README.
-
+**Repository HEAD:** R36 Draft PR #31 exact final SHA; `main` `2b369ef2d609247896e1ab32118f1dc498407f51` bootstrap only.  
 **Deployed Version:** UNVERIFIED.  
-**DB Version:** UNVERIFIED (candidate source declares 1.1.0).  
+**DB Version:** UNVERIFIED; repository source target 1.1.0 only.  
 **Migration State:** UNVERIFIED.  
 **Live Verification Status:** NOT PERFORMED.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+
+### R36-D04 Additional signed-token and approval request-shape safety
+R36 independently found and corrected invalid array/object/bool/decimal numeric inputs in `reader_access`, `download_session`, `approve_document`, `access_policy`, and `repair` prior to user-visible grants, policy changes, DB reads or idempotent claims. The same real REST fixture now executes malformed requests through these additional actual methods. **Four confirmed source/input-boundary defect groups R36-D01..D04** were corrected after the twenty scoped source reviews.
