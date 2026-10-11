@@ -111,3 +111,11 @@ R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot pro
 | File 05, File 06, File 21, File 23, File 25 owner boundaries | Source adapter only; counterpart versions and real deployment not established | No duplicate course/knowledge/feed/dashboard/visual owner created; File 12 remains source document owner | Retained static R28 owner contract suite | Versioned connected provider/consumer journey |
 
 **Unverified dependencies:** Auth File00 claims, real WordPress staging, File26 indexing, privacy/guardian/rights providers and all cross-repository deployments. Package directory name conflict remains change-control, not fixed by unrelated source patches. No live-resolution claim.
+
+## R30 Catalog-safe input and policy parity (2026-10-11)
+
+| Source requirement | Code/test evidence | Remaining acceptance |
+|---|---|---|
+| F12-FR-001, F12-FR-013, F12-NFR-004 | `PLDR_Search::search` rejects non-scalar/bool/null typed catalog parameters before query casts or filters; augmented `tests/test-r29-catalog-facets.php` with 17 structured/invalid scenarios | Actual WordPress REST and browser query error semantics, File26 index parity and high-volume entitlement pagination |
+| F12-FR-008/009, File00 security, CEN-PRI-001 | `PLDR_Access::can_access_edition` re-integrates tested malformed embargo and unknown-audience denial; `tests/test-r30-policy-fail-closed.php` real-class 23 assertions | Actual physical DB corrupted rows, current File00 entitlement provider and logged-in/anonymous/suspended journeys |
+| F12-NFR-009, central release status | New unique `1.1.0-rc.9` source/package; R26/27/28 and repeated 20× whole-plan static suite retained | New exact-HEAD CI and separately deployed runtime/DB/package hash verification |
