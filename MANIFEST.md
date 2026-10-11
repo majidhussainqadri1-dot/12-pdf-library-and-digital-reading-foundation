@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.13`
+Candidate: `1.1.0-rc.14`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -78,18 +78,18 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R29.md` — 20 scoped comparisons to the actual File 12/central/companion written plans, exact two source defects and remediation boundaries.
 - `tests/test-r29-catalog-facets.php` — actual `PLDR_Search` fixtures for author/source/edition/ISBN/license/year/access facets, invalid values, private-result denial, cursor query binding and REST/HTML parity.
 - File 12 FR-001 / FR-013: add seven bounded bibliographic facets, plus accessible signed Next/First navigation. Existing owner authorization and signed cursor invariants retained. R28 earlier 20-source-matrix and prior corrective suites preserved.
-- Candidate `1.1.0-rc.13`; DB/schema and interface contract stay `1.1.0`. Package folder rename remains a separate unapproved change-control gate.
+- Candidate `1.1.0-rc.14`; DB/schema and interface contract stay `1.1.0`. Package folder rename remains a separate unapproved change-control gate.
 
 ## R31 corrective audit and test inventory
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`: new 20 distinct focused source/plan inspections, frozen D01-D03 finding ledger and staged/live evidence limits.
 - `tests/test-r31-ingest-input-shapes.php`: actual PHP ingest entrypoint under malformed scalar/JSON-list/PDF-cover upload fixtures; invalid data cannot touch DB or file operations.
-- `class-pldr-ingest.php`: metadata schema and upload shape strict gates before canonical lookup or upload handling. Candidate `1.1.0-rc.13`, DB/contract `1.1.0`, no migration.
+- `class-pldr-ingest.php`: metadata schema and upload shape strict gates before canonical lookup or upload handling. Candidate `1.1.0-rc.14`, DB/contract `1.1.0`, no migration.
 
 ## R32 new source audit, integrity tests and release truth
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`: 20 scoped plan/owner/source inspections, frozen source defects R32-D01/D02/D03 and unverified staging/live prerequisites.
 - `tests/test-r32-pdf-physical-integrity.php`: exercises real `PLDR_Ingest::validate_pdf` on correctly-sized and mismatched PDF file bytes, modified source, appended polyglot; source invariants for Crypto failure immediate private-temp deletion and supplied cover precommit acceptance.
 - `tests/test-r31-ingest-input-shapes.php`: three actual ingest-entrypoint bad cover/HTTP path tests added to existing 47 R31 fixtures.
-- Version 1.1.0-rc.13 is *software/package only*; source DB/schema/interface contract still 1.1.0, no R32 migration. Package internal-folder naming conflict remains a separate unapproved change-control matter.
+- Version 1.1.0-rc.14 is *software/package only*; source DB/schema/interface contract still 1.1.0, no R32 migration. Package internal-folder naming conflict remains a separate unapproved change-control matter.
 
 ## R33 unified candidate and new tests
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R33.md`: 20 focused source/plan checks and exact divergence reconciliation between separate R32 PR #22 and #23 green candidates. Both mistakenly carried rc.11 but had different source bytes.
