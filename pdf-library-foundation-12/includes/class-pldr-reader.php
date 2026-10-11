@@ -13,6 +13,16 @@ final class PLDR_Search {
                 return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_filter_invalid','The requested PDF Library filter is invalid.',400));
             }
         }
+        // Catalog page controls are numeric, not general text filters.
+        // absint() would silently turn -2 into page 2 and 1.9 into page 1.
+        foreach(array('page','per_page') as $field){
+            if(!array_key_exists($field,$args))continue;
+            $value=$args[$field];
+            if(!(is_int($value)&&$value>=1) &&
+               !(is_string($value)&&strlen($value)<=10&&preg_match('/^[0-9]+$/D',$value)&&(int)$value>=1)){
+                return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_pagination_invalid','PDF Library page controls must be positive whole numbers.',400,array('field'=>$field)));
+            }
+        }
         $term = PLDR_Core::normalize_search((string) ($args['q'] ?? ''));
         $term_len=function_exists('mb_strlen')?mb_strlen($term,'UTF-8'):strlen($term);
         if($term_len>160)return array('items'=>array(),'error'=>PLDR_Core::machine_error('pldr_catalog_query_long','PDF Library search query is too long.',400,array('max_characters'=>160)));
