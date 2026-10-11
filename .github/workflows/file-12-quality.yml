@@ -102,6 +102,8 @@ jobs:
         run: php tests/test-r29-catalog-facets.php
       - name: R30 malformed embargo and undefined audience fail-closed regression
         run: php tests/test-r30-policy-fail-closed.php
+      - name: R31 real ingest metadata and upload shape regression
+        run: php tests/test-r31-ingest-input-shapes.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
