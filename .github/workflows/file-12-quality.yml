@@ -110,6 +110,8 @@ jobs:
         run: php tests/test-r33-policy-flags.php
       - name: R34 real persisted permission, public DTO and anonymous delivery grant regression
         run: php tests/test-r34-access-grants.php
+      - name: R35 actual private bookmark/note/tag JSON and null rights-change regression
+        run: php tests/test-r35-reading-item-input-shapes.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
