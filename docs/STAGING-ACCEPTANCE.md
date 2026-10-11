@@ -1,4 +1,4 @@
-# File 12 staging acceptance checklist — 1.1.0-rc.22 (R43 source candidate; NOT YET STAGING ACCEPTED)
+# File 12 staging acceptance checklist — 1.1.0-rc.23 (R44 source candidate; NOT YET STAGING ACCEPTED)
 
 A release may not be called staging-accepted until all items below have fresh evidence on the actual Hostinger staging environment.
 
@@ -40,3 +40,5 @@ A release may not be called staging-accepted until all items below have fresh ev
 31. R42 Future-24 GET input validation: exercise genuine WordPress REST registration and real MySQL with invalid negative, fractional, boolean, nested and overflowing page/limit/offset/left/right/after_id/days and non-scalar cursor/query/selection/format. Confirm no private/provider read and no search/AI/shelf broadening on invalid input. Verify valid parameters for reflow, compare, citation, annotations, heatmap, shelves, insights, context and File16 corpus; IDOR and consumer allowlist unchanged.
 
 32. **R43 runtime mutation validation:** execute actual WordPress POST/DELETE routes with JSON and form payloads containing nested arrays/objects, boolean/scalar and negative/fractional/overflow edition_id, page, expected_version, duration, unauthorized/offline grant values, shelves/annotation/derived-text/context/OCR/verification flags. Confirm zero owner/SQL/provider side effects and no leaked private object identity for rejected requests; verify valid request shapes and optimistic concurrency across installed File00/05/06/16/21/23 contract versions. The isolated source regression does not replace this staging gate.
+
+33. **R44 offline rights expiry at runtime:** insert/restore lawful and intentionally corrupt legacy rights records in isolated Hostinger staging, prove impossible dates, timezone boundaries, overdue rights and near-expiring (<2-minute) rights do not emit unsafe offline-grants; compare actual native signed access-token row `expires_at` with persisted rights and device vault `offline_valid_until`; verify no extension under concurrent rights update or credential revocation. Test File00 entitlement and offline reconnect; execute real MySQL/browser sequence with rollback and privacy evidence.
