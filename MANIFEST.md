@@ -155,3 +155,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - R39-D04: untouched legacy `true/on/yes` stored grant rights are normalized to 1 on versioned audience/rights edits; bad/false flags to 0. Existing transaction, outbox and issued-token revocation pathways unchanged.
 - Actual `tests/test-r39-rights-calendar-policy.php`: execute Access/Core with fake WP DB; bad/valid dates, UTC/offset, legacy record fail-close and positive flag preservation. Included in PHP8.1/8.3/8.4 QA, prior R28–R38 source tests retained.
 - Software rc.18; source DB/schema/interface contract 1.1.0. No new DB migration. No changes to plan/source WordPress inner folder mismatch without Founder staging approval.
+
+
+## R40 rc.19 — rights calendar on ingest, pending version-policy inheritance, bounded catalog pagination
+- F12-FR-001: catalog `page/per_page` strict positive whole-numeric values before SQL authorization/filter scans; no negative/decimal/zero coercion.
+- F12-FR-003/008: fresh PDF `rights_expires_at` / `embargo_until` validated by same ISO checkdate/UTC/offset `PLDR_Access::strict_rights_timestamp` as read-time authorization/policy mutation. Malformed dates rejected before PDF/DB operations.
+- F12-FR-004/008: pending-edition nonmutation of current access policy compares explicitly supplied fields, inherited omitted grant flags and embargo, preserving R39 canonical true/on/yes flags and conservative malformed values. Actual pending-version post-upload branch still requires genuine HTTP WordPress staging testing (two source invariants only).
+- Real `tests/test-r40-ingest-date-catalog-pagination.php` (PHP8.1/8.3/8.4): exercises actual ingest and catalog with invalid/valid dates and page numbers plus canonical timestamp helper. Retains all prior R28–R39 source QA.
+- Software package `1.1.0-rc.19`; source DB schema/integration interface `1.1.0`; no new migration. Existing ZIP inner folder mismatch and deployed/plugin/DB/live verification unmodified and remain release gates.
