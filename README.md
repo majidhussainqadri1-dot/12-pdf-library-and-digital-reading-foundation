@@ -2,9 +2,15 @@
 
 This branch contains the **R32 source-only corrective candidate** for File 12, based on the exact-green R30 rc.9 lineage. It retains R28's reconciliation of divergent R27 security fixes (reader/IIIF pregrant checks and current derivative binding revalidation), tightens the direct HTML reader, and retains canonical ownership across the platform. R32 retains R31 malformed metadata guards, and additionally verifies claimed PDF byte size against the physical source, cleans encryption-failure temporary files eagerly (the shutdown safety net remains), and denies explicit bad/partial cover uploads before the canonical PDF transaction. Source/CI/package truth is not staging/live truth.
 
+## R33 unified candidate and safety checks (11 October 2026)
+
+Two distinct R32 Draft PRs #22 and #23 both used rc.11 but had different patches. This R33 candidate descends from PR #22 (PDF physical size verification, eager encrypted-temp cleanup and cover-upload preflight) and selectively includes PR #23's canonical explicit true/false parser for ingest/consent and download/print/offline policy updates. The shared parser is `PLDR_Core::policy_flag`, and an additional access-policy metadata input-shape gate blocks arrays/objects before database reads. The new actual PHP regression is `tests/test-r33-policy-flags.php`, and prior R32 physical PDF regression remains in CI. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R33.md`.
+
+This is an unmerged **repository** candidate; never infer installed PHP, database or migration parity from CI.
+
 ## Candidate identity
 
-- Software: `1.1.0-rc.11`
+- Software: `1.1.0-rc.12`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
