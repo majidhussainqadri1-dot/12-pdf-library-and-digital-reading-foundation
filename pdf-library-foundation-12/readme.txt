@@ -4,7 +4,7 @@ Tags: pdf, library, digital-reading, rights, accessibility, rtl, iiif, annotatio
 Requires at least: 7.0
 Tested up to: 7.0.1
 Requires PHP: 8.1
-Stable tag: 1.1.0-rc.22
+Stable tag: 1.1.0-rc.23
 License: GPLv2 or later
 
 File 12 canonical implementation for the Sabri Social Homeopathy Platform.
@@ -37,4 +37,6 @@ Restricted originals are never published through WordPress Media Library. Delive
 == Accessibility and localization ==
 American English base with Urdu/Arabic/RTL readiness, semantic LTR exceptions for PDF coordinates/code, reflow/text-size/line-height/column controls, reduced-motion behavior, keyboard-accessible controls, and locale-aware public labels.
 
-R43 source candidate 1.1.0-rc.22 adds strict pre-read Future-24 JSON/form mutation shape checks for 18 owner-authorized handlers; source DB/integration contract remains 1.1.0.
+R43 source candidate 1.1.0-rc.23 adds strict pre-read Future-24 JSON/form mutation shape checks for 18 owner-authorized handlers; source DB/integration contract remains 1.1.0.
+
+R44 source candidate hardens Future offline rights with strict current File12 calendar validation and a safe 60s delivery-token expiry buffer. Staging and live install acceptance remain pending.
