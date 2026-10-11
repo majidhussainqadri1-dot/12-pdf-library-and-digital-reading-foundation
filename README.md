@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.22`
+- Software: `1.1.0-rc.23`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -97,3 +97,7 @@ Source-only corrective candidate rc.21; the 20 source/requirement owner checks a
 
 ## R43 (11 October 2026): Future mutation shape protection
 The R43 **source-only** candidate 1.1.0-rc.22 retains the original File12 FR001–019, NFR001–010 and Future-24 contracts and performs twenty distinct bounded plan-to-source checks, detailed in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R43.md`. Four groups of malformed POST/DELETE request coercion were identified in Future-24 handlers. New `PLDR_Future_REST::validate_mutation_shape` protects eighteen native-authorized mutation entrypoints before source reads, idempotency and provider operations. New executable isolated fixture: `tests/test-r43-future-mutation-shapes.php`. DB schema and integration contract remain 1.1.0. Real staging and Hostinger live parity are unverified.
+
+
+## R44 — offline rights expiry/grant-time correctness
+Source-only rc.23: twenty bounded requirement/source inspections are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R44.md`. Two defects fixed: Future offline authorization/grant now use canonical strict File12 rights calendar interpretation rather than lenient `strtotime`; near-expiring rights no longer generate a native minimum-60s delivery token that outlasts rights. New `tests/test-r44-offline-rights-window.php` and exact-HEAD GitHub Actions gate. DB and interface source contract remain 1.1.0; staging/deployed Hostinger/plugin folder incompatibility/live parity all unverified.

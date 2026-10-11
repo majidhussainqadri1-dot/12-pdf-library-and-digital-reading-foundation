@@ -1,3 +1,16 @@
+# File12 R44 — offline rights law and short-lived grants, source-only 1.1.0-rc.23
+
+- Exact immutable parent: R43 Draft #38 HEAD `1695592dc350ecd77fd4211244ee99b8b70588f9`; R44 HEAD/CI not inherited.
+- 20 bounded topic-based source/plan checks (not 20 independent end-to-end audits), 19 source implementation paths present and R44-D01/D02 in offline rights windows verified/corrected after completing all reviews.
+- Strict canonical ISO rights calendar parsing now shared with Future-24 offline grant/reconnect; minimum-60s signed grant does not widen rights nearing expiry. Regression: `tests/test-r44-offline-rights-window.php`.
+- Candidate software `1.1.0-rc.23`; source DB/schema and interface contract `1.1.0`, no source migration.
+- Live Hostinger plugin/version/checksum, physical DB/options/schema/migration, companion installed contract versions, keyring/backup/restore and browser/offline/RTL/security acceptance **UNVERIFIED**; no staging approval/merge/deploy.
+- Original planned inner folder `12-pdf-library-foundation` versus built `pdf-library-foundation-12` discrepancy remains under Founder change control.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R43 — Future mutation raw input validation; software 1.1.0-rc.22
 
 - Exact source parent: R42 PR#37 `35780dacdc0bb83ca40aa547b1b42752c40eff49` (previous exact green CI is not R43 evidence).

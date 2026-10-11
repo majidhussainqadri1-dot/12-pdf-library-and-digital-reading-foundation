@@ -240,6 +240,43 @@ final class PLDR_Future_REST {
     public static function annotations_import(WP_REST_Request $r) { $shape=self::validate_mutation_shape($r,array(),array(),array('items'),array());if(is_wp_error($shape))return $shape; $edition_id=absint($r['edition']);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'annotations-import',static fn()=>PLDR_Future_Annotations::import($edition_id,self::body($r))); }
     public static function iiif(WP_REST_Request $r) { return self::response(PLDR_Future_IIIF::manifest((string)$r['id'])); }
     public static function heatmap(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('q'),array());if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Search::heatmap(absint($r['edition']),(string)$r['q'])); }
+
+    /**
+     * Future offline operations use exactly the same strict calendar parser
+     * as current File12 access/embargo checks. Historical impossible dates
+     * must fail closed, never roll forward under strtotime().
+     */
+    private static function offline_rights_expiry(array $edition) {
+        $raw=$edition['rights_expires_at']??null;
+        if(null===$raw || ''===$raw)return null;
+        $expiry=PLDR_Access::strict_rights_timestamp($raw);
+        if(false===$expiry){
+            return PLDR_Core::machine_error('pldr_offline_rights_state',
+                'Offline rights expiry could not be validated; offline access was denied.',
+                503,array('degraded'=>true));
+        }
+        if($expiry<=time()){
+            return PLDR_Core::machine_error('pldr_offline_rights_expired',
+                'Offline rights have expired.',403);
+        }
+        return $expiry;
+    }
+
+    /**
+     * File12 signed delivery enforces an unavoidable 60s minimum TTL.
+     * Do not silently extend an offline grant beyond current rights.
+     * Reserve 60s for transaction/request skew before legal expiry.
+     */
+    private static function offline_delivery_token_ttl(int $valid_until) {
+        $remaining=$valid_until-time();
+        if($remaining<=120){
+            return PLDR_Core::machine_error('pldr_offline_rights_window',
+                'The remaining authorized offline window is too short for a safe signed grant.',
+                403);
+        }
+        return min(900,$remaining-60);
+    }
+
     public static function offline_grant(WP_REST_Request $r) { $shape=self::validate_mutation_shape($r,array(),array('edition_id'),array(),array());if(is_wp_error($shape))return $shape;
         $b=self::body($r);$edition_id=absint($b['edition_id']??0);
         $edition=PLDR_Future_Data::require_edition($edition_id,'offline');
@@ -254,13 +291,12 @@ final class PLDR_Future_REST {
             }
             $ttl=max(HOUR_IN_SECONDS,min(30*DAY_IN_SECONDS,$ttl));
             $valid=time()+$ttl;
-            if(!empty($edition['rights_expires_at'])){
-                $rights=strtotime((string)$edition['rights_expires_at']);
-                if(false===$rights)return PLDR_Core::machine_error('pldr_offline_rights_state','Offline rights expiry could not be interpreted safely; no grant was issued.',503,array('degraded'=>true));
-                $valid=min($valid,$rights);
-            }
+            $rights=self::offline_rights_expiry($edition);
+            if(is_wp_error($rights))return $rights;
+            if(null!==$rights)$valid=min($valid,$rights);
             if($valid<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);
-            $grant_ttl=max(60,min(900,$valid-time()));
+            $grant_ttl=self::offline_delivery_token_ttl($valid);
+            if(is_wp_error($grant_ttl))return $grant_ttl;
             $grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline',$uid,$grant_ttl);
             if(is_wp_error($grant))return $grant;
             $grant['offline_valid_until']=gmdate('c',$valid);
@@ -274,13 +310,9 @@ final class PLDR_Future_REST {
         $edition_id=absint($r['edition']);
         $edition=PLDR_Future_Data::require_edition($edition_id,'offline');
         if(is_wp_error($edition))return $edition;
-        $valid_until=null;
-        if(!empty($edition['rights_expires_at'])){
-            $rights=strtotime((string)$edition['rights_expires_at']);
-            if(false===$rights)return PLDR_Core::machine_error('pldr_offline_rights_state','Offline rights expiry could not be interpreted safely.',503,array('degraded'=>true));
-            if($rights<=time())return PLDR_Core::machine_error('pldr_offline_rights_expired','Offline rights have expired.',403);
-            $valid_until=gmdate('c',$rights);
-        }
+        $rights=self::offline_rights_expiry($edition);
+        if(is_wp_error($rights))return $rights;
+        $valid_until=null!==$rights?gmdate('c',$rights):null;
         return rest_ensure_response(array('authorized'=>true,'edition_id'=>$edition_id,'checked_at'=>gmdate('c'),'rights_valid_until'=>$valid_until,'reconnect_reauthorized'=>true));
     }
     public static function preferences_get(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('key'),array());if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Preferences::get((string)($r['key']?:'reader'))); }
