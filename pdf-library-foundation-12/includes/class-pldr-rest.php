@@ -29,6 +29,34 @@ final class PLDR_REST {
         register_rest_route('pldr/v1','/repair',array('methods'=>'POST','callback'=>array(__CLASS__,'repair'),'permission_callback'=>array(__CLASS__,'can_repair')));
     }
 
+    /**
+     * Verify REST JSON/form input shapes BEFORE absint/string coercion,
+     * ownership lookups, idempotency claims, or private database operations.
+     * Preserve existing missing-field/precondition responses in native owners.
+     */
+    private static function validate_mutation_shape(WP_REST_Request $request,array $text=array(),array $integers=array(),array $arrays=array()) {
+        foreach($text as $field){
+            $v=$request[$field];
+            if(null!==$v && (!is_scalar($v)||is_bool($v))){
+                return PLDR_Core::machine_error('pldr_rest_input_shape','Mutation field requires a scalar value.',400,array('field'=>$field));
+            }
+        }
+        foreach($integers as $field){
+            $v=$request[$field];
+            if(null=== $v)continue;
+            if(!(is_int($v) && $v>=0) && !(is_string($v) && preg_match('/^[0-9]+$/D',$v))){
+                return PLDR_Core::machine_error('pldr_rest_input_shape','Mutation field requires a nonnegative integer.',400,array('field'=>$field));
+            }
+        }
+        foreach($arrays as $field){
+            $v=$request[$field];
+            if(null!==$v&&!is_array($v)){
+                return PLDR_Core::machine_error('pldr_rest_input_shape','Mutation evidence must be an array.',400,array('field'=>$field));
+            }
+        }
+        return true;
+    }
+
     public static function logged_in(): bool { return is_user_logged_in(); }
     public static function can_publish(): bool { return PLDR_Core::authorize('publish'); }
     public static function can_manage(): bool { return PLDR_Core::authorize('manage'); }
