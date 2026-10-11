@@ -23,6 +23,7 @@ final class PLDR_Core {
         return $edition===42?array('id'=>42,'pages'=>12,'document_id'=>7,'version'=>3):null;
     }
     public static function now():string{return '2026-10-11 02:00:00';}
+    public static function audit(string $type,int $id,string $action,array $data=array(),int $user_id=0):bool{return true;}
     public static function sanitize_json_list($value):array{
         if(is_string($value)){
             $decoded=json_decode($value,true);
@@ -45,6 +46,9 @@ final class PLDR_R35_DB {
     public int $insert_id=0;
     public int $writes=0;
     public array $last_row=array();
+    public array $read_rows=array();
+    public function prepare(string $sql,...$params):string{return $sql;}
+    public function get_results($sql,$output=null):array{return $this->read_rows;}
     public function insert(string $table,array $data,$format=null):int{
         $this->writes++;$this->insert_id++;$this->last_row=$data;return 1;
     }
@@ -107,4 +111,19 @@ $res=PLDR_Reading::add_item(42,$noPage,9);
 $assert(is_wp_error($res)&&$res->code==='pldr_page_range','real page bounds lost');
 $notAllowed=PLDR_Reading::add_item(42,$base,13);
 $assert(is_wp_error($notAllowed)&&$notAllowed->code==='pldr_item_forbidden','reader owner authorization lost');
-echo "PASS R35: {$assertions} executable private reading-item shape, rights and valid-tags assertions\n";
+// R35: actual PLDR_Reading::items() must reject malformed HISTORIC
+// persisted JSON even after the modern writer validates new tags.
+$validRow=array('id'=>1,'item_type'=>'bookmark','page_number'=>2,'anchor_text'=>'text','note_text'=>'',
+    'tags_json'=>'["research","reference"]','version'=>1,'created_at'=>'2026-10-11 01:00:00','updated_at'=>'2026-10-11 01:00:00');
+foreach(array('{"private":"value"}','[["nested"]]','["research",1]',json_encode(array_fill(0,31,'excess')),'not-json') as $stored){
+    $db=$GLOBALS['wpdb'];$db->read_rows=array_replace($validRow,array('tags_json'=>$stored));
+    $db->read_rows=array($db->read_rows);
+    $items=PLDR_Reading::items(42,9);
+    $assert(is_array($items)&&isset($items['error'])&&is_wp_error($items['error'])&&$items['error']->code==='pldr_items_corrupt',
+       'corrupt historic private tags were exposed: '.substr($stored,0,24));
+}
+$GLOBALS['wpdb']->read_rows=array($validRow);
+$items=PLDR_Reading::items(42,9);
+$assert(is_array($items)&&count($items)===1&&$items[0]['tags']===array('research','reference'),
+   'well-formed private reading item was not returned');
+echo "PASS R35: {$assertions} executable private reading input, stored-tag integrity and authorization assertions\n";
