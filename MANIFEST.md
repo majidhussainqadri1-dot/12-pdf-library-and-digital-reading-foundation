@@ -128,3 +128,13 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 
 
 - R36-D04 source extension: strict pre-DB `reader_access` / `download_session` signed grant inputs, `approve_document` and `access_policy` IDs/version, and `repair` operation. Exercises actual methods with malformed inputs in the R36 REST fixture; core File00 authorization and staging/lifecycle acceptance remain separate release gates.
+
+
+## R37 rc.16 — native private deletion + reader permissions agree with Access
+- Governing written File12 amended v1.1 FR-008/FR-010/FR-012, NFR-001/002 and consolidated central plan: private owner state must be truthful, rights displays may not contradict delivery authorization, and different source candidates need distinct release evidence.
+- R37-D01 `PLDR_Reading::delete_item`: invalid user/item is rejected; success only if WordPress DB delete affected exactly 1 owner-scoped row; SQL failure and 0 affected rows are false.
+- R37-D02 `PLDR_Reader::document_html` permission flags `canDownload/canPrint/canOffline`: canonical `PLDR_Core::policy_flag` exact true only; historical text `false/off/no` and malformed imported data do not advertise granted permissions.
+- R37-D03 `PLDR_REST::reader_manifest` `permissions` similarly fail closed on legacy values and remain consistent with current Access enforcement.
+- R37-D04 distinct R36 Drafts PR30/31 both identify rc.15 but differ by source; R37 uses PR31 proven exact-green base and selectively preserves PR30 native deletion fix as unique software rc.16.
+- New `tests/test-r37-reader-permission-delete.php` exercises actual REST manifest/Core parser and direct owned private deletion with real methods, plus a source-only UI config invariant; PHP8.1/8.3/8.4. Previous R28–R36 QA retained.
+- Source DB/schema and integration contract remain 1.1.0. Production installed exact build, schema/migration, plugins, keys, browser and backup/rollback remain UNVERIFIED.
