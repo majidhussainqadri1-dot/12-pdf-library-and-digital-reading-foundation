@@ -89,3 +89,13 @@ This traceability establishes implementation presence and automated repository e
 | Versioned release | Candidate software `1.1.0-rc.6` / DB `1.1.0` / contract `1.1.0`, package checksum controlled separately | CI exact-head build | Deployed parity + staging/live acceptance |
 
 R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot prove deployed source checksum, actual schema/migration, live UI, backup/restore, rollback, or installed companion owner contracts.
+
+
+## R28 requirement-to-code and adjacent-plan audit (2026-10-11)
+- **Entire governing matrix:** F12-FR-001–019 (19), F12-NFR-001–010 (10), F12-FUT-001–024 (24) = 53 unique IDs; 12 source-side external adapter anchors. All appear in `tests/test-r28-twenty-full-plan-sweeps.php` and are rechecked for 20 complete source regression passes, with 20 distinct extra invariants.
+- **F12-FR-009 / File 24:** merged R27-B `PLDR_Access::current_delivery_binding()` and delivery-time fail-closed association recheck; tests `tests/test-r28-detached-grant-binding.php`.
+- **F12-FR-010:** direct HTML-reader `PLDR_Reading::state`, `PLDR_Core::public_document_dto` and `PLDR_Core::policy` checked before any initial PDF/thumbnail bearer grant. Test `tests/test-r28-reader-html-pregrant.php`.
+- **F12-FR-009/F12-FUT-010:** inherited and retained R27-A core REST reader / IIIF policy-before-grant sequencing; earlier tests retained.
+- **File 05/06/16/17/19/20/21/23/24/25/26 and CF-04:** only File 12 source adapters inspected. External source/deployed contracts, native roles, version parity, File 23 native edit-route status and CF-04 secure-media activation must be independently tested. No duplicate domain ownership authorized.
+- **Release identity:** distinct source candidate `1.1.0-rc.7`, schema & contract still `1.1.0`; root/plugin README and package markers aligned. Written planned ZIP folder vs longstanding candidate folder discrepancy is intentionally a dated change-control blocker, not silently rewritten.
+- **Evidence boundary:** 20 automated repeated static source checks + specific executable PHP regressions are repository claims, not complete running-product/staging/live validation. Full details in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md`.
