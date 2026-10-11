@@ -48,6 +48,20 @@ final class PLDR_Ingest {
             if(is_string($list) && strlen($list)>16000){
                 return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document list exceeds the maximum input size.',400,array('field'=>$list_field));
             }
+            if(is_string($list)){
+                $trimmed=ltrim($list);
+                if('['===substr($trimmed,0,1) || '{'===substr($trimmed,0,1)){
+                    $parsed=json_decode($list,true);
+                    if(!is_array($parsed) || !array_is_list($parsed) || count($parsed)>100){
+                        return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document JSON list must be a bounded indexed list.',400,array('field'=>$list_field));
+                    }
+                    foreach($parsed as $item){
+                        if(!is_string($item) && !is_int($item) && !is_float($item)){
+                            return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document JSON list contains a nested or invalid value.',400,array('field'=>$list_field));
+                        }
+                    }
+                }
+            }
         }
         foreach(array('pdf','cover') as $kind){
             if(!array_key_exists($kind,$files))continue;
