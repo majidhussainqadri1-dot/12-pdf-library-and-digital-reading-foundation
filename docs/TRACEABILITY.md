@@ -141,3 +141,15 @@ R31 is a source QA candidate, not proof of operational resolution. See `docs/TWE
 | Central owner and File05/06/21/23/25 contracts | No new external source defect proven in the File12 static owner adapters | No duplicate foreign domain owner and no DB-schema changes created | Real companion source, versions and operational API/event delivery remain unverified |
 
 See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`; do not mistake exact-head green CI for live deployment/DB parity.
+
+## R33 11 October 2026 — rights/consent truth and divergent PR source reconciliation
+
+| Governing requirement | Verified prior source gap | R33 exact owner fix + real test | Production boundary |
+|---|---|---|---|
+| F12-FR-008, F12-NFR-001; platform rights and user consent | PHP `empty('false')` / `!empty('false')` could promote a disabled flag to true | `PLDR_Core::policy_flag`; `PLDR_Ingest` normalizes patient-case consent, distinct scan and download/print/offline; `tests/test-r33-policy-flags.php` | Real WordPress/permissions and provider checks mandatory |
+| F12-FR-008 licensed read/download/print/offline policy | `PLDR_Access::update_policy` could write 1 for text `false/off/no` | Canonical flag validation and normalized 0/1 persistence in real update policy method, executable regression checks persisted values | Installed DB/role, revocation and provider parity pending |
+| F12-NFR-001 and central strict request contract | Nested `audience`, `entitlement_key`, `embargo_until` might be coerced during rights mutation | Explicit scalar guard before DB reads; negative cases assert no DB writes/reads | Staging JSON/REST request and malformed roles pending |
+| Central release and source-reality rules | Two diverged R32 code candidates both labelled `1.1.0-rc.11` | R33 independently versioned `1.1.0-rc.12` based on proven R32 PR #22 and selective PR #23 fixes; separate exact HEAD CI | No automatic `main` merge or Hostinger deployment without Founder approval |
+| File05/06/16/17/19/20/21/23/24/25/26 & CF04 | Source-side adapters do not establish matching deployed code | No replacement of foreign canonical owners; retained static adapter checks | Fetch and test real external install versions, provider contracts and coupled journeys |
+
+**20-area audit:** `docs/TWENTY-ROUND-REVIEW-2026-10-11-R33.md`. Do not classify static presence/green CI as production acceptance.

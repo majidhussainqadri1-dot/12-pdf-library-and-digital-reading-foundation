@@ -27,9 +27,16 @@ final class PLDR_Ingest {
             }
         }
         foreach(array('download_allowed','print_allowed','offline_allowed','patient_case_consent','confirm_distinct_scan') as $flag){
-            if(array_key_exists($flag,$data) && !is_scalar($data[$flag])){
+            if(!array_key_exists($flag,$data))continue;
+            if(!is_scalar($data[$flag])){
                 return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document policy flag is not a scalar value.',400,array('field'=>$flag));
             }
+            $parsed=PLDR_Core::policy_flag($data[$flag]);
+            if(null===$parsed){
+                return PLDR_Core::machine_error('pldr_ingest_policy_flag','Document policy flag must be an explicit supported true or false value.',400,array('field'=>$flag));
+            }
+            // Normalize all downstream consent, distinct-scan and rights decisions.
+            $data[$flag]=$parsed;
         }
         foreach(array('subjects','collections') as $list_field){
             if(!array_key_exists($list_field,$data))continue;

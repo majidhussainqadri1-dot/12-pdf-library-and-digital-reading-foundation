@@ -118,6 +118,22 @@ final class PLDR_Core {
         return false;
     }
 
+    /**
+     * Rights, privacy-consent and duplicate-confirmation flags must be
+     * interpreted independently of PHP truthy nonempty strings.
+     * null = malformed/unsupported, 0 = explicit no, 1 = explicit yes.
+     */
+    public static function policy_flag($value): ?int {
+        if(is_bool($value))return $value?1:0;
+        if(is_int($value))return $value===0||$value===1?$value:null;
+        if(!is_string($value))return null;
+        switch(strtolower(trim($value))){
+            case '1': case 'true': case 'yes': case 'on': return 1;
+            case '0': case 'false': case 'no': case 'off': case '': return 0;
+        }
+        return null;
+    }
+
     public static function sanitize_json_list($value): array {
         if (is_string($value)) {
             $decoded = json_decode($value, true);

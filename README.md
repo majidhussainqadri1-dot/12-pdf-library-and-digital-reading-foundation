@@ -1,10 +1,10 @@
 # File 12 — PDF Library and Digital Reading
 
-This branch contains the **R32 source-only corrective candidate** for File 12, based on the exact-green R30 rc.9 lineage. It retains R28's reconciliation of divergent R27 security fixes (reader/IIIF pregrant checks and current derivative binding revalidation), tightens the direct HTML reader, and retains canonical ownership across the platform. R32 retains R31 malformed metadata guards, and additionally verifies claimed PDF byte size against the physical source, cleans encryption-failure temporary files eagerly (the shutdown safety net remains), and denies explicit bad/partial cover uploads before the canonical PDF transaction. Source/CI/package truth is not staging/live truth.
+This branch contains the **R33 source-only corrective candidate** for File 12, based on the exact-green R30 rc.9 lineage. It retains R28's reconciliation of divergent R27 security fixes (reader/IIIF pregrant checks and current derivative binding revalidation), tightens the direct HTML reader, and retains canonical ownership across the platform. R33 retains R31 malformed metadata guards, and additionally verifies claimed PDF byte size against the physical source, cleans encryption-failure temporary files eagerly (the shutdown safety net remains), and denies explicit bad/partial cover uploads before the canonical PDF transaction. R33 additionally unifies a divergent separately-green R32 rights/consent policy-flag fix and rejects structured rights-policy mutation input before database reads. Source/CI/package truth is not staging/live truth.
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.11`
+- Software: `1.1.0-rc.12`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
