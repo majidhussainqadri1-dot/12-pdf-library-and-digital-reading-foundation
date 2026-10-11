@@ -138,3 +138,12 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - R37-D04 distinct R36 Drafts PR30/31 both identify rc.15 but differ by source; R37 uses PR31 proven exact-green base and selectively preserves PR30 native deletion fix as unique software rc.16.
 - New `tests/test-r37-reader-permission-delete.php` exercises actual REST manifest/Core parser and direct owned private deletion with real methods, plus a source-only UI config invariant; PHP8.1/8.3/8.4. Previous R28–R36 QA retained.
 - Source DB/schema and integration contract remain 1.1.0. Production installed exact build, schema/migration, plugins, keys, browser and backup/rollback remain UNVERIFIED.
+
+
+## R38 source/package identity rc.17
+- File12 FR-012 private paginated note reads; FR-013 lawful OCR search; FR-014 stable document/edition/page scholarly citation; NFR-001 per read authorization; NFR-004 bounded inputs.
+- R38-D01/02: `PLDR_REST::validate_query_shape` denies invalid nested, bool, negative, decimal numbers and cursor/query values before DB/ownership on private reading and OCR GET endpoints.
+- R38-D03: strict citation page/edition/style GET inputs; basic endpoint allows Sabri/APA/MLA only, returns explicit 400 for unsupported export names rather than mislabeling Sabri output. FUT-006 advanced export remains distinct.
+- R38-D04: `PLDR_Reader::citation` embeds stable edition ID across Sabri/APA/MLA while retaining the existing document family URL and page.
+- `tests/test-r38-rest-read-shapes-citation.php` invokes actual REST and citation renderer methods with bad and legitimate controls; included PHP 8.1/8.3/8.4 gate, all R1–R37 tests retained.
+- No new DB/schema migration; source contract stays 1.1.0. Source-only package `1.1.0-rc.17`, no Hostinger deployed/source checksum/DB/schema parity proof.
