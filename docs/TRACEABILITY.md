@@ -204,3 +204,16 @@ See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`. No GitHub CI result is a subst
 | Central release source vs live separation | R36 PR30 and PR31 both rc.15 but different code | Unique R37 rc.16 based on PR31 with explicit PR30 native deletion reconciliation; no unverified main merge | Exact SHA QA on R37 only; installed File12 and File05/06/16/17/19/20/21/23/24/25/26 and CF04 contract parity unverified |
 
 R37 twenty distinct scoped audit ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R37.md`. Static requirement presence/green CI does not establish production acceptance.
+
+
+## R38 (11 October 2026) — File12 read input shape and scholarly citation provenance
+
+| Source requirement | Exact R37 defect | R38 source fix and actual test | Staging/owner acceptance gap |
+|---|---|---|---|
+| `F12-FR-012`, `NFR-001/002/004`: private reading pages/filters | `PLDR_REST::reading_items` converted nested/boolean/negative/decimal edition_id, limit/offset and malformed cursor with PHP casts before DB/authorization | New `PLDR_REST::validate_query_shape` fails closed with 400 before reading; `tests/test-r38-rest-read-shapes-citation.php` executes actual method, invalid and valid pages, no DB/auth on invalid | Real WP REST route, enrolled/guardian user + DB/page concurrency staging unverified |
+| `F12-FR-013`: lawful OCR text search, safe query access | OCR endpoint cast invalid q/cursor to "Array" and invalid limit/edition to synthetic number | Strict GET query shape before `PLDR_Search::ocr`; actual method negative and legitimate OCR controls | OCR provider/index, Arabic/Urdu search and File26 installed federator unverified |
+| `F12-FR-014`: stable document/edition/page citation | Citation endpoint accepted negative/decimal/nested page as another page; invalid style name was echoed even when formatter returned Sabri content | Strict page/edition/style query; reject unsupported basic styles instead of mislabel; actual `PLDR_REST::citation` cases | Future24 advanced Chicago/BibTeX/RIS/CSL export is a separate governed output, not claimed here |
+| `F12-FR-004/014`: specific immutable edition provenance | Citation renderer returned canonical document link + bibliographic labels, with no unique edition ID when same work has multiple editions | `PLDR_Reader::citation` includes immutable File12 edition ID across Sabri/APA/MLA; real tests cite editions 42 and 43 with same family ID | End-user browser/copy-paste, File25 presentation, external archival resolver not checked |
+| Central ownership/trace: File05/06/16/17/19/20/21/23/24/25/26 and CF04 | Static File12 adapter does not prove native plugin installed or contract-compatible | No foreign owner or source DB contract moved; rc.17 is separate signed source candidate | Live deployed File12 checksum, actual DB/options/schema/migration, other installed owner versions and all staged workflow tests unverified |
+
+All twenty new focused source/plan reviews: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R38.md`. A 20x static matrix is a source-presence check, not an end-to-end or Live certification.
