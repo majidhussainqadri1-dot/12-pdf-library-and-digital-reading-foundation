@@ -1,32 +1,29 @@
-# File 12 — R36 strict REST privacy and mutation boundary candidate (11 October 2026)
+# File 12 — R37 source-level private deletion and reader permission truth (11 October 2026)
 
-| Verified item | Exact source/plan evidence |
+| Fact | Exact and limited evidence |
 |---|---|
-| Frozen source basis | R35 Draft PR #28 exact HEAD `90dd4768ded28842b93c3b953a48e0a747f32890` (Actions #451 green); GitHub main bootstrap-only `2b369ef2d609247896e1ab32118f1dc498407f51` |
-| Governing materials | Actual uploaded File12 amended v1.1 Future-24; three central consolidated master plans; companion File05/06/21/23/25, source-side owner contracts |
-| Twenty scoped manual checks | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`: twenty different source-plan focal checks, *not* twenty exhaustive WordPress or live checks |
-| R36-D01 confirmed & fixed | Paginated `PLDR_REST::reading_items` bypassed R35 private stored tag validation. Both direct and REST endpoints now use shared `PLDR_Reading::parse_stored_tags` for historic JSON map/nested/oversized malformed rows |
-| R36-D02 confirmed & fixed | REST `save_progress` coerced nested/bool/noninteger page/edition IDs and malformed version marker before current private state check; strict early mutation field type guard |
-| R36-D03 confirmed & fixed | REST rights report/decision/appeal silently cast nested evidence/reasons/notes/version; strict scalar/nonnegative decimal/evidence-array preflight before rights DB reads, event/outbox or idempotency |
-| Other guarded mutation routes | Private add/delete reading item ID and expected version protected from shape coercion |
-| Actual executable new test | `tests/test-r36-rest-privacy-mutation.php`: real paged `PLDR_REST::reading_items` malformed/valid tags, real malformed progress/rights/reading-item REST methods and no DB effects on rejected inputs |
-| Retained complete source QA | R35 native Reading 61 actual cases, R34 Access 66, R33 rights 109, R31 Ingest 50, R32 PDF validator 5; R28 20×(53 File12 FR/NFR/FUT IDs +12 source adapters)=1300 static presence asserts and 20 invariants, historic crypto/range/rights/search suites |
-| Software candidate | `1.1.0-rc.15`, **DB/schema/interface source contract still `1.1.0`**, no new DB migration |
-| Exact final source CI | Only final immutable R36 PR #31 HEAD counts; package inner ZIP hash needs match same run |
-| Install root mismatch | Plan `12-pdf-library-foundation`, source ZIP inner `pdf-library-foundation-12`; Founder-controlled compatibility/migration/rollback unresolved |
-| Native external owner installs | UNVERIFIED File00/01/05/06/16/17/19/20/21/23/24/25/26 and CF04, including claims/entitlements/cache/projections |
-| Staging/Hostinger/browser/provider/backup/rollback | NOT VERIFIED; no Founder authorization to merge/deploy |
+| Frozen parent | R36 Draft PR #31, `eeafd8b29189a13dd961a96a3bfa3cd80625c9da`, GitHub Actions #462 green |
+| Divergent candidate | Independent R36 Draft PR #30 `8dd37ee8d08d9fcdbc3d5187da76b8f73c94cdfa`, also labelled rc.15; different source contained native private deletion correction. It is NOT auto-merged or deployed |
+| Requirements / original docs | File12 v1.1 Future-24 amended; three central consolidated governing plans; File05/06/21/23/25 companion plans |
+| R37 20 focused source reviews | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R37.md`: twenty separate scoped requirement/source checks (not twenty human-complete code audits, staging, or Live E2E tests) |
+| R37-D01 native private delete | `PLDR_Reading::delete_item` no longer misreports deleting 0 rows or deleting with invalid item/user ID; only `1 === $wpdb->delete` is success |
+| R37-D02 native reader user-facing permission truth | `PLDR_Reader::document_html` JS config for download, print and offline checks stored rights through canonical `PLDR_Core::policy_flag`, denies legacy `false/off` |
+| R37-D03 REST manifest permission truth | `PLDR_REST::reader_manifest` uses identical exact-1 parser for rights projections, not PHP `!empty()` |
+| R37-D04 release ambiguity | Two different rc.15 Drafts are not a deployable common truth; R37's reconciled source is a distinct unique software `1.1.0-rc.16` candidate |
+| Real source regression | `tests/test-r37-reader-permission-delete.php`: actual REST manifest + real Core rights parser for supported/legacy/invalid flags, native private deletion row-count + owner guard; JS reader boot config source invariant (not real browser rendering) |
+| Other source QA | Retains R36 76 real REST/privacy, R35 61 native private reading, R34 66 access/token, R33 109 rights flags, R31 50 ingest, R32 5 actual PDF, R28 20×(53 FR/NFR/FUT +12 owner-adapter checks)=1300 static matches plus 20 invariants, earlier crypto/range/rights/search/future tests |
+| Source software version | `1.1.0-rc.16`; DB/schema version `1.1.0` and external interface contract `1.1.0` unchanged, no new migration |
+| Final required QA evidence | Exact LAST PR #32 commit must have matching SUCCESS Actions; matching inner install ZIP SHA and outer artifact digest separate |
+| Plan vs source ZIP inner root | Written plan `12-pdf-library-foundation` vs source/build `pdf-library-foundation-12`, Founder change-control/staged compatibility upgrade/rollback required |
+| Exact installed File12 and companion owner versions | UNVERIFIED: File00/01/05/06/16/17/19/20/21/23/24/25/26 and CF04 |
+| Real live/staging/backup/keys/DB/config/logs | UNVERIFIED; no approval/merge/deploy/live re-test |
 
-## Mandatory live-first five separate truths
+## Live-first 5-field evidence
 
-**Repository HEAD:** R36 Draft PR #31 exact final SHA; `main` `2b369ef2d609247896e1ab32118f1dc498407f51` bootstrap only.  
+**Repository HEAD:** latest R37 Draft PR #32 exact final SHA from matched CI; GitHub `main` unchanged bootstrap `2b369ef2d609247896e1ab32118f1dc498407f51`.  
 **Deployed Version:** UNVERIFIED.  
-**DB Version:** UNVERIFIED; repository source target 1.1.0 only.  
+**DB Version:** UNVERIFIED (source declares 1.1.0 only).  
 **Migration State:** UNVERIFIED.  
 **Live Verification Status:** NOT PERFORMED.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
-
-
-### R36-D04 Additional signed-token and approval request-shape safety
-R36 independently found and corrected invalid array/object/bool/decimal numeric inputs in `reader_access`, `download_session`, `approve_document`, `access_policy`, and `repair` prior to user-visible grants, policy changes, DB reads or idempotent claims. The same real REST fixture now executes malformed requests through these additional actual methods. **Four confirmed source/input-boundary defect groups R36-D01..D04** were corrected after the twenty scoped source reviews.
