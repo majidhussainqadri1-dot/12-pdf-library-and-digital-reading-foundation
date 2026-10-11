@@ -119,3 +119,14 @@ R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot pro
 | F12-FR-001, F12-FR-013, F12-NFR-004 | `PLDR_Search::search` rejects non-scalar/bool/null typed catalog parameters before query casts or filters; augmented `tests/test-r29-catalog-facets.php` with 17 structured/invalid scenarios | Actual WordPress REST and browser query error semantics, File26 index parity and high-volume entitlement pagination |
 | F12-FR-008/009, File00 security, CEN-PRI-001 | `PLDR_Access::can_access_edition` re-integrates tested malformed embargo and unknown-audience denial; `tests/test-r30-policy-fail-closed.php` real-class 23 assertions | Actual physical DB corrupted rows, current File00 entitlement provider and logged-in/anonymous/suspended journeys |
 | F12-NFR-009, central release status | New unique `1.1.0-rc.9` source/package; R26/27/28 and repeated 20× whole-plan static suite retained | New exact-HEAD CI and separately deployed runtime/DB/package hash verification |
+
+## R31 (11 October 2026): File 12 / central governed ingest validation
+
+| Plan requirement | Proven previous source gap | Changed source and regression | Pending acceptance |
+|---|---|---|---|
+| F12-FR-001/002, central API structural-validation law | Required and optional scalar metadata could coerce an array/object into the literal string `Array`, or throw before returning a stable error | `PLDR_Ingest::ingest` now validates known metadata/flags before DB or uploaded-file side effects; `tests/test-r31-ingest-input-shapes.php` actual method fixtures | Real WP REST/nonce/role/HTTP upload on staging |
+| F12-FR-001 subjects & collections | Nested array/object JSON lists were not rejected before string conversion | Bounded indexed list and JSON list checks, invalid nested input fails closed | Actual large multilingual metadata/provider tests |
+| F12-FR-002, AT-01/AT-06 | PDF/Cover nested `tmp_name` and filename could reach `is_uploaded_file`, causing TypeError | Verify file parameter array, path/name strings and scalar size/status before file operations | Real multipart hostile shape/scan on staging |
+| F12-NFR-001/007 and central owner law | Not an excuse to alter schema or other owners | Source-only `1.1.0-rc.10`; same `1.1.0` DB/contract; all canonical owners preserved | Hostinger exact artifact/DB/migration, external File00/05/06/16/20/24/25 and CF04 integration, backup/rollback and Founder acceptance |
+
+R31 is a source QA candidate, not proof of operational resolution. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`.

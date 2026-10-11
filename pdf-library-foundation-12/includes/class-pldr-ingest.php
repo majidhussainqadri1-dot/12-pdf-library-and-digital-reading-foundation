@@ -9,6 +9,77 @@ final class PLDR_Ingest {
         if (!$actor_id || !PLDR_Core::authorize('publish', 0, $actor_id)) {
             return PLDR_Core::machine_error('pldr_forbidden', 'You are not authorized to submit File 12 documents.', 403);
         }
+        // File 12 / central API law: invalid request structure must be rejected
+        // before canonical family DB queries, file operations, or metadata writes.
+        // Array/object casts otherwise become "Array" (or throw), silently
+        // corrupting author/source/rights evidence and upload preconditions.
+        $scalar_fields=array(
+            'document_public_id','expected_document_version','title','document_type','category',
+            'language','author_name','source_name','rights_basis','access_mode','slug',
+            'translator','publisher','isbn','publication_year','pages','edition_label',
+            'license_code','territory','takedown_contact','rights_evidence_ref',
+            'entitlement_key','rights_expires_at','embargo_until','supersedes_edition_id',
+            'patient_case_consent_ref','patient_case_anonymization_ref'
+        );
+        foreach($scalar_fields as $field){
+            if(array_key_exists($field,$data) && (!is_scalar($data[$field]) || is_bool($data[$field]))){
+                return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document metadata field must be a scalar text or number.',400,array('field'=>$field));
+            }
+        }
+        foreach(array('download_allowed','print_allowed','offline_allowed','patient_case_consent','confirm_distinct_scan') as $flag){
+            if(array_key_exists($flag,$data) && !is_scalar($data[$flag])){
+                return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document policy flag is not a scalar value.',400,array('field'=>$flag));
+            }
+        }
+        foreach(array('subjects','collections') as $list_field){
+            if(!array_key_exists($list_field,$data))continue;
+            $list=$data[$list_field];
+            if(!is_array($list) && !is_string($list)){
+                return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document subject and collection lists require an array or text.',400,array('field'=>$list_field));
+            }
+            if(is_array($list) && (!array_is_list($list) || count($list)>100)){
+                return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document list must be a bounded indexed list.',400,array('field'=>$list_field));
+            }
+            if(is_array($list))foreach($list as $item){
+                if(!is_string($item) && !is_int($item) && !is_float($item)){
+                    return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document list contains an invalid nested value.',400,array('field'=>$list_field));
+                }
+            }
+            if(is_string($list) && strlen($list)>16000){
+                return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document list exceeds the maximum input size.',400,array('field'=>$list_field));
+            }
+            if(is_string($list)){
+                $trimmed=ltrim($list);
+                if('['===substr($trimmed,0,1) || '{'===substr($trimmed,0,1)){
+                    $parsed=json_decode($list,true);
+                    if(!is_array($parsed) || !array_is_list($parsed) || count($parsed)>100){
+                        return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document JSON list must be a bounded indexed list.',400,array('field'=>$list_field));
+                    }
+                    foreach($parsed as $item){
+                        if(!is_string($item) && !is_int($item) && !is_float($item)){
+                            return PLDR_Core::machine_error('pldr_ingest_metadata_shape','Document JSON list contains a nested or invalid value.',400,array('field'=>$list_field));
+                        }
+                    }
+                }
+            }
+        }
+        foreach(array('pdf','cover') as $kind){
+            if(!array_key_exists($kind,$files))continue;
+            $upload=$files[$kind];
+            if(!is_array($upload)){
+                return PLDR_Core::machine_error('pldr_ingest_upload_shape','The uploaded file structure is invalid.',400,array('field'=>$kind));
+            }
+            foreach(array('tmp_name','name') as $file_key){
+                if(array_key_exists($file_key,$upload) && !is_string($upload[$file_key])){
+                    return PLDR_Core::machine_error('pldr_ingest_upload_shape','File upload contains an invalid filename or temporary path.',400,array('field'=>$kind));
+                }
+            }
+            foreach(array('error','size') as $file_key){
+                if(array_key_exists($file_key,$upload) && (!is_scalar($upload[$file_key]) || is_bool($upload[$file_key]))){
+                    return PLDR_Core::machine_error('pldr_ingest_upload_shape','File upload contains invalid size or status.',400,array('field'=>$kind));
+                }
+            }
+        }
         $existing_doc = null;$current_policy=null;$expected_document_version=0;
         if (!empty($data['document_public_id'])) {
             $wpdb->last_error='';

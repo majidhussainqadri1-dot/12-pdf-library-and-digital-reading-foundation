@@ -1,29 +1,29 @@
-# File 12 — R30 reconciled source candidate — 11 October 2026
+# File 12 — R31 source candidate 1.1.0-rc.10 (11 October 2026)
 
-| Truth gate | Grounded status |
+| Independent evidence | Exact fact |
 |---|---|
-| Governing sources | File12 v1.1 amended Future24; Three Central Consolidated Master Plans; Files05/06/21/23/25; native Files00/01/16/17/19/20/24/26 interfaces |
-| Frozen parent | Draft PR #19 at `8ee7f4246ae90980291c031022d5adfdb40717ae` |
-| Divergent safety branch | Draft PR #18 at `b2a8455685ce0aa47fce941512c36b0e7232f55c`, not automatically in PR19 |
-| Audit | 20 different focused source-to-plan checks; see `docs/TWENTY-ROUND-REVIEW-2026-10-11-R30.md` |
-| New/reconciled defects | R30-D01 invalid structured search filter broadening; R30-D02 malformed embargo fail-open; R30-D03 undefined audience entitlements |
-| Corrections | Catalog pre-parse input typing; approved embargo/audience fail-closed code copied from PR18 |
-| CI tests | 20× full 53+12 plan source matrix, R29 catalog fixture with 17 new malformed cases, R30 actual policy fixture with 23 assertions, and historical R1–R28 tests |
-| Source candidate | `1.1.0-rc.9` (separate from divergent rc.8 builds) |
-| Source schema/contract | `1.1.0` / `1.1.0`; no R30 schema change |
-| Exact final HEAD CI | PENDING fresh evidence |
-| Folder name incompatibility | Plan: `12-pdf-library-foundation`; repo ZIP: `pdf-library-foundation-12`; controlled Founder decision/upgrade test required |
-| Deployed Version | UNVERIFIED |
-| DB Version | UNVERIFIED |
-| Migration State | UNVERIFIED |
-| Live Verification Status | NOT PERFORMED |
-| Actual staging integration/rollback | UNVERIFIED |
-| Production approval and deployment | NOT PERFORMED |
+| Governing authority | Attached File12 v1.1 amended Future-24, Three Consolidated Central Plans, companion File05/06/21/23/25, and File12/native owner interface boundaries |
+| Main repository HEAD | `2b369ef2d609247896e1ab32118f1dc498407f51`; bootstrap README only |
+| Reviewed source baseline | R30 Draft PR #20 exact green SHA `715fa30f1f63bbe34aa05eb148a6434f355e5145` |
+| R31 audit | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`, twenty distinct focused source-plan inspections, not twenty full live/staging/test-suite runs |
+| Confirmed R31 source defects | D01 invalid nested scalar document metadata could be cast to `Array`; D02 malformed subjects/collections lists incl nested JSON were not rejected; D03 invalid nested PDF/cover upload shape could reach `is_uploaded_file` |
+| R31 code corrections | `PLDR_Ingest::ingest` validates scalar metadata, privacy/rights flags, bounded list/JSON structure and upload fields before any file/DB side effects |
+| New actual-code test | `tests/test-r31-ingest-input-shapes.php`: 40+ invalid/valid real PHP ingest-entrypoint cases with DB side effects forbidden |
+| Retained tests | 20 × full 53-FR/NFR/Future + 12 cross-owner static source matrix, real R29 catalog fixtures, R30 policy regression, R1–R28 crypto/range/tamper and historical suites |
+| Candidate software ZIP | `1.1.0-rc.10` — not deployed |
+| DB/source schema + contract | `1.1.0` / `1.1.0`, unchanged |
+| Exact final R31 CI | **Must be checked only at final unchanged R31 SHA after this status/review commit** |
+| Staging + real consumers | UNVERIFIED; companion installed versions/roles/providers unverified |
+| Source-vs-plan package folder | Plan `12-pdf-library-foundation`; historical code `pdf-library-foundation-12`; Founder-approved staging migration decision pending |
+| Backup, restoration, offline/RTL/rights/live-role acceptance | NOT VERIFIED |
+| Production deploy/live parity | NOT DONE |
 
-Repository HEAD: confirm latest R30 PR SHA after final commit.
-Deployed Version: unverified.
-DB Version: unverified (source declares 1.1.0).
-Migration State: unverified.
-Live Verification Status: not performed.
+## Five-field live-first truth
 
-Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔
+**Repository HEAD:** R31 exact final SHA in Draft PR after review; `main` initial README `2b369ef...`.  
+**Deployed Version:** Unverified.  
+**DB Version:** Unverified (source target `1.1.0` only).  
+**Migration State:** Unverified.  
+**Live Verification Status:** Not performed.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
