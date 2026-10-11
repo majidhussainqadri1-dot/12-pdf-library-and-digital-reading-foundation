@@ -1,27 +1,33 @@
-# File 12 — R27 source candidate status (10 October 2026)
+# File 12 — R28 Corrective Source Candidate — 2026-10-11
 
-| Independent gate | Status and exact evidence |
+| Independent evidence gate | Current grounded state |
 |---|---|
-| Governing specs | Consolidated central plan + File 12 v1.1 Future-24 amended + companion File 05/06/21/23/25 plans |
-| `main` truth | `2b369ef2d609247896e1ab32118f1dc498407f51`: bootstrap README only |
-| Exact inspected source baseline | R26 PR #13 `510754c9cb92b39cb43ff4ff7a0e4430e48a713e` |
-| Competing R26 branch | PR #12 `d8b37264d45583304805bfea97840dc6d510a102`, still unmerged; not presumed identical |
-| R27 review record | `docs/TWENTY-ROUND-REVIEW-2026-10-10-R27.md`: 20 distinct focused source-plan passes (not twenty live runs) |
-| Confirmed code defects | R27-D01 reader manifest creates signed grants before later DB/preflight failures; R27-D02 IIIF creates preview grants before policy DB check |
-| Corrections | Move entire reader-manifest entitlement/policy/reading/a11y/thumbnail preflight before first grant; move IIIF policy preflight before first preview grant |
-| Retained regression | `tests/test-twenty-round-review-r27.php`: 20 owner/feature source-area checks and signed-grant sequencing tests |
-| Candidate software/plugin | `1.1.0-rc.6` |
-| Candidate DB schema / integration contract | `1.1.0` / `1.1.0` (no migration version change in R27) |
-| Current exact R27 CI result | **Unverified until GitHub Actions completes on final unchanged R27 HEAD** |
-| Packaging conflict | Plan names ZIP internal top-level folder `12-pdf-library-foundation`; longstanding candidate actually uses `pdf-library-foundation-12`. Controlled Founder change request/compatibility migration needed before changing |
-| Staging deployed code/DB/migration | Unverified; repository source/CI is NOT deployed truth |
-| Backup/restore/browser/accessibility/offline/provider/Founder acceptance | Not independently evidenced |
-| Live verification | Not performed |
+| Governing text | Latest File 12 v1.1 Future-24 amended, three central governing plans, cross-linked File 05,06,21,23,25, and other canonical owner boundaries |
+| `main` truth | `2b369ef2d609247896e1ab32118f1dc498407f51` (bootstrap README only) |
+| Audited exact R27-A parent | `0c9ba8ba4091234183e057145d0f9a21bcaff7b9` / PR #15 |
+| Independently divergent R27-B candidate | `a369a8525d01d7bfdf82c794d1d2cc60510beeea` (had distinct detached derivative binding fix) |
+| R28 draft PR | #16, branch `review/file-12-r28-twenty-complete-plan-passes-2026-10-11` |
+| Twenty-pass matrix | `tests/test-r28-twenty-full-plan-sweeps.php`: twenty complete automated **static** 53-requirement+12-adapter matrix passes, plus 20 targeted invariants. Not 20 independent line-by-line/live tests |
+| Found and corrected source issues | R28-D01: port lost R27-B detached-thumbnail signed-grant ownership recheck. R28-D02: HTML reader pregrant state/policy ordering. R28-D03: divergent R27 candidate collision at rc.6. R28-D04: root README still rc.3 |
+| New executable regressions | `tests/test-r28-detached-grant-binding.php`, `tests/test-r28-reader-html-pregrant.php`, `tests/test-r28-twenty-full-plan-sweeps.php`; existing R27/earlier suites retained |
+| Candidate software version | `1.1.0-rc.7` |
+| DB schema/integration contract candidate | `1.1.0` / `1.1.0`; no schema change |
+| Exact-final-head CI | **Verify the last unchanged R28 SHA from GitHub Actions after this status commit**. Older green CI is not evidence for a changed HEAD |
+| Planned package folder | Written File 12 plan `12-pdf-library-foundation`; candidate `pdf-library-foundation-12`. Change control / compatibility and staged migration remains pending |
+| Real Hostinger staging, browser/roles/rights/OCR/CF-04 consumers | Not verified |
+| Physical deployed DB version/schema/migration and private storage/keys | Not verified |
+| Restore/rollback, Founder acceptance, production deployment and live retest | Not verified |
 
-## Source and live are distinct
+## Exact review record
 
-Do not merge, relabel as production ready, deploy or claim defect resolved on live until: final exact-head QA and package checksum → Hostinger staging artifact/DB/roles/rights/provider/offline/RTL tests → backup/restore/rollback → Founder approval → production deploy → live test and parity proof.
+See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md` for the per-round defect/clean accounting, actual test scope and cross-file acceptance gaps.
 
-**Repository HEAD:** See exact R27 branch commit. **Deployed Version:** unverified. **DB Version:** unverified. **Migration State:** unverified. **Live Verification Status:** not verified.
+## Production-truth five fields
+
+**Repository HEAD:** R28 PR branch final commit; main `2b369ef...`.  
+**Deployed Version:** Unverified.  
+**DB Version:** Unverified (candidate source 1.1.0 only).  
+**Migration State:** Unverified.  
+**Live Verification Status:** Not tested.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**

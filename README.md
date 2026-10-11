@@ -1,10 +1,10 @@
 # File 12 — PDF Library and Digital Reading
 
-This branch contains the **File 12 Future Digital Reading Intelligence 24 candidate** for the Sabri Social Homeopathy Platform. It starts from the exact-green R23 candidate and includes the R24 fresh twenty-round corrective hardening without transferring canonical ownership from companion files.
+This branch contains the **R28 source-only corrective candidate** for File 12, based on the prior R27 rc.6 lineage. It reconciles the two divergent R27 security fixes (reader/IIIF pregrant checks and current derivative binding revalidation), tightens the direct HTML reader, and retains canonical ownership across the platform. Source/CI/package truth is not staging/live truth.
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.3`
+- Software: `1.1.0-rc.7`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -16,7 +16,7 @@ This branch contains the **File 12 Future Digital Reading Intelligence 24 candid
 
 The candidate retains File 12 canonical catalog/bibliographic ownership, private encrypted PDF objects, governed ingest, malware/OCR provider gates, editions and dedupe, versioned audience/access policy, short-lived bound delivery grants, authenticated HTTP Range delivery, the responsive accessible reader, private progress/bookmarks/notes/highlights, citations, lawful OCR search, rights/takedown/appeal lifecycle, preservation/integrity, versioned Book Content Packs, governed outbox integration, privacy export/erasure, safe repair, legacy migration, and rights-aware download manager.
 
-## R24 corrective hardening
+## Historical R24 corrective hardening
 
 R24 adds File 01 registration for `/library/manage/`; fail-closed rejection of already-expired ingest rights; canonical publication/restore rights-policy checks; strictly monotonic private progress revisions; access-filtered catalog cursor skip continuity; one governed R21 outbox dispatcher; offline-vault reconnect/server reauthorization; shared Sabri Green token inheritance; duplicate-safe fingerprint scheduling; authenticated derived-text provider mutations; bounded signed-cursor pagination for the private reading workspace; and permanent R24 review/regression evidence.
 
@@ -55,4 +55,4 @@ File 12 owns document/edition/reader state and advanced reading metadata that be
 
 This repository candidate is **not automatically a live-site claim**. Production completion still requires Hostinger staging evidence for fresh install and supported upgrade/migration, real key backup/restore/decrypt, malware/OCR and optional authority/translation providers, private storage, large-file/range/weak-connection/offline-vault behavior, roles/IDOR/privacy/rights workflows, companion integrations, responsive/RTL/accessibility/browser testing, deterministic package verification, backup/rollback rehearsal, Founder acceptance, deployment, and live re-test/parity.
 
-See `docs/FUTURE-24.md`, `docs/STAGING-ACCEPTANCE.md`, `docs/TRACEABILITY.md`, `docs/TWENTY-ROUND-REVIEW-2026-08-13-R24.md`, and `STATUS.md`.
+See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md`, `docs/FUTURE-24.md`, `docs/STAGING-ACCEPTANCE.md`, `docs/TRACEABILITY.md`, `docs/TWENTY-ROUND-REVIEW-2026-08-13-R24.md`, and `STATUS.md`.
