@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.12`
+Candidate: `1.1.0-rc.13`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -78,18 +78,18 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R29.md` — 20 scoped comparisons to the actual File 12/central/companion written plans, exact two source defects and remediation boundaries.
 - `tests/test-r29-catalog-facets.php` — actual `PLDR_Search` fixtures for author/source/edition/ISBN/license/year/access facets, invalid values, private-result denial, cursor query binding and REST/HTML parity.
 - File 12 FR-001 / FR-013: add seven bounded bibliographic facets, plus accessible signed Next/First navigation. Existing owner authorization and signed cursor invariants retained. R28 earlier 20-source-matrix and prior corrective suites preserved.
-- Candidate `1.1.0-rc.12`; DB/schema and interface contract stay `1.1.0`. Package folder rename remains a separate unapproved change-control gate.
+- Candidate `1.1.0-rc.13`; DB/schema and interface contract stay `1.1.0`. Package folder rename remains a separate unapproved change-control gate.
 
 ## R31 corrective audit and test inventory
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`: new 20 distinct focused source/plan inspections, frozen D01-D03 finding ledger and staged/live evidence limits.
 - `tests/test-r31-ingest-input-shapes.php`: actual PHP ingest entrypoint under malformed scalar/JSON-list/PDF-cover upload fixtures; invalid data cannot touch DB or file operations.
-- `class-pldr-ingest.php`: metadata schema and upload shape strict gates before canonical lookup or upload handling. Candidate `1.1.0-rc.12`, DB/contract `1.1.0`, no migration.
+- `class-pldr-ingest.php`: metadata schema and upload shape strict gates before canonical lookup or upload handling. Candidate `1.1.0-rc.13`, DB/contract `1.1.0`, no migration.
 
 ## R32 new source audit, integrity tests and release truth
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`: 20 scoped plan/owner/source inspections, frozen source defects R32-D01/D02/D03 and unverified staging/live prerequisites.
 - `tests/test-r32-pdf-physical-integrity.php`: exercises real `PLDR_Ingest::validate_pdf` on correctly-sized and mismatched PDF file bytes, modified source, appended polyglot; source invariants for Crypto failure immediate private-temp deletion and supplied cover precommit acceptance.
 - `tests/test-r31-ingest-input-shapes.php`: three actual ingest-entrypoint bad cover/HTTP path tests added to existing 47 R31 fixtures.
-- Version 1.1.0-rc.12 is *software/package only*; source DB/schema/interface contract still 1.1.0, no R32 migration. Package internal-folder naming conflict remains a separate unapproved change-control matter.
+- Version 1.1.0-rc.13 is *software/package only*; source DB/schema/interface contract still 1.1.0, no R32 migration. Package internal-folder naming conflict remains a separate unapproved change-control matter.
 
 ## R33 unified candidate and new tests
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R33.md`: 20 focused source/plan checks and exact divergence reconciliation between separate R32 PR #22 and #23 green candidates. Both mistakenly carried rc.11 but had different source bytes.
@@ -98,3 +98,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Access::update_policy`: rejects nested audience/entitlement/embargo metadata and interprets download/print/offline disabled values correctly, before DB read.
 - `tests/test-r33-policy-flags.php`: live PHP class/method isolated fixture; retained R32 physical PDF validator suite, R31 malformed-ingest fixtures and earlier tests.
 - Software/package rc.12 is distinct; source schema and interface contract remain 1.1.0, no migration. Live deployed artifact and folder naming mismatch remain outside this release candidate.
+
+## R34: persisted rights/public delivery parity (software 1.1.0-rc.13)
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R34.md`: twenty new scoped source-plan reviews and three proven source defects (not 20 complete staging/live tests).
+- `PLDR_Access::can_access_edition`: strict five-operation allowlist, read/download/print/offline/preview; canonical `PLDR_Core::policy_flag` used on persisted rights for fail-closed historical corrupt values.
+- `PLDR_Core::public_document_dto`: displays permissions only if same canonical 1/0 parser explicitly grants; false/off/unknown values no longer advertise download/print/offline.
+- `PLDR_Access::issue_token`: explicit anonymous -1 authorized without inheriting active browser identity, and newly issued public token stored as user_id 0 with public audience hash matching `deliver`.
+- `tests/test-r34-access-grants.php`: actual Core and Access PHP fixture covering legacy policies, DTO and anonymous/user signed grants, in PHP 8.1/8.3/8.4 quality gate.
+- Source-only candidate: DB/schema and integration contract remain `1.1.0`; live installed versions and the plan/source folder name conflict are unverified and unchanged.

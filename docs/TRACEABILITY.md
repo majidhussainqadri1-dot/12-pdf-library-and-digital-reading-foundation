@@ -153,3 +153,14 @@ See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R32.md`; do not mistake exact-head gree
 | File05/06/16/17/19/20/21/23/24/25/26 & CF04 | Source-side adapters do not establish matching deployed code | No replacement of foreign canonical owners; retained static adapter checks | Fetch and test real external install versions, provider contracts and coupled journeys |
 
 **20-area audit:** `docs/TWENTY-ROUND-REVIEW-2026-10-11-R33.md`. Do not classify static presence/green CI as production acceptance.
+
+## R34 — File12 FR-008/009 and NFR-001 rights consistency (11 Oct 2026)
+
+| Governing requirement | Confirmed gap at exact R33 SHA | Source correction | Test/remaining gate |
+|---|---|---|---|
+| FR-008, NFR-001: denied historical download/print/offline permissions | Persisted noncanonical DB strings 'false'/'off' evaluated as allowed under `empty` even though R33 validated new writes | `PLDR_Access::can_access_edition` uses canonical policy_flag on each applicable persisted grant, explicit 1 only; unknown operations rejected | `tests/test-r34-access-grants.php` actual Access behavior; WordPress DB migration/legacy corruption test still pending |
+| FR-008, public truth/permissions in File20/25 views | `PLDR_Core::public_document_dto` used `!empty`, and could display a prohibited operation as true | DTO uses identical exact binary parser; invalid legacy data is never advertised as permitted | Real Core DTO fixture; File20/25 live visual UX pending |
+| FR-009: signed audience/operation/bearer/revocation | Explicit anonymous `-1` grant was written/hash-bound as user:-1 but delivery revalidated public for nonpositive stored user | Anonymous auth sentinel kept at access check; persisted grant user_id=0 and audience hash public; named users remain bound | Real issue_token/Core test fixture; real HTTP bearer+revocation and IDOR staging pending |
+| Central plan + File05/06/16/17/19/20/21/23/24/25/26/CF04 owner contracts | Source-side references don't prove deployed other owners | No foreign data ownership moved to File12; source/schema contract 1.1.0 unchanged | Installed cross-file contracts, events/roles and staging E2E unverified |
+
+The R34 source audit and twenty scoped checks are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R34.md`. The retained 20-repeat static plan matrix is not a staging or Live test.

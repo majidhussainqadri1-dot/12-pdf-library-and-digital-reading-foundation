@@ -5,6 +5,9 @@ defined('ABSPATH') || exit;
 final class PLDR_Access {
     private const MAX_TOKEN_ISSUES_PER_HOUR = 600;
     public static function can_access_edition(int $edition_id, string $operation = 'read', int $user_id = 0): bool {
+        // Authorization is operation-bound at every layer, not only at the REST
+        // boundary issuing short-lived delivery tokens.
+        if(!in_array($operation,array('read','preview','download','print','offline'),true))return false;
         $edition = PLDR_Core::edition($edition_id);
         if (!$edition) return false;
         // A negative sentinel means an explicitly anonymous/public authorization check.
@@ -36,9 +39,17 @@ final class PLDR_Access {
                 return false;
             }
         }
-        if ('download' === $operation && empty($policy['download_allowed'])) return false;
-        if ('print' === $operation && empty($policy['print_allowed'])) return false;
-        if ('offline' === $operation && empty($policy['offline_allowed'])) return false;
+        // Existing/imported policy records may bypass modern mutation-time
+        // validation. Noncanonical persisted "false"/"off"/garbage must never
+        // produce an implicit download, print or offline permission.
+        foreach(array('download'=>'download_allowed','print'=>'print_allowed','offline'=>'offline_allowed') as $action=>$field){
+            if($operation!==$action)continue;
+            $grant=PLDR_Core::policy_flag($policy[$field]??null);
+            if(1!==$grant){
+                if(null===$grant)PLDR_Core::audit('edition',$edition_id,'policy_grant_invalid',array('field'=>$field),$user_id);
+                return false;
+            }
+        }
         if ('preview' === $operation) $operation = 'read';
 
         $audience = (string) $policy['audience'];
@@ -145,9 +156,13 @@ final class PLDR_Access {
         if (!in_array($operation, array('read', 'download', 'print', 'offline', 'preview'), true)) {
             return PLDR_Core::machine_error('pldr_operation', 'Unsupported File 12 delivery operation.', 400);
         }
-        $user_id = $user_id ?: get_current_user_id();
+        // -1 is a deliberately anonymous authorization sentinel. Signed
+        // public grants are stored as 0, not -1, or delivery's public audience
+        // hash would differ and an otherwise valid public token becomes unusable.
+        $authorize_user=$user_id<0?-1:($user_id?:get_current_user_id());
+        $user_id=$authorize_user<0?0:$authorize_user;
         $wpdb->last_error='';
-        $allowed=self::can_access_edition($edition_id, $operation, $user_id);
+        $allowed=self::can_access_edition($edition_id, $operation, $authorize_user);
         if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_access_authorization_read','Delivery authorization state could not be verified reliably; no grant was issued.',503,array('degraded'=>true));
         if (!$allowed) {
             return PLDR_Core::machine_error('pldr_access_denied', 'The requested document is unavailable for this operation.', 403);
