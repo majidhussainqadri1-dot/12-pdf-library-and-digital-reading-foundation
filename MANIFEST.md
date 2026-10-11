@@ -79,3 +79,8 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `tests/test-r29-catalog-facets.php` — actual `PLDR_Search` fixtures for author/source/edition/ISBN/license/year/access facets, invalid values, private-result denial, cursor query binding and REST/HTML parity.
 - File 12 FR-001 / FR-013: add seven bounded bibliographic facets, plus accessible signed Next/First navigation. Existing owner authorization and signed cursor invariants retained. R28 earlier 20-source-matrix and prior corrective suites preserved.
 - Candidate `1.1.0-rc.10`; DB/schema and interface contract stay `1.1.0`. Package folder rename remains a separate unapproved change-control gate.
+
+## R31 corrective audit and test inventory
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R31.md`: new 20 distinct focused source/plan inspections, frozen D01-D03 finding ledger and staged/live evidence limits.
+- `tests/test-r31-ingest-input-shapes.php`: actual PHP ingest entrypoint under malformed scalar/JSON-list/PDF-cover upload fixtures; invalid data cannot touch DB or file operations.
+- `class-pldr-ingest.php`: metadata schema and upload shape strict gates before canonical lookup or upload handling. Candidate `1.1.0-rc.10`, DB/contract `1.1.0`, no migration.
