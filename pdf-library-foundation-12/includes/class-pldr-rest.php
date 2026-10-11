@@ -215,8 +215,10 @@ final class PLDR_REST {
         $rows=is_array($rows)?$rows:array();$has_more=count($rows)>$limit;if($has_more)$rows=array_slice($rows,0,$limit);
         foreach($rows as &$row){
             $row['id']=(int)$row['id'];$row['page_number']=(int)$row['page_number'];$row['version']=(int)$row['version'];
-            $tags=json_decode((string)$row['tags_json'],true);
-            if(!is_array($tags)){
+            // REST and direct private reading must enforce the same
+            // historical-tag structure and never expose malformed DTOs.
+            $tags=PLDR_Reading::parse_stored_tags((string)$row['tags_json']);
+            if(null===$tags){
                 PLDR_Core::audit('reading_item',(int)$row['id'],'reading_item_tags_corrupt',array('edition_id'=>$edition_id),$uid);
                 return PLDR_Core::machine_error('pldr_items_corrupt','Stored private reading-item tags failed integrity validation; no partial item page was returned.',500,array('item_id'=>(int)$row['id']));
             }
