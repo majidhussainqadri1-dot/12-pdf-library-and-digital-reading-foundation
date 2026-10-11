@@ -4,13 +4,19 @@ This branch contains the **R29 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.8`
+- Software: `1.1.0-rc.9`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
 - Canonical install folder: `pdf-library-foundation-12/`
 - WordPress slug/text domain: `pdf-library-digital-reading`
 - PHP namespace prefix: `PLDR_`
+
+## R30 integrated source correction (11 October 2026)
+
+This review reconciles divergent R29 Draft PRs #18 and #19 on a distinct rc.9 source candidate. Preserved File12 catalog facets, signed-pagination and public navigation from PR #19, restored the proven embargo/audience fail-closed rules from PR #18, and rejects structured/bool/null filter inputs rather than broadening a search silently. The real policy fixture and catalog facet tests are rerun in exact-HEAD CI alongside the prior R26–R28 suites and 20-repeat static 53-ID + 12-adapter source matrix. See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R30.md`.
+
+No staging or live deployment is implied.
 
 ## Core plan scope
 
