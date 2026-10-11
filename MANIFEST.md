@@ -90,3 +90,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `tests/test-r32-pdf-physical-integrity.php`: exercises real `PLDR_Ingest::validate_pdf` on correctly-sized and mismatched PDF file bytes, modified source, appended polyglot; source invariants for Crypto failure immediate private-temp deletion and supplied cover precommit acceptance.
 - `tests/test-r31-ingest-input-shapes.php`: three actual ingest-entrypoint bad cover/HTTP path tests added to existing 47 R31 fixtures.
 - Version 1.1.0-rc.12 is *software/package only*; source DB/schema/interface contract still 1.1.0, no R32 migration. Package internal-folder naming conflict remains a separate unapproved change-control matter.
+
+## R33 unified candidate and new tests
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R33.md`: 20 focused source/plan checks and exact divergence reconciliation between separate R32 PR #22 and #23 green candidates. Both mistakenly carried rc.11 but had different source bytes.
+- `PLDR_Core::policy_flag`: canonical optional 1/0/null parser for access, consent and duplicate-scan permissions; callers reject invalid flags before DB effects.
+- `PLDR_Ingest::ingest`: stores canonical binary policy flags and rejects false-like patient case consent and distinct-scan confirmations.
+- `PLDR_Access::update_policy`: rejects nested audience/entitlement/embargo metadata and interprets download/print/offline disabled values correctly, before DB read.
+- `tests/test-r33-policy-flags.php`: live PHP class/method isolated fixture; retained R32 physical PDF validator suite, R31 malformed-ingest fixtures and earlier tests.
+- Software/package rc.12 is distinct; source schema and interface contract remain 1.1.0, no migration. Live deployed artifact and folder naming mismatch remain outside this release candidate.
