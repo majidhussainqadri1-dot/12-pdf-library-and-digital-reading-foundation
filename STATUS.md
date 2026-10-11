@@ -26,3 +26,7 @@
 **Live Verification Status:** NOT PERFORMED.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+
+### R36-D04 Additional signed-token and approval request-shape safety
+R36 independently found and corrected invalid array/object/bool/decimal numeric inputs in `reader_access`, `download_session`, `approve_document`, `access_policy`, and `repair` prior to user-visible grants, policy changes, DB reads or idempotent claims. The same real REST fixture now executes malformed requests through these additional actual methods. **Four confirmed source/input-boundary defect groups R36-D01..D04** were corrected after the twenty scoped source reviews.
