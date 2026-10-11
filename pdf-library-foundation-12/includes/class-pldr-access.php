@@ -71,6 +71,14 @@ final class PLDR_Access {
     public static function update_policy(int $document_id,array $changes,int $actor_id=0,int $expected_version=0) {
         global $wpdb; $actor_id=$actor_id?:get_current_user_id();
         if(!PLDR_Core::authorize('manage',$document_id,$actor_id)&&!PLDR_Core::authorize('rights',$document_id,$actor_id))return PLDR_Core::machine_error('pldr_policy_forbidden','Document access-policy authority is required.',403);
+        // Stored rights must never treat the nonempty string "false"
+        // as an enabled download, print, or offline permission.
+        foreach(array('download_allowed','print_allowed','offline_allowed') as $flag){
+            if(!array_key_exists($flag,$changes))continue;
+            $parsed=PLDR_Core::policy_flag($changes[$flag]);
+            if(null===$parsed)return PLDR_Core::machine_error('pldr_policy_flag','Document access flag must be an explicit supported true or false value.',400,array('field'=>$flag));
+            $changes[$flag]=$parsed;
+        }
         $wpdb->last_error='';$doc=PLDR_Core::document($document_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_policy_document_read','Document state could not be read reliably before access-policy update.',503,array('degraded'=>true));
         $wpdb->last_error='';$current=PLDR_Core::policy($document_id);if(''!==(string)$wpdb->last_error)return PLDR_Core::machine_error('pldr_policy_read','Access-policy state could not be read reliably.',503,array('degraded'=>true));
         if(!$doc||!$current)return PLDR_Core::machine_error('pldr_policy_missing','Document access policy was not found.',404);
