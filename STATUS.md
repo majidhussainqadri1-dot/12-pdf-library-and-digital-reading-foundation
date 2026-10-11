@@ -1,25 +1,26 @@
-# File12 — R40, Source-Only Ingest Rights & Catalog Numeric Integrity (11 Oct 2026)
+# File12 — R41 REST request integrity and private tag list truth (11 October 2026)
 
-| Source verification dimension | Grounded evidence |
+| Source/release dimension | Verified scope |
 |---|---|
-| Frozen source baseline | R39 Draft PR#34 exact green `c572bef9de1d6aa71c370a9a73e35235b9878c75`; Actions #480 SUCCESS |
-| Governing plans | Original uploaded amended File12 v1.1 Future24 **19 FR/10 NFR/24 FUT source requirements**, consolidated 3 central plans, uploaded File05/06/21/23/25 and File00/01/16/17/19/20/24/26/CF04 source-side adapter boundaries |
-| Twenty scoped new checks | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R40.md`, 20 distinct requirement/path presence plus risk inspections, NOT 20 exhaustive complete code/Hostinger E2E reviews |
-| R40-D01 fixed | New PDF-ingest `rights_expires_at` and `embargo_until` no longer accept malformed Feb31 or host-timezone-dependent dates; reuse canonical R39 rights validator already used on access read and rights policy mutation |
-| R40-D02 fixed | Pending edition submitted with omitted grant/embargo fields no longer falsely signals a change of live policy. Stored current policy is canonical source; invalid legacy grants fail closed. **Source invariant only** until real WP HTTP-upload staging acceptance |
-| R40-D03 fixed | Catalog page/per_page invalid numeric inputs rejected pre-DB instead of `absint` converting negative, decimal, zero to another page/size |
-| Executable R40 test | `tests/test-r40-ingest-date-catalog-pagination.php`: actual `PLDR_Ingest::ingest`, `PLDR_Search::search`, `PLDR_Access::strict_rights_timestamp` under isolated mock WP DB; real positive and negative inputs, no-DB-on-invalid, plus two specifically marked source-only pending branch guards |
-| Previous executable/source quality | R39 real rights calendar 70; R38 GET/citation 264; R37 real reader/deletion 153 + 3 JS source invariants; R36 76 real REST/rights; R35 61 native private notes; R34 66 token/access; R33 109 flags; R31 50 ingest; R32 5 PDF physical. R28 repeated 20×(53 governed IDs+12 source adapter anchors)=1300 static checks +20 invariants. Does not certify live/staging completeness |
-| New source software candidate | `1.1.0-rc.19`, DB schema and integration contract remain `1.1.0`. No migrations or live changes |
-| Plugin install root | Plan `12-pdf-library-foundation` vs built source `pdf-library-foundation-12`: compatibility and rollback controlled by Founder; unverified installed root |
-| Actual File12 Hostinger installed code/version/hash, schema/options/data/migrations/logs/keys, actual installed owner module versions | UNVERIFIED |
-| Production release acceptance | Browser+RTL/accessibility, real scanner/OCR, roles/access/timezones, File26 search, backup/rollback/recovery, two real staging reviews, Founder sign-off, merge/deploy and live re-test NOT PERFORMED |
+| Frozen repository parent | R40 Draft PR #35 exact green HEAD `b1338d4fb7d041cc6c46c3d7bac4814a8f07b584`, Actions #488 complete success |
+| Governing attached sources | Original amended File12 v1.1 Future24 **FR001–019, NFR001–010, FUT001–024**; consolidated three central master plans; File05/06/21/23/25; source File00/01/16/17/19/20/24/26/CF04 boundaries |
+| R41 distinct twenty focused checks | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R41.md` — 20 requirements-to-source owner foci, **not** 20 exhaustive human reviews or live/staging E2E sessions |
+| R41-D01 fixed | `PLDR_REST::register` no longer pre-sanitizes library `page/per_page` with WordPress `absint`, which bypassed R40 strict catalog numeric validation; real registration metadata/handler assertions |
+| R41-D02 fixed | `PLDR_REST::reader_manifest` now rejects nested/bool/negative/decimal `edition` before any DB/authorization read |
+| R41-D03 fixed | Shared private `PLDR_Reading::parse_stored_tags` distinguishes invalid historic JSON object `{}` from valid indexed empty list `[]`; direct and paginated REST private note outputs fail closed on corrupted historical maps |
+| Actual executable test | `tests/test-r41-rest-route-private-tags.php`: actual REST registration, actual malformed catalog/manifest handlers, native and paginated REST private note readers; no DB read on invalid GET and positive valid tags. Runs PHP 8.1/8.3/8.4 |
+| Source test baseline retained | R40 126 actual Ingest/Catalog plus 2 explicitly source-only pending branch; R39 70 rights; R38 264 GET/citation; R37 153 reader/deletion +3 UI source; R36 76 private REST; R35 61 native notes; R34 66 grants; R33 109 flags; R31 50 ingest; R32 5 PDF; R28 20×(53 governed IDs +12 source owner adapter anchors)=1,300 static assertions +20 invariants, older crypto/rights/search/range/future tests |
+| New software candidate | `1.1.0-rc.20`; **source DB/schema and integration contract `1.1.0` unchanged**, no DB migration |
+| Final source proof requirement | Exact final immutable R41 PR #36 HEAD **and matching** SUCCESS Actions on that SHA; installer ZIP SHA256 is distinct from outer artifact digest |
+| Unresolved plugin inner root | Plan `12-pdf-library-foundation` versus current build `pdf-library-foundation-12`; Founder-controlled compat upgrade/rollback required |
+| Native installed owner code/contract reality | File00/01/05/06/16/17/19/20/21/23/24/25/26 + CF04 actual deployed versions/hash **UNVERIFIED** |
+| Hostinger actual File12 PHP/JS version/hash, DB tables/options/migration, scanner/OCR/keyring, browser RTL/a11y/offline, privacy, backup/rollback and staging live retest | **UNVERIFIED**, no approved merge/deploy |
 
-## Live-First FIVE independent fields
-**Repository HEAD:** R40 Draft PR#35 final exact SHA and same-sha GitHub Actions success must be checked. `main` still bootstrap `2b369ef2d609247896e1ab32118f1dc498407f51`.
-**Deployed Version:** UNVERIFIED.
-**DB Version:** UNVERIFIED (source declares contract/schema `1.1.0` only).
-**Migration State:** UNVERIFIED.
+## Five live-first separated realities
+**Repository HEAD:** R41 Draft PR #36 final exact SHA once verified by final CI; GitHub `main` is still bootstrap-only `2b369ef2d609247896e1ab32118f1dc498407f51`.  
+**Deployed Version:** UNVERIFIED.  
+**DB Version:** UNVERIFIED (source contract 1.1.0, not physical DB).  
+**Migration State:** UNVERIFIED.  
 **Live Verification Status:** NOT PERFORMED.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**

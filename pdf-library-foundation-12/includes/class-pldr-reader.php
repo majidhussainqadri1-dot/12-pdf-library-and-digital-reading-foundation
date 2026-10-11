@@ -340,8 +340,11 @@ final class PLDR_Reading {
      */
     public static function parse_stored_tags(string $json): ?array {
         if(strlen($json)>16000)return null;
-        $tags=json_decode($json,true);
-        if(!is_array($tags)||!array_is_list($tags)||count($tags)>30)return null;
+        // Decode without associative conversion: JSON {} must NOT collapse
+        // into the same empty PHP array as a valid JSON list [].
+        // This canonical parser is shared by direct and REST private readers.
+        $tags=json_decode($json);
+        if(!is_array($tags)||count($tags)>30)return null;
         foreach($tags as $tag){
             if(!is_string($tag))return null;
         }
