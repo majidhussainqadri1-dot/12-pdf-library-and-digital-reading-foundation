@@ -69,3 +69,7 @@ The R36 **source-only** software candidate `1.1.0-rc.16` addresses: (1) privacy-
 
 
 R36 also applies the same no-coercion input law to signed reader/download grants, rights approval and versioned access-policy updates, and repair command parameters. All four R36 source defect groups are recorded in the dated R36 review document; no live deployed proof exists.
+
+
+## R37 — Reader rights display and private delete result truth (11 October 2026)
+R37 source-only candidate `1.1.0-rc.16` fixes File12 FR-008/010/012 rights/readers: a legacy native `PLDR_Reading::delete_item` call now confirms exactly one owner-scoped deletion rather than treating 0 affected rows as success; direct HTML/JS reader boot and REST `reader_manifest` now both use the same `PLDR_Core::policy_flag` exact-1 rights interpretation as access enforcement/public document DTO. R36's stronger REST privacy/mutation controls are retained. R37 distinct source audit and evidence: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R37.md`, PHP fixture `tests/test-r37-reader-permission-delete.php`. A divergent R36 Draft branch also named `rc.15` is not installed/merged by implication. No staging/live/performance/host-version claims are made.
