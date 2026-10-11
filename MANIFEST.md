@@ -106,3 +106,13 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Access::issue_token`: explicit anonymous -1 authorized without inheriting active browser identity, and newly issued public token stored as user_id 0 with public audience hash matching `deliver`.
 - `tests/test-r34-access-grants.php`: actual Core and Access PHP fixture covering legacy policies, DTO and anonymous/user signed grants, in PHP 8.1/8.3/8.4 quality gate.
 - Source-only candidate: DB/schema and integration contract remain `1.1.0`; live installed versions and the plan/source folder name conflict are unverified and unchanged.
+
+## R35 private notes/bookmark + exact source unity (1.1.0-rc.14)
+- Governing plan: File12 `F12-FR-012` user-private bookmarks/notes/tags; NFR-001/002 object/field security and privacy, central canonical ownership/strict input/traceability.
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`: twenty distinct source/plan review foci; 5 source/release findings, implementation truth limits.
+- R34 PR #26 and #27 were **divergent code builds both named rc.13**. R35 uses #26 as parent (preserves its persisted-permission + anonymous signed token repairs), selectively incorporates #27 private read/write guards; new exact build identity rc.14.
+- `PLDR_Reading::add_item`: validates note/tag/type/page/anchor fields before insert, rejects nested/associative/malformed JSON and silently coerced `Array` content; accepts legitimate bounded plain or JSON tags.
+- `PLDR_Reading::items`: fail closed previously stored corrupt/map/nested/oversized tags before exposing user-private DTOs.
+- `PLDR_Access::update_policy`: explicitly nullable embargo clear permitted, null audience/entitlement now denied.
+- `tests/test-r35-reading-item-input-shapes.php`: actual add_item and items PHP integration fixture; `tests/test-r33-policy-flags.php` extended null audience/entitlement test; PHP 8.1/8.3/8.4 QA jobs.
+- No source DB/schema contract migration (still 1.1.0). Plan inner plugin root discrepancy and installed companion owner/version/real Hostinger state require staged founder-controlled parity and rollback.
