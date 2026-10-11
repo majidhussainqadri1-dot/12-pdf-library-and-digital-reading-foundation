@@ -98,3 +98,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Access::update_policy`: rejects nested audience/entitlement/embargo metadata and interprets download/print/offline disabled values correctly, before DB read.
 - `tests/test-r33-policy-flags.php`: live PHP class/method isolated fixture; retained R32 physical PDF validator suite, R31 malformed-ingest fixtures and earlier tests.
 - Software/package rc.12 is distinct; source schema and interface contract remain 1.1.0, no migration. Live deployed artifact and folder naming mismatch remain outside this release candidate.
+
+## R34: persisted rights/public delivery parity (software 1.1.0-rc.13)
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R34.md`: twenty new scoped source-plan reviews and three proven source defects (not 20 complete staging/live tests).
+- `PLDR_Access::can_access_edition`: strict five-operation allowlist, read/download/print/offline/preview; canonical `PLDR_Core::policy_flag` used on persisted rights for fail-closed historical corrupt values.
+- `PLDR_Core::public_document_dto`: displays permissions only if same canonical 1/0 parser explicitly grants; false/off/unknown values no longer advertise download/print/offline.
+- `PLDR_Access::issue_token`: explicit anonymous -1 authorized without inheriting active browser identity, and newly issued public token stored as user_id 0 with public audience hash matching `deliver`.
+- `tests/test-r34-access-grants.php`: actual Core and Access PHP fixture covering legacy policies, DTO and anonymous/user signed grants, in PHP 8.1/8.3/8.4 quality gate.
+- Source-only candidate: DB/schema and integration contract remain `1.1.0`; live installed versions and the plan/source folder name conflict are unverified and unchanged.
