@@ -147,3 +147,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - R38-D04: `PLDR_Reader::citation` embeds stable edition ID across Sabri/APA/MLA while retaining the existing document family URL and page.
 - `tests/test-r38-rest-read-shapes-citation.php` invokes actual REST and citation renderer methods with bad and legitimate controls; included PHP 8.1/8.3/8.4 gate, all R1–R37 tests retained.
 - No new DB/schema migration; source contract stays 1.1.0. Source-only package `1.1.0-rc.18`, no Hostinger deployed/source checksum/DB/schema parity proof.
+
+
+## R39 rc.18 — File12 embargo and rights expiry as real calendars; legacy flag preservation
+- Governing File12 FR-003 rights expiry and FR-008 embargo, NFR-001/002 authorization/privacy, NFR-007 staged migration and consolidated central owner boundaries.
+- R39-D01/02/03: strict `PLDR_Access::strict_rights_timestamp` with checkdate, ISO clock/offset validity and deterministic UTC; reused for embargo *updates* and for historical persisted embargo and edition rights expiration *reads*. Invalid imported rights cannot silently extend ordinary-reader access.
+- R39-D04: untouched legacy `true/on/yes` stored grant rights are normalized to 1 on versioned audience/rights edits; bad/false flags to 0. Existing transaction, outbox and issued-token revocation pathways unchanged.
+- Actual `tests/test-r39-rights-calendar-policy.php`: execute Access/Core with fake WP DB; bad/valid dates, UTC/offset, legacy record fail-close and positive flag preservation. Included in PHP8.1/8.3/8.4 QA, prior R28–R38 source tests retained.
+- Software rc.18; source DB/schema/interface contract 1.1.0. No new DB migration. No changes to plan/source WordPress inner folder mismatch without Founder staging approval.
