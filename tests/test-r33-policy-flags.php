@@ -74,6 +74,16 @@ foreach(array('download_allowed','print_allowed','offline_allowed') as $name){
         $check($before===$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries,'invalid policy update touched DB for '.$name);
     }
 }
+// Rights API must reject non-scalar current-policy fields before any DB
+// read/write; these inputs can be sent by malformed JSON REST clients.
+foreach(array('audience','entitlement_key','embargo_until') as $field){
+    foreach(array(array('malformed'),(object)array('nested'=>true),false) as $invalid){
+        $before=$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries;
+        $result=PLDR_Access::update_policy(5,array($field=>$invalid),77,2);
+        $check(is_wp_error($result)&&$result->code==='pldr_policy_input_shape','malformed policy '.$field.' not rejected');
+        $check($before===$GLOBALS['wpdb']->reads+$GLOBALS['wpdb']->queries,'invalid policy '.$field.' touched database');
+    }
+}
 // Real policy update persists the canonical 0 for previously dangerous text
 // "false" and "off", but still accepts truly enabled access flags.
 $ok=PLDR_Access::update_policy(5,array('download_allowed'=>'false','print_allowed'=>'off','offline_allowed'=>'no'),77,2);
