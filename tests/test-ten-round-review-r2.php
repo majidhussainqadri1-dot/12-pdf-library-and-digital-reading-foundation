@@ -82,7 +82,7 @@ $must($insights, 'windowed_completion', 'Completion metric is not bounded to the
 // Round 10.
 $must($frest, 'PLDR_Future_Data::reflow(absint', 'REST reflow does not pass page selection into the data layer.');
 $must($frest, 'PLDR_Future_Corpus::manifest(absint', 'REST corpus pagination is not wired.');
-$must($frest, "'cursor'=>array('sanitize_callback'=>'sanitize_text_field')", 'REST corpus signed cursor sanitization missing.');
+$must($frest, "validate_query_shape(\$r,array('cursor'),array('limit','offset'))", 'REST corpus cursor/limit/offset raw shape guard missing.');
 $must($frest, 'pldr_corpus_cursor_required', 'REST corpus rejects obsolete offset traversal only with an explicit cursor-required error.');
 
 $doc = dirname(__DIR__) . '/docs/TEN-ROUND-REVIEW-2026-08-11-R2.md';

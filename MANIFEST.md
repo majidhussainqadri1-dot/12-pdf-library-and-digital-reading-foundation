@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.20`
+Candidate: `1.1.0-rc.21`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -171,3 +171,10 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - File12 `F12-FR-012`, `NFR-002` private notes: canonical native+REST stored-tags decoder preserves JSON array/object type. Invalid `{}` rejects rather than being presented as valid `[]`; normal bounded string tag arrays retained.
 - Actual test `tests/test-r41-rest-route-private-tags.php` invokes REST registration, `PLDR_REST::library`, `reader_manifest`, `reading_items`, `PLDR_Reading::items`/parser on real methods with isolated WP DB mocks. PHP8.1/8.3/8.4 CI and retained R28–R40 suites.
 - Software version `1.1.0-rc.20`, schema/interface source contract `1.1.0` unchanged; plugin inner directory plan/source mismatch, staging/restore and active deployment unknown.
+
+
+## R42 — Future REST strict raw query (software 1.1.0-rc.21)
+- Frozen twenty owner/plan scope inspections: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R42.md`.
+- `PLDR_Future_REST`: remove pre-handler numeric/cursor sanitization, early typed checks for 10 Future GET endpoints; prevents negative/decimal/structured query coercion and protects private shelves, File16 corpus and File05/06 context adapters.
+- `tests/test-r42-future-rest-query-shapes.php`: real route registration and method input-shape negative tests (isolated WP fixture, not E2E).
+- Source DB and versioned integration contract remain 1.1.0. No staging or deployed code/DB parity evidence; folder migration decision outstanding.

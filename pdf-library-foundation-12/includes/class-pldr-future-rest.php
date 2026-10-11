@@ -5,7 +5,7 @@ defined('ABSPATH') || exit;
 final class PLDR_Future_REST {
     public static function register(): void {
         register_rest_route('pldr/v1', '/future/features', array('methods'=>'GET','callback'=>array(__CLASS__,'features'),'permission_callback'=>'__return_true'));
-        register_rest_route('pldr/v1', '/future/reflow/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'reflow'),'permission_callback'=>'__return_true','args'=>array('page'=>array('sanitize_callback'=>'absint'))));
+        register_rest_route('pldr/v1', '/future/reflow/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'reflow'),'permission_callback'=>'__return_true','args'=>array('page'=>array())));
         register_rest_route('pldr/v1', '/future/outline/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'outline'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/compare', array('methods'=>'GET','callback'=>array(__CLASS__,'compare'),'permission_callback'=>'__return_true'));
         register_rest_route('pldr/v1', '/future/citation-export/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'citation_export'),'permission_callback'=>'__return_true'));
@@ -38,7 +38,7 @@ final class PLDR_Future_REST {
             array('methods'=>'DELETE','callback'=>array(__CLASS__,'shelf_delete'),'permission_callback'=>array(__CLASS__,'logged_in')),
         ));
         register_rest_route('pldr/v1', '/future/shelves/(?P<id>\d+)/items', array(
-            array('methods'=>'GET','callback'=>array(__CLASS__,'shelf_items'),'permission_callback'=>array(__CLASS__,'logged_in'),'args'=>array('cursor'=>array('sanitize_callback'=>'sanitize_text_field'),'limit'=>array('sanitize_callback'=>'absint'))),
+            array('methods'=>'GET','callback'=>array(__CLASS__,'shelf_items'),'permission_callback'=>array(__CLASS__,'logged_in'),'args'=>array('cursor'=>array(),'limit'=>array())),
             array('methods'=>'POST','callback'=>array(__CLASS__,'shelf_add'),'permission_callback'=>array(__CLASS__,'logged_in')),
             array('methods'=>'DELETE','callback'=>array(__CLASS__,'shelf_remove_item'),'permission_callback'=>array(__CLASS__,'logged_in')),
         ));
@@ -57,7 +57,7 @@ final class PLDR_Future_REST {
         register_rest_route('pldr/v1', '/future/accessibility/(?P<edition>\d+)/refresh', array('methods'=>'POST','callback'=>array(__CLASS__,'a11y_refresh'),'permission_callback'=>array(__CLASS__,'can_review')));
         register_rest_route('pldr/v1', '/future/reading-room', array('methods'=>'POST','callback'=>array(__CLASS__,'reading_room'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/context/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'context'),'permission_callback'=>'__return_true'));
-        register_rest_route('pldr/v1', '/future/corpus/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'corpus'),'permission_callback'=>'__return_true','args'=>array('cursor'=>array('sanitize_callback'=>'sanitize_text_field'),'limit'=>array('sanitize_callback'=>'absint'),'offset'=>array('sanitize_callback'=>'absint'))));
+        register_rest_route('pldr/v1', '/future/corpus/(?P<edition>\d+)', array('methods'=>'GET','callback'=>array(__CLASS__,'corpus'),'permission_callback'=>'__return_true','args'=>array('cursor'=>array(),'limit'=>array(),'offset'=>array())));
         register_rest_route('pldr/v1', '/future/derive-text', array('methods'=>'POST','callback'=>array(__CLASS__,'derive_text'),'permission_callback'=>array(__CLASS__,'logged_in')));
         register_rest_route('pldr/v1', '/future/preservation/(?P<edition>\d+)', array(
             array('methods'=>'GET','callback'=>array(__CLASS__,'preservation'),'permission_callback'=>array(__CLASS__,'logged_in')),
@@ -67,6 +67,34 @@ final class PLDR_Future_REST {
             array('methods'=>'GET','callback'=>array(__CLASS__,'duplicates'),'permission_callback'=>array(__CLASS__,'logged_in')),
             array('methods'=>'POST','callback'=>array(__CLASS__,'fingerprint'),'permission_callback'=>array(__CLASS__,'logged_in')),
         ));
+    }
+
+
+    /**
+     * Preserve raw Future-24 GET parameters until shape validation. WordPress
+     * absint/sanitize callbacks otherwise turn malformed input into valid
+     * page/limit/cursor values before the owner sees the original request.
+     * No edition, private shelf or corpus lookup may precede this check.
+     */
+    private static function validate_query_shape(WP_REST_Request $request,array $text=array(),array $integers=array()) {
+        foreach($text as $field){
+            $value=$request[$field];
+            if(null!==$value && (!is_scalar($value) || is_bool($value))){
+                return PLDR_Core::machine_error('pldr_future_query_input_shape','Future reader query text or cursor must be a scalar.',400,array('field'=>$field));
+            }
+        }
+        foreach($integers as $field){
+            $value=$request[$field];
+            if(null===$value)continue;
+            $valid=is_int($value) && $value>=0;
+            if(is_string($value) && preg_match('/^(?:0|[1-9][0-9]*)$/D',$value)
+                && strlen($value)<=strlen((string)PHP_INT_MAX)
+                && (string)(int)$value===$value) $valid=true;
+            if(!$valid){
+                return PLDR_Core::machine_error('pldr_future_query_input_shape','Future reader query page, limit or offset must be a nonnegative integer.',400,array('field'=>$field));
+            }
+        }
+        return true;
     }
 
     public static function logged_in(): bool { return is_user_logged_in(); }
@@ -155,19 +183,19 @@ final class PLDR_Future_REST {
     }
 
     public static function features() { return rest_ensure_response(array('version'=>PLDR_Future::VERSION,'count'=>count(PLDR_Future::FEATURES),'features'=>PLDR_Future::FEATURES,'production_truth'=>'Source capability presence is not staging/live acceptance.')); }
-    public static function reflow(WP_REST_Request $r) { return self::response(PLDR_Future_Data::reflow(absint($r['edition']),absint($r['page']))); }
+    public static function reflow(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array(),array('page'));if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Data::reflow(absint($r['edition']),absint($r['page']))); }
     public static function outline(WP_REST_Request $r) { return self::response(PLDR_Future_Data::outline(absint($r['edition']))); }
-    public static function compare(WP_REST_Request $r) { return self::response(PLDR_Future_Data::compare(absint($r['left']),absint($r['right']))); }
-    public static function citation_export(WP_REST_Request $r) { return self::response(PLDR_Future_Citations::export(absint($r['edition']),sanitize_key((string)($r['format']?:'csl-json')),absint($r['page']))); }
+    public static function compare(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array(),array('left','right'));if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Data::compare(absint($r['left']),absint($r['right']))); }
+    public static function citation_export(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('format'),array('page'));if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Citations::export(absint($r['edition']),sanitize_key((string)($r['format']?:'csl-json')),absint($r['page']))); }
     public static function anchor(WP_REST_Request $r) { $b=self::body($r);$edition_id=absint($b['edition_id']??0);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'anchor',static fn()=>PLDR_Future_Anchors::save($edition_id,absint($b['page']??0),(array)($b['selector']??array()),(string)($b['note']??''))); }
     public static function authority(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'authority',static fn()=>PLDR_Future_Authority::lookup((string)($b['type']??''),(string)($b['value']??''),!empty($b['force']))); }
     public static function ocr_quality(WP_REST_Request $r) { return self::response(PLDR_Future_OCR_Lab::report(absint($r['edition']))); }
     public static function ocr_correction(WP_REST_Request $r) { $b=self::body($r);$edition_id=absint($r['edition']);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'ocr-correction',static fn()=>PLDR_Future_OCR_Lab::submit($edition_id,absint($b['page']??0),(string)($b['original']??''),(string)($b['corrected']??''))); }
     public static function ocr_review(WP_REST_Request $r) { $b=self::body($r);$id=absint($r['id']);$pre=self::ocr_review_target_before_mutation($id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'ocr-review',static fn()=>PLDR_Future_OCR_Lab::review($id,(string)($b['decision']??''),(string)($b['note']??''),absint($b['expected_version']??0))); }
-    public static function annotations_export(WP_REST_Request $r) { return self::response(PLDR_Future_Annotations::export(absint($r['edition']),absint($r['after_id']),absint($r['limit']?:200))); }
+    public static function annotations_export(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array(),array('after_id','limit'));if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Annotations::export(absint($r['edition']),absint($r['after_id']),absint($r['limit']?:200))); }
     public static function annotations_import(WP_REST_Request $r) { $edition_id=absint($r['edition']);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'annotations-import',static fn()=>PLDR_Future_Annotations::import($edition_id,self::body($r))); }
     public static function iiif(WP_REST_Request $r) { return self::response(PLDR_Future_IIIF::manifest((string)$r['id'])); }
-    public static function heatmap(WP_REST_Request $r) { return self::response(PLDR_Future_Search::heatmap(absint($r['edition']),(string)$r['q'])); }
+    public static function heatmap(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('q'),array());if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Search::heatmap(absint($r['edition']),(string)$r['q'])); }
     public static function offline_grant(WP_REST_Request $r) {
         $b=self::body($r);$edition_id=absint($b['edition_id']??0);
         $edition=PLDR_Future_Data::require_edition($edition_id,'offline');
@@ -211,17 +239,17 @@ final class PLDR_Future_REST {
         }
         return rest_ensure_response(array('authorized'=>true,'edition_id'=>$edition_id,'checked_at'=>gmdate('c'),'rights_valid_until'=>$valid_until,'reconnect_reauthorized'=>true));
     }
-    public static function preferences_get(WP_REST_Request $r) { return self::response(PLDR_Future_Preferences::get((string)($r['key']?:'reader'))); }
+    public static function preferences_get(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('key'),array());if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Preferences::get((string)($r['key']?:'reader'))); }
     public static function preferences_save(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'preferences-save',static fn()=>PLDR_Future_Preferences::save((string)($b['key']??'reader'),(array)($b['value']??array()),absint($b['expected_version']??0))); }
     public static function shelves() { $items=PLDR_Future_Shelves::list();if(isset($items['error'])&&is_wp_error($items['error']))return $items['error'];return self::response(array('items'=>$items,'private'=>true,'read_only'=>true)); }
     public static function shelf_bootstrap(WP_REST_Request $r) { return self::idempotent($r,'shelf-bootstrap',static function(){ $ready=PLDR_Future_Shelves::ensure_defaults(get_current_user_id());if(is_wp_error($ready))return $ready;$items=PLDR_Future_Shelves::list();if(isset($items['error'])&&is_wp_error($items['error']))return $items['error'];return array('items'=>$items,'private'=>true,'initialized'=>true); }); }
     public static function shelf_create(WP_REST_Request $r) { $b=self::body($r);return self::idempotent($r,'shelf-create',static fn()=>PLDR_Future_Shelves::create((string)($b['name']??''))); }
-    public static function shelf_items(WP_REST_Request $r) { $items=PLDR_Future_Shelves::items(absint($r['id']),(string)$r['cursor'],absint($r['limit']?:50));if(isset($items['error'])&&is_wp_error($items['error']))return $items['error'];return self::response($items); }
+    public static function shelf_items(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('cursor'),array('limit'));if(is_wp_error($shape))return $shape; $items=PLDR_Future_Shelves::items(absint($r['id']),(string)$r['cursor'],absint($r['limit']?:50));if(isset($items['error'])&&is_wp_error($items['error']))return $items['error'];return self::response($items); }
     public static function shelf_add(WP_REST_Request $r) { $b=self::body($r);$shelf_id=absint($r['id']);$edition_id=absint($b['edition_id']??0);$pre=self::owned_shelf_before_mutation($shelf_id);if(is_wp_error($pre))return $pre;$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'shelf-add',static fn()=>PLDR_Future_Shelves::add($shelf_id,$edition_id,absint($b['expected_version']??0))); }
     public static function shelf_rename(WP_REST_Request $r) { $b=self::body($r);$shelf_id=absint($r['id']);$pre=self::owned_shelf_before_mutation($shelf_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'shelf-rename',static fn()=>PLDR_Future_Shelves::rename($shelf_id,(string)($b['name']??''),absint($b['expected_version']??0))); }
     public static function shelf_delete(WP_REST_Request $r) { $b=self::body($r);$shelf_id=absint($r['id']);$pre=self::owned_shelf_before_mutation($shelf_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'shelf-delete',static fn()=>PLDR_Future_Shelves::remove($shelf_id,absint($b['expected_version']??0))); }
     public static function shelf_remove_item(WP_REST_Request $r) { $b=self::body($r);$shelf_id=absint($r['id']);$pre=self::owned_shelf_before_mutation($shelf_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'shelf-remove-item',static fn()=>PLDR_Future_Shelves::remove_item($shelf_id,absint($b['edition_id']??0),absint($b['expected_version']??0))); }
-    public static function insights(WP_REST_Request $r) { return self::response(PLDR_Future_Insights::report(absint($r['days']?:30))); }
+    public static function insights(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array(),array('days'));if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Insights::report(absint($r['days']?:30))); }
     public static function insight_event(WP_REST_Request $r) { $b=self::body($r);$edition_id=absint($b['edition_id']??0);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'insight-event',static fn()=>PLDR_Future_Insights::event($edition_id,(string)($b['type']??''),absint($b['page']??1),absint($b['duration_seconds']??0),(array)($b['context']??array()))); }
     public static function handoff_get(WP_REST_Request $r) { return self::response(PLDR_Future_Handoff::get(absint($r['edition']))); }
     public static function handoff_save(WP_REST_Request $r) { $b=self::body($r);$edition_id=absint($r['edition']);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'handoff-save',static fn()=>PLDR_Future_Handoff::save($edition_id,(array)($b['context']??$b),absint($b['expected_version']??0))); }
@@ -229,8 +257,8 @@ final class PLDR_Future_REST {
     public static function a11y_refresh(WP_REST_Request $r) { $edition_id=absint($r['edition']);$pre=self::review_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'a11y-refresh',static fn()=>PLDR_Future_A11y::inspect($edition_id,true)); }
     public static function a11y_verify(WP_REST_Request $r) { $b=self::body($r);$edition_id=absint($r['edition']);$pre=self::review_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'a11y-verify',static fn()=>PLDR_Future_A11y::verify($edition_id,(string)($b['note']??''))); }
     public static function reading_room(WP_REST_Request $r) { $b=self::body($r);$edition_id=absint($b['edition_id']??0);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'reading-room',static fn()=>PLDR_Future_Rooms::create($edition_id,absint($b['page']??1),(array)($b['anchor']??array()))); }
-    public static function context(WP_REST_Request $r) { return self::response(PLDR_Future_Context::lookup(absint($r['edition']),(string)$r['selection'],absint($r['page']))); }
-    public static function corpus(WP_REST_Request $r) { if(absint($r['offset'])>0)return PLDR_Core::machine_error('pldr_corpus_cursor_required','Offset pagination is not supported for AI corpus manifests; use the signed cursor returned by the previous page.',400);$limit=absint($r['limit']);if(!$limit)$limit=250;return self::response(PLDR_Future_Corpus::manifest(absint($r['edition']),(string)$r['cursor'],$limit)); }
+    public static function context(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('selection'),array('page'));if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Context::lookup(absint($r['edition']),(string)$r['selection'],absint($r['page']))); }
+    public static function corpus(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('cursor'),array('limit','offset'));if(is_wp_error($shape))return $shape; if(absint($r['offset'])>0)return PLDR_Core::machine_error('pldr_corpus_cursor_required','Offset pagination is not supported for AI corpus manifests; use the signed cursor returned by the previous page.',400);$limit=absint($r['limit']);if(!$limit)$limit=250;return self::response(PLDR_Future_Corpus::manifest(absint($r['edition']),(string)$r['cursor'],$limit)); }
     public static function derive_text(WP_REST_Request $r) { $b=self::body($r);$edition_id=absint($b['edition_id']??0);$pre=self::readable_edition_before_mutation($edition_id);if(is_wp_error($pre))return $pre;return self::idempotent($r,'derive-text',static fn()=>PLDR_Future_Derived_Text::derive($edition_id,absint($b['page']??0),(string)($b['text']??''),(string)($b['mode']??''),(string)($b['target']??''))); }
     public static function preservation(WP_REST_Request $r) { return self::response(PLDR_Future_Preservation::read(absint($r['edition']))); }
     public static function preservation_refresh(WP_REST_Request $r) { $b=self::body($r);$edition_id=absint($r['edition']);$pre=self::review_edition_before_mutation($edition_id,array('repair','manage'));if(is_wp_error($pre))return $pre;return self::idempotent($r,'preservation-refresh',static fn()=>PLDR_Future_Preservation::assess($edition_id,!empty($b['verify']))); }

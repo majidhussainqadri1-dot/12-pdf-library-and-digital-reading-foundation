@@ -253,3 +253,14 @@ Detailed twenty distinct scoped source-to-plan inspections: `docs/TWENTY-ROUND-R
 | Central and File05/06/16/17/19/20/21/23/24/25/26/CF04 canonical ownership | File12 source-side consumer adapters cannot certify actual companion plugin deployment and contract versions | No canonical foreign source moved into File12 and no schema upgrade; R41 unique rc.20 package candidate only | Founder-approved installed parity audit, backups, two staging cycles, rollback and live retest pending |
 
 Twenty distinct scoped source-to-plan review paths and limits recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R41.md`. Neither passing CI nor a source anchor establishes Production readiness.
+
+
+## R42 — Future-24 REST query ownership and input integrity (11 October 2026)
+| Plan / companion owner | Exact code implementation | Source regression | Staging obligation |
+|---|---|---|---|
+| F12-FUT-001; F12-NFR-001/004 | `PLDR_Future_REST::reflow` strict raw page preflight; no WordPress `absint` pre-sanitizer | `tests/test-r42-future-rest-query-shapes.php` | WordPress REST/real reflow preview and malformed requests |
+| F12-FUT-015; F12-FR-012 | `PLDR_Future_REST::shelf_items` raw cursor/limit fail-closed preflight | same executable test | Real user-scoped shelf entitlement/cursor and IDOR |
+| F12-FUT-021; File16 | `PLDR_Future_REST::corpus` raw cursor/limit/offset preflight; native File16 deny-by-default provider unchanged | same executable test | Installed File16 consumer allowlist and no restricted OCR leak |
+| F12-FUT-004/006/009/011/016/020; Files05/06 | `PLDR_Future_REST::compare/citation_export/annotations_export/heatmap/insights/context/preferences_get` raw text/numeric checks | same fixture, isolated WordPress stand-in | Valid positive reader/provider flows plus deny malformed values |
+
+These checks do not prove staging, production, actual physical DB schema/migration, external providers or installed companion plugin compatibility. Governing review ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R42.md`. Source software 1.1.0-rc.21, DB/schema/interface 1.1.0 unchanged.
