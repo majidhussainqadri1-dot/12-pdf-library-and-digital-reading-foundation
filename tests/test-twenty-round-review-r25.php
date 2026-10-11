@@ -32,8 +32,8 @@ $must($admin,"array('search_text'=>\$text)",'derived search-index repair still l
 $forbid($admin,"array('search_text'=>\$text,'updated_at'=>PLDR_Core::now())",'derived search-index repair still rewrites canonical document updated_at');
 $must($access,'public static function cleanup_tokens(): array','token cleanup does not return truthful bounded outcome');
 $must($admin,"array_merge(array('operation'=>'tokens'),\$result)",'token repair still fabricates success');
-$must($main,'Version: 1.1.0-rc.19','R25 release-candidate marker missing');
-$must($main,"define('PLDR_VERSION', '1.1.0-rc.19')",'R25 runtime release-candidate constant missing');
+$must($main,'Version: 1.1.0-rc.20','R25 release-candidate marker missing');
+$must($main,"define('PLDR_VERSION', '1.1.0-rc.20')",'R25 runtime release-candidate constant missing');
 $must($main,"define('PLDR_DB_VERSION', '1.1.0')",'R25 unexpectedly changed DB version');
 $must($main,"define('PLDR_CONTRACT_VERSION', '1.1.0')",'R25 unexpectedly changed integration contract version');
 
