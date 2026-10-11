@@ -80,6 +80,17 @@ final class PLDR_Ingest {
                 }
             }
         }
+        // An explicitly supplied cover cannot silently vanish after a
+        // partial/failed upload or a non-HTTP temporary path. Reject it before
+        // committing the canonical PDF and creating reconciliation debt.
+        if(isset($files['cover'])){
+            $cover_upload=$files['cover'];
+            $cover_error=(int)($cover_upload['error']??UPLOAD_ERR_NO_FILE);
+            $cover_supplied=$cover_error!==UPLOAD_ERR_NO_FILE || !empty($cover_upload['tmp_name']) || !empty($cover_upload['name']);
+            if($cover_supplied && ($cover_error!==UPLOAD_ERR_OK || empty($cover_upload['tmp_name']) || !is_uploaded_file($cover_upload['tmp_name']))){
+                return PLDR_Core::machine_error('pldr_cover_upload_preflight','Supplied cover failed its complete HTTP-upload preflight; PDF ingest was not started.',400);
+            }
+        }
         $existing_doc = null;$current_policy=null;$expected_document_version=0;
         if (!empty($data['document_public_id'])) {
             $wpdb->last_error='';
