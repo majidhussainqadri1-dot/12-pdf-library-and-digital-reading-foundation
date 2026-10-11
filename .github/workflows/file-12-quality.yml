@@ -104,6 +104,8 @@ jobs:
         run: php tests/test-r30-policy-fail-closed.php
       - name: R31 real ingest metadata and upload shape regression
         run: php tests/test-r31-ingest-input-shapes.php
+      - name: R32 genuine PDF upload byte-count, polyglot and encryption-cleanup contract regression
+        run: php tests/test-r32-pdf-physical-integrity.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
