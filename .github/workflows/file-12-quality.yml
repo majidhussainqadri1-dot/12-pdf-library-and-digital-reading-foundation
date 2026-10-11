@@ -116,6 +116,8 @@ jobs:
         run: php tests/test-r36-rest-privacy-mutation.php
       - name: R37 actual REST manifest legacy permission and native private deletion regression
         run: php tests/test-r37-reader-permission-delete.php
+      - name: R38 actual GET reading/OCR/citation shapes and stable edition identity
+        run: php tests/test-r38-rest-read-shapes-citation.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
