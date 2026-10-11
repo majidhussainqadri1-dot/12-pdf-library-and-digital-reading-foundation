@@ -80,6 +80,17 @@ final class PLDR_Ingest {
                 }
             }
         }
+        // An explicitly supplied cover cannot silently vanish after a
+        // partial/failed upload or a non-HTTP temporary path. Reject it before
+        // committing the canonical PDF and creating reconciliation debt.
+        if(isset($files['cover'])){
+            $cover_upload=$files['cover'];
+            $cover_error=(int)($cover_upload['error']??UPLOAD_ERR_NO_FILE);
+            $cover_supplied=$cover_error!==UPLOAD_ERR_NO_FILE || !empty($cover_upload['tmp_name']) || !empty($cover_upload['name']);
+            if($cover_supplied && ($cover_error!==UPLOAD_ERR_OK || empty($cover_upload['tmp_name']) || !is_uploaded_file($cover_upload['tmp_name']))){
+                return PLDR_Core::machine_error('pldr_cover_upload_preflight','Supplied cover failed its complete HTTP-upload preflight; PDF ingest was not started.',400);
+            }
+        }
         $existing_doc = null;$current_policy=null;$expected_document_version=0;
         if (!empty($data['document_public_id'])) {
             $wpdb->last_error='';
@@ -205,7 +216,17 @@ final class PLDR_Ingest {
         }
         $crypto = array();
         $crypto_error = '';
-        if (!PLDR_Crypto::encrypt_file($pdf['tmp_name'], $temp, $crypto, $crypto_error)) {
+        try {
+            $encrypted=PLDR_Crypto::encrypt_file($pdf['tmp_name'], $temp, $crypto, $crypto_error);
+        } catch (Throwable $e) {
+            // Fail closed and clear any partially created private ciphertext now,
+            // not only via the Storage shutdown safety-net.
+            PLDR_Storage::delete($temp);
+            PLDR_Core::audit('system',0,'pldr_encrypt_exception',array('exception_class'=>get_class($e)),$actor_id);
+            return PLDR_Core::machine_error('pldr_encrypt_failed','Private object encryption was interrupted; the temporary object was removed.',503);
+        }
+        if (!$encrypted) {
+            PLDR_Storage::delete($temp);
             return PLDR_Core::machine_error('pldr_encrypt_failed', $crypto_error ?: 'Private object encryption failed.', 503);
         }
         if (!PLDR_Storage::atomic_commit($temp, $allocation['path'])) {
@@ -391,6 +412,13 @@ final class PLDR_Ingest {
             return PLDR_Core::machine_error('pldr_pdf_size', 'The PDF is empty or exceeds the governed File 12 size limit.', 413, array('max_bytes' => $max));
         }
         $path = (string) $pdf['tmp_name'];
+        // A claimed upload byte count is not proof of the physical source
+        // object we are about to hash, scan, encrypt and persist.
+        clearstatcache(true,$path);
+        $actual_size=@filesize($path);
+        if(false===$actual_size || $actual_size!==$size){
+            return PLDR_Core::machine_error('pldr_pdf_size_mismatch','Uploaded PDF byte count does not match the verified source file.',400);
+        }
         $head = file_get_contents($path, false, null, 0, 8);
         if (!is_string($head) || 0 !== strpos($head, '%PDF-')) {
             return PLDR_Core::machine_error('pldr_pdf_signature', 'The uploaded object does not begin with a genuine PDF signature.', 400);
