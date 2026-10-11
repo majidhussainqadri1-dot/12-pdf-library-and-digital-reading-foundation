@@ -1,28 +1,29 @@
-# File 12 — R34 exact-source rights consistency candidate (11 October 2026)
+# File12 — R35 Private Reading-State Integrity + Divergent R34 Unified (11 October 2026)
 
-| Field | Verified scope |
+| Release fact | Evidence-bound status |
 |---|---|
-| Source basis | R33 Draft PR #24 exact-green `f7b1828ceb932837f9031e65f4d1dc44cc43b9e7` |
-| Governing plans | File12 v1.1 Future24 amended; Three Consolidated Central Plans; supplied File05/06/21/23/25 plans |
-| New 20 reviews | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R34.md`, twenty distinct scoped source/owner/plan focus checks. NOT twenty full WordPress/staging/live tests |
-| R34-D01 | Legacy persisted download/print/offline values `'false'`/`'off'` bypassed new writer validation and were treated as allowed; corrected in actual `PLDR_Access::can_access_edition` |
-| R34-D02 | Public DTO permissions used old `!empty()` truthiness and could advertise rights not actually valid; corrected in `PLDR_Core::public_document_dto` |
-| R34-D03 | Explicit anonymous `-1` issue-token user did not match `deliver()` public audience hash; corrected issuance to store/hash user 0 after anonymous authorization |
-| New real PHP test | `tests/test-r34-access-grants.php`: actual Core/Access methods, persisted false/on/off/invalid, public DTO parity, invalid operation denial and explicit anonymous/user token hash semantics |
-| Retained tests | R28 20×(53 File12 governed IDs+12 source-side adapters)=1,300 static anchors, R29 catalog fixture, R30 policy, R31 50 ingest, R32 real PDF, R33 105 policy flag assertions, earlier crypto/range/security/future tests |
-| Software candidate | `1.1.0-rc.13` source-only, unique ZIP; no new R34 schema migration |
-| Source DB & interface contract | `1.1.0` / `1.1.0` unchanged |
-| Exact final R34 HEAD CI | Must verify on last unchanged PR #26 head and matching artifact SHA after all docs commits |
-| ZIP internal folder conflict | Written plan `12-pdf-library-foundation` vs source `pdf-library-foundation-12`; Founder-approved compatibility migration and rollback needed |
-| Other owner module installed versions/contracts | UNVERIFIED: File00/01/05/06/16/17/19/20/21/23/24/25/26, CF-04 |
-| Real WordPress staging/backup/rollback/Hostinger runtime | UNVERIFIED; Founder approval not granted for deployment |
+| Frozen parent | R34 PR #26 HEAD `335952e2f7b47cd7bf95cd184cfa6de7059917ea`, CI #444 green |
+| Divergent source | R34 PR #27 HEAD `79ef7659ba816f7959313ddf4ded047236685202`, independently different `rc.13` with private-note shape correction — not contained in #26 |
+| Governing basis | Actual attached File12 v1.1 Future24 amended; three central consolidated plans; File05/06/21/23/25 companion owner plans |
+| Twenty focused new audits | `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`. Distinct source/plan areas; not 20 full deployed WordPress end-to-end reviews |
+| Corrected R35-D01 | Two diverging `rc.13` candidates: integrated unique real code into new software/package `1.1.0-rc.14`, neither old branch silently assumed merged |
+| Corrected R35-D02/D03 | `PLDR_Reading::add_item`: bounded scalar type/page/note/anchor checks, valid positive integer page, strict tagged indexed array/JSON string list/CSV, no nested/associative item casts before private insert |
+| Corrected R35-D04 | `PLDR_Access::update_policy` rejects explicit `null` rights audience/entitlement key before DB; preserves supported null embargo clearing |
+| Corrected R35-D05 | `PLDR_Reading::items` validates even old persisted private tags as indexed max-30 string list; rejects map/nested/malformed/oversized values with audit and no partial item list |
+| Actual tests | `tests/test-r35-reading-item-input-shapes.php` executes actual add_item/items; `tests/test-r33-policy-flags.php` extended with null rights tests |
+| Retained tests | R34 66 Access/DTO/anonymous token, R33 105 rights flag, R32 5 physical PDF, R31 50 actual ingest, R29 catalog/cursor, R30 policy rights, R28 20x(53 FR/NFR/FUT +12 owner adapters)=1300 static source anchors +20 invariants; earlier crypto/range tests |
+| Software candidate | `1.1.0-rc.14`, DB/schema/interface contract still `1.1.0`, no new migration |
+| Exact final CI | Must reverify completed Actions on immutable last R35 PR head, not merely earlier green branches |
+| Plugin folder compatibility | Plan inner root `12-pdf-library-foundation` vs source ZIP `pdf-library-foundation-12`; still requires Founder-approved migration, staged restore and rollback |
+| Companion owner builds and installed contracts | UNVERIFIED: File00/01/05/06/16/17/19/20/21/23/24/25/26 and CF04 |
+| Real staging/browser/provider/keys/backup/live | NOT TESTED; Founder approval pending; Draft PR only |
 
-## Separate reality truths
+## Five truth fields
 
-**Repository HEAD:** R34 Draft PR #26 final immutable SHA after checks; `main` remains bootstrap README `2b369ef2d609247896e1ab32118f1dc498407f51`.
+**Repository HEAD:** R35 Draft PR #28 final immutable HEAD to be checked; main stays `2b369ef2d609247896e1ab32118f1dc498407f51` bootstrap README.
 
 **Deployed Version:** UNVERIFIED.  
-**DB Version:** UNVERIFIED (source declares 1.1.0).  
+**DB Version:** UNVERIFIED (candidate source declares 1.1.0).  
 **Migration State:** UNVERIFIED.  
 **Live Verification Status:** NOT PERFORMED.
 
