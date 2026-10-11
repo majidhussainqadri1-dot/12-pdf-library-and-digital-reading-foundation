@@ -98,6 +98,8 @@ jobs:
         run: php tests/test-r28-reader-html-pregrant.php
       - name: R28 twenty repeated full plan-to-code matrix sweeps
         run: php tests/test-r28-twenty-full-plan-sweeps.php
+      - name: R29 live-logic catalog facet and signed cursor fixture regression
+        run: php tests/test-r29-catalog-facets.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
