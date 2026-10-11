@@ -177,3 +177,11 @@ The R34 source audit and twenty scoped checks are recorded in `docs/TWENTY-ROUND
 | File05/06/16/17/19/20/21/23/24/25/26/CF04 owners | Source adapter checks are not native consumer deployment truth | No cross-file ownership change, source DB/contract stays 1.1.0 | Real installed version and staging provider acceptance mandatory |
 
 See `docs/TWENTY-ROUND-REVIEW-2026-10-11-R35.md`. Source-only; no merge/live claims.
+
+## R36 consistent private notes/tags read and truthful delete — 2026-10-11
+
+| Governing requirement | File12 exact code & regression | Unverified release gates |
+|---|---|---|
+| F12-FR-012 and NFR-001/002: private tags must never leak malformed historical data | `PLDR_Reading::valid_stored_tags` reused in native `PLDR_Reading::items` and paginated `PLDR_REST::reading_items`; test-r36 actual class fixture invalid JSON map/nested/mixed/overfull; full-page fail-closed | Actual host DB legacy records, role/login/IDOR, private erasure/export |
+| FR012 authorized delete and observable result | `PLDR_Reading::delete_item` true only for exactly one owned row deleted; 0/DB failure false, invalid item/actor rejected before query | WordPress REST/UX idempotent deletion/rollback, File24 privacy |
+| Central code/source/release parity law | Distinct rc.15, source DB 1.1.0; fresh exact-final-HEAD CI required | Deployed plugin hash, wp_options and migration parity, backup/rollback, founder sign-off |
