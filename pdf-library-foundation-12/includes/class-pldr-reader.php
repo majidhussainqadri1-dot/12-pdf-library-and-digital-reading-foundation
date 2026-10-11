@@ -551,13 +551,15 @@ final class PLDR_Reader {
     public static function citation(array $edition,int $page=0,string $style='sabri'): string {
         $author=trim((string)$edition['author_name']); $title=trim((string)$edition['title']); $year=(int)$edition['publication_year']; $label=trim((string)$edition['edition_label']);
         $stable=home_url('/library/document/'.rawurlencode((string)$edition['public_id']).'/');
+        $edition_id=absint($edition['id']??0);
+        $edition_ref=$edition_id>0?' [File 12 edition ID: '.$edition_id.']':'';
         if ('apa' === $style) {
-            return trim($author . '. ' . ($year ? '(' . $year . '). ' : '') . $title . ($label ? ' (' . $label . ').' : '.') . ' ' . $stable . ($page ? ' p. ' . $page : ''));
+            return trim($author . '. ' . ($year ? '(' . $year . '). ' : '') . $title . ($label ? ' (' . $label . ').' : '.') . ' ' . $stable . ($page ? ' p. ' . $page : '')).$edition_ref;
         }
         if ('mla' === $style) {
-            return trim($author . '. “' . $title . '.” ' . ($edition['publisher'] ?: '') . ', ' . ($year ?: 'n.d.') . '. ' . $stable . ($page ? ' p. ' . $page . '.' : ''));
+            return trim($author . '. “' . $title . '.” ' . ($edition['publisher'] ?: '') . ', ' . ($year ?: 'n.d.') . '. ' . $stable . ($page ? ' p. ' . $page . '.' : '')).$edition_ref;
         }
-        return trim($author.' — '.$title.($label?' — '.$label:'').($year?' — '.$year:'').' — File 12 '.$edition['public_id'].($page?' — p. '.$page:'').' — '.$stable);
+        return trim($author.' — '.$title.($label?' — '.$label:'').($year?' — '.$year:'').' — File 12 '.$edition['public_id'].($page?' — p. '.$page:'').' — '.$stable).$edition_ref;
     }
 
     private static function cover_token(int $edition_id): string { global $wpdb; $wpdb->last_error=''; $oid=(int)$wpdb->get_var($wpdb->prepare('SELECT object_id FROM '.PLDR_Core::table('derivatives').' WHERE edition_id=%d AND derivative_type=%s AND status=%s LIMIT 1',$edition_id,'cover','available')); if(''!==(string)$wpdb->last_error){PLDR_Core::audit('edition',$edition_id,'cover_derivative_read_failed',array());return'';} if(!$oid)return''; $grant=PLDR_Access::issue_token($edition_id,$oid,'preview',get_current_user_id(),900); return is_array($grant)?$grant['url']:''; }
