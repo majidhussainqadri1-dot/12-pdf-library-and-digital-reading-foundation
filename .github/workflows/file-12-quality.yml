@@ -92,6 +92,8 @@ jobs:
         run: php tests/test-twenty-round-review-r26.php
       - name: R27 twenty-area source contract and manifest pregrant invariants
         run: php tests/test-twenty-round-review-r27.php
+      - name: R28 detached derivative binding executable regression
+        run: php tests/test-r28-detached-grant-binding.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
