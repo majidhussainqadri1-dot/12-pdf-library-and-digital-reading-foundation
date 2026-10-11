@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.22`
+Candidate: `1.1.0-rc.23`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -185,3 +185,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `class-pldr-future-rest.php`: typed mutation preflight for 18 REST entrypoints, avoiding `absint`/string/array coercion of malformed request bodies before owner, File00 entitlement and File05/06/16/21/23 adapter boundaries.
 - `tests/test-r43-future-mutation-shapes.php`: actual PHP method negative-input tests under isolated WP/DB stubs. Runs along with all previous regression suites.
 - Software 1.1.0-rc.22; source DB/schema and integration contract unchanged 1.1.0, no DB migration. Source-only; no staging/live claim.
+
+
+## R44 strict historical offline rights and token window (software rc.23)
+- R44 20 scoped reviews: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R44.md`.
+- `PLDR_Future_REST::offline_rights_expiry` delegates to canonical `PLDR_Access::strict_rights_timestamp`, used by both grant and reconnect.
+- `PLDR_Future_REST::offline_delivery_token_ttl` accounts for immutable native 60-second grant minimum and keeps a 60-second buffer before rights expiry; too-short windows are denied.
+- `tests/test-r44-offline-rights-window.php` exercises real parser + Future reauthorization/TTL, isolated WordPress fixtures only.
+- Source schema/integration version still 1.1.0, runtime Hostinger state/backup/staging/live unverified.
