@@ -106,6 +106,8 @@ jobs:
         run: php tests/test-r31-ingest-input-shapes.php
       - name: R32 genuine PDF upload byte-count, polyglot and encryption-cleanup contract regression
         run: php tests/test-r32-pdf-physical-integrity.php
+      - name: R33 real rights consent and download policy flag regression
+        run: php tests/test-r33-policy-flags.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
