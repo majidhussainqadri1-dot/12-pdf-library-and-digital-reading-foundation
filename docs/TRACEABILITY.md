@@ -99,3 +99,11 @@ R27 green CI (if obtained) proves only the exact GitHub candidate. It cannot pro
 - **File 05/06/16/17/19/20/21/23/24/25/26 and CF-04:** only File 12 source adapters inspected. External source/deployed contracts, native roles, version parity, File 23 native edit-route status and CF-04 secure-media activation must be independently tested. No duplicate domain ownership authorized.
 - **Release identity:** distinct source candidate `1.1.0-rc.7`, schema & contract still `1.1.0`; root/plugin README and package markers aligned. Written planned ZIP folder vs longstanding candidate folder discrepancy is intentionally a dated change-control blocker, not silently rewritten.
 - **Evidence boundary:** 20 automated repeated static source checks + specific executable PHP regressions are repository claims, not complete running-product/staging/live validation. Full details in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md`.
+
+## R29 persisted embargo / audience fail-closed review (2026-10-11)
+
+| Governing area | Code owner and test | Independent acceptance |
+|---|---|---|
+| F12-FR-008/009, F12-NFR-001: malformed legacy embargo must not open public access | PLDR_Access::can_access_edition; tests/test-r29-policy-fail-closed.php (actual-class negative-path fixture) | Real WordPress/DB malformed state, parser behavior, rights history and audit logging on staging |
+| F12-FR-008, File00/24: undefined audience cannot grant access via external entitlement adapter | Exact four allowlisted audience values, auditable denial before apply_filters('pldr_user_entitled') | Live companion entitlement and File00 role/suspension/minor assertions require real integration |
+| F12-NFR-009: release identity and package | Distinct 1.1.0-rc.8, PHP 8.1/8.3/8.4, R26/R27/R28/R29 tests, repeated 20-pass static matrix | Current exact HEAD CI and Hostinger deployed artifact checksum parity are different gates |
