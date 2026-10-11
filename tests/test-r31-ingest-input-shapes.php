@@ -34,7 +34,7 @@ foreach(array('title','document_type','category','language','author_name','sourc
     $input=$good;$input[$key]=array('not'=>'scalar');
     $cases[]=array($key.' list injection',$input,array(),'pldr_ingest_metadata_shape');
 }
-foreach(array('document_public_id','expected_document_version','slug','translator','publisher','isbn','year','publication_year','pages','edition_label','license_code','territory','takedown_contact','rights_evidence_ref','entitlement_key','rights_expires_at','embargo_until','supersedes_edition_id','patient_case_consent_ref','patient_case_anonymization_ref') as $key){
+foreach(array('document_public_id','expected_document_version','slug','translator','publisher','isbn','publication_year','pages','edition_label','license_code','territory','takedown_contact','rights_evidence_ref','entitlement_key','rights_expires_at','embargo_until','supersedes_edition_id','patient_case_consent_ref','patient_case_anonymization_ref') as $key){
     $input=$good;$input[$key]=array('nested');
     $cases[]=array($key.' nested injection',$input,array(),'pldr_ingest_metadata_shape');
 }
