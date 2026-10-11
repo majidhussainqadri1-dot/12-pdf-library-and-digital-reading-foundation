@@ -125,3 +125,6 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `tests/test-r36-rest-privacy-mutation.php`: actual REST PHP fixture with legacy private map/nested/bad JSON, valid items, malformed progress and rights changes, fake DB no-side-effect assertions; on PHP8.1/8.3/8.4 quality gate.
 - `docs/TWENTY-ROUND-REVIEW-2026-10-11-R36.md`: 20 scoped Source/Plan checks, three classes of proven source issues, strict source/staging/live demarcation.
 - Software `1.1.0-rc.15` differs from previous rc.14; source DB/schema and interface contract `1.1.0` unchanged; original plan/plugin ZIP root naming incompatibility remains unapproved change control.
+
+
+- R36-D04 source extension: strict pre-DB `reader_access` / `download_session` signed grant inputs, `approve_document` and `access_policy` IDs/version, and `repair` operation. Exercises actual methods with malformed inputs in the R36 REST fixture; core File00 authorization and staging/lifecycle acceptance remain separate release gates.
