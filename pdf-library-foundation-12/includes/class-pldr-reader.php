@@ -311,6 +311,13 @@ final class PLDR_Reader {
                 <select name="type" aria-label="<?php esc_attr_e('Document type', 'pdf-library-digital-reading'); ?>"><option value=""><?php esc_html_e('All document types', 'pdf-library-digital-reading'); ?></option><?php foreach (PLDR_Core::DOCUMENT_TYPES as $key=>$label): ?><option value="<?php echo esc_attr($key); ?>" <?php selected((string)($_GET['type']??''),$key); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?></select>
                 <select name="category" aria-label="<?php esc_attr_e('Category', 'pdf-library-digital-reading'); ?>"><option value=""><?php esc_html_e('All categories', 'pdf-library-digital-reading'); ?></option><?php foreach (PLDR_Core::CATEGORIES as $key=>$label): ?><option value="<?php echo esc_attr($key); ?>" <?php selected((string)($_GET['category']??''),$key); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?></select>
                 <input name="language" value="<?php echo esc_attr((string)($_GET['language']??'')); ?>" placeholder="<?php esc_attr_e('Language', 'pdf-library-digital-reading'); ?>">
+                <input name="author" value="<?php echo esc_attr((string)($_GET['author']??'')); ?>" maxlength="120" aria-label="<?php esc_attr_e('Author', 'pdf-library-digital-reading'); ?>" placeholder="<?php esc_attr_e('Author', 'pdf-library-digital-reading'); ?>">
+                <input name="source" value="<?php echo esc_attr((string)($_GET['source']??'')); ?>" maxlength="120" aria-label="<?php esc_attr_e('Publication or source', 'pdf-library-digital-reading'); ?>" placeholder="<?php esc_attr_e('Source', 'pdf-library-digital-reading'); ?>">
+                <input name="edition" value="<?php echo esc_attr((string)($_GET['edition']??'')); ?>" maxlength="120" aria-label="<?php esc_attr_e('Edition label', 'pdf-library-digital-reading'); ?>" placeholder="<?php esc_attr_e('Edition', 'pdf-library-digital-reading'); ?>">
+                <input name="isbn" value="<?php echo esc_attr((string)($_GET['isbn']??'')); ?>" maxlength="120" aria-label="<?php esc_attr_e('ISBN', 'pdf-library-digital-reading'); ?>" placeholder="ISBN">
+                <input name="license" value="<?php echo esc_attr((string)($_GET['license']??'')); ?>" maxlength="120" aria-label="<?php esc_attr_e('License code', 'pdf-library-digital-reading'); ?>" placeholder="<?php esc_attr_e('License', 'pdf-library-digital-reading'); ?>">
+                <input name="year" type="number" min="1" max="9999" value="<?php echo esc_attr((string)($_GET['year']??'')); ?>" aria-label="<?php esc_attr_e('Publication year', 'pdf-library-digital-reading'); ?>" placeholder="<?php esc_attr_e('Year', 'pdf-library-digital-reading'); ?>">
+                <select name="access_mode" aria-label="<?php esc_attr_e('Access mode', 'pdf-library-digital-reading'); ?>"><option value=""><?php esc_html_e('All eligible access modes', 'pdf-library-digital-reading'); ?></option><?php foreach(array('public','account','education-entitled','assigned') as $mode): ?><option value="<?php echo esc_attr($mode); ?>" <?php selected((string)($_GET['access_mode']??''),$mode); ?>><?php echo esc_html($mode); ?></option><?php endforeach; ?></select>
                 <button type="submit"><?php esc_html_e('Apply filters', 'pdf-library-digital-reading'); ?></button>
             </form>
             <section class="pldr-grid" aria-live="polite">
@@ -319,6 +326,21 @@ final class PLDR_Reader {
                     <article class="pldr-card"><div class="pldr-card-body"><span class="pldr-kicker"><?php echo esc_html(PLDR_Core::DOCUMENT_TYPES[$item['type']] ?? $item['type']); ?></span><h2><a href="<?php echo esc_url(PLDR_Core::route_url('document', array('id'=>$item['id'],'slug'=>$item['slug']))); ?>"><?php echo esc_html($item['title']); ?></a></h2><p><?php echo esc_html((string)($item['edition']['author']??'')); ?> · <?php echo absint((int)($item['edition']['pages']??0)); ?> <?php esc_html_e('pages', 'pdf-library-digital-reading'); ?></p><p><?php echo esc_html((string)($item['language']??'')); ?></p></div></article>
                 <?php endforeach; ?>
             </section>
+            <?php if(!empty($result['next_cursor'])):
+                // Pagination keeps exactly the supported facets. A signed cursor is bound to them.
+                $query_args=array();
+                foreach(array('q','type','category','language','author','source','edition','isbn','license','year','access_mode','per_page') as $query_key) {
+                    if(isset($_GET[$query_key])&&is_scalar($_GET[$query_key]))$query_args[$query_key]=sanitize_text_field((string)$_GET[$query_key]);
+                }
+                $first_url=add_query_arg($query_args,PLDR_Core::route_url('library'));
+                $query_args['cursor']=(string)$result['next_cursor'];
+                $next_url=add_query_arg($query_args,PLDR_Core::route_url('library'));
+            ?>
+            <nav class="pldr-pagination" aria-label="<?php esc_attr_e('Library results pagination', 'pdf-library-digital-reading'); ?>">
+                <a href="<?php echo esc_url($first_url); ?>"><?php esc_html_e('First results', 'pdf-library-digital-reading'); ?></a>
+                <a rel="next" href="<?php echo esc_url($next_url); ?>"><?php esc_html_e('Next eligible documents', 'pdf-library-digital-reading'); ?></a>
+            </nav>
+            <?php endif; ?>
         </main>
         <?php
         return (string) ob_get_clean();
