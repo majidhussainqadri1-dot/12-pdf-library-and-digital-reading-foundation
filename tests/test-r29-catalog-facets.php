@@ -85,6 +85,7 @@ $cases=array(
     array(array('page'=>array(1)),array('ERROR:pldr_catalog_filter_invalid'),'structured pagination page fail closed'),
     array(array('per_page'=>array(24)),array('ERROR:pldr_catalog_filter_invalid'),'structured page size fail closed'),
     array(array('author'=>false),array('ERROR:pldr_catalog_filter_invalid'),'boolean author fail closed'),
+    array(array('author'=>(object) array('name'=>'John')),array('ERROR:pldr_catalog_filter_invalid'),'object facet must not broaden catalog'),
     array(array('q'=>null),array('ERROR:pldr_catalog_filter_invalid'),'null search query fail closed'),
     array(array('type'=>'bogus'),array('ERROR:pldr_catalog_filter_invalid'),'unknown type fail closed'),
 );
