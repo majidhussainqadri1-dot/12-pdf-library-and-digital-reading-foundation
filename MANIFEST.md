@@ -64,3 +64,11 @@ Canonical plugin directory: `pdf-library-foundation-12/`
 Large PDF/book binaries, secrets, private runbooks and external corpus payloads are intentionally **not** embedded in GitHub or the plugin package.
 
 - R27 source review: `docs/TWENTY-ROUND-REVIEW-2026-10-10-R27.md`; permanent regression: `tests/test-twenty-round-review-r27.php`.
+
+
+## R28 evidence
+- `docs/TWENTY-ROUND-REVIEW-2026-10-11-R28.md`: exact-baseline, 20-pass full source-plan matrix ledger, four corrected source/documentation issues, and separate deployment-truth restrictions.
+- `tests/test-r28-detached-grant-binding.php`: detached original/derivative signed-delivery authorization regression.
+- `tests/test-r28-reader-html-pregrant.php`: direct HTML reader must check private state and policy before grant issuance.
+- `tests/test-r28-twenty-full-plan-sweeps.php`: 20 repeated 53-ID + 12 companion anchor source sweeps (1,300 presence checks) and one additional invariant per pass.
+- Competing R27 branch security corrections unified into R28; software candidate rc.7, DB/contract still 1.1.0.
