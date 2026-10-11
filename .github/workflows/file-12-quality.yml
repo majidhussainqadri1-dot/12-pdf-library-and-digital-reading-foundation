@@ -114,6 +114,8 @@ jobs:
         run: php tests/test-r35-reading-item-input-shapes.php
       - name: R36 real paginated private REST and malformed progress/rights mutations
         run: php tests/test-r36-rest-privacy-mutation.php
+      - name: R37 actual REST manifest legacy permission and native private deletion regression
+        run: php tests/test-r37-reader-permission-delete.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
