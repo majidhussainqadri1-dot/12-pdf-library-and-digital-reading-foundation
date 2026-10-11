@@ -349,8 +349,6 @@ final class PLDR_Reader {
         $object = PLDR_Core::object((int)$edition['object_id']);
         if(''!==(string)$wpdb->last_error)return self::state_html('error');
         if (!$object) return self::state_html('error');
-        $grant = PLDR_Access::issue_token((int)$edition['id'],(int)$object['id'],'read',get_current_user_id(),900);
-        if (is_wp_error($grant)) return self::state_html('error');
         $state = PLDR_Reading::state((int)$edition['id']);
         if(isset($state['error'])&&is_wp_error($state['error']))return self::state_html('error');
         $wpdb->last_error='';
@@ -358,10 +356,13 @@ final class PLDR_Reader {
         if(''!==(string)$wpdb->last_error)return self::state_html('error');
         try{$interaction_html=(string)apply_filters('pldr_interaction_controls_html','',(int)$edition['id'],$interaction_dto);}
         catch(Throwable $e){$interaction_html='';PLDR_Core::audit('edition',(int)$edition['id'],'reader_interaction_provider_failed',array('provider_failure'=>true));}
-        $thumbs = self::thumbnail_tokens((int)$edition['id']);
         $wpdb->last_error='';
         $policy=PLDR_Core::policy((int)$doc['id']);
         if(''!==(string)$wpdb->last_error||!$policy)return self::state_html('error');
+        // Complete all canonical/reading/policy preflight checks before issuing bearer grants.
+        $grant = PLDR_Access::issue_token((int)$edition['id'],(int)$object['id'],'read',get_current_user_id(),900);
+        if (is_wp_error($grant)) return self::state_html('error');
+        $thumbs = self::thumbnail_tokens((int)$edition['id']);
         $config = array(
             'editionId'=>(int)$edition['id'],'publicId'=>$public_id,'title'=>(string)$doc['title'],'pages'=>(int)$edition['pages'],'url'=>$grant['url'],'expiresAt'=>$grant['expires_at'],'startPage'=>max(1,(int)$state['page']),'progressRevision'=>(string)($state['updated_at']??''),
             'rest'=>esc_url_raw(rest_url('pldr/v1/')),'nonce'=>wp_create_nonce('wp_rest'),'thumbnails'=>$thumbs,'canDownload'=>!empty($policy['download_allowed']),'canPrint'=>!empty($policy['print_allowed']),'canOffline'=>!empty($policy['offline_allowed']),
