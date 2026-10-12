@@ -1,3 +1,14 @@
+# File12 R47 — File17 reading-room page/region integrity; source-only rc.26
+
+- 20 bounded File12 FR001–019/FUT017/019, central + File00/05/06/17/20/21/23/24/25/26/CF04 source-owner checks; not 20 exhaustive whole-repo/real-E2E reviews. R47-D01 out-of-range room page silently clamped; R47-D02 nested region values wrong-typed/clamped before File17 room provider. Corrected only after inspections.
+- Actual native `PLDR_Future_Rooms::create/anchor` page and region guards reject invalid source identity with no partial local/provider room creation. New executable regression `tests/test-r47-reading-room-page-region-integrity.php`, including prior R46 real native tests. Exact SHA/CI pending.
+- Source candidate software `1.1.0-rc.26`, source DB/schema/contract `1.1.0` unchanged; no physical migration. `main` remains bootstrap only. Deployed plugin/runtime hash and all companion installed contract versions, DB/wp_options, backups, staging and live unverified.
+- Original plan plugin folder `12-pdf-library-foundation` vs built `pdf-library-foundation-12` still requires Founder change-control.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R46 — cross-device Handoff and File17 Room selector validation (source-only rc.25)
 
 - Exact source parent: R45 PR#40 HEAD `b5e04a380aef62b7d83d15ef17079e5867d86528` (its green CI is NOT evidence for R46).
