@@ -4,7 +4,7 @@ Tags: pdf, library, digital-reading, rights, accessibility, rtl, iiif, annotatio
 Requires at least: 7.0
 Tested up to: 7.0.1
 Requires PHP: 8.1
-Stable tag: 1.1.0-rc.25
+Stable tag: 1.1.0-rc.26
 License: GPLv2 or later
 
 File 12 canonical implementation for the Sabri Social Homeopathy Platform.
@@ -44,3 +44,5 @@ R44 source candidate hardens Future offline rights with strict current File12 ca
 R45 source candidate 1.1.0-rc.24: W3C portable annotations now reuse canonical user-private reading-tags validation and deny partial export on historical corrupted tag objects. Source schema/contract remain 1.1.0; real Hostinger/staging parity remains unverified.
 
 R46 source candidate 1.1.0-rc.25: strict Future-17 cross-device page/anchor and Future-19 File17 reading-room selector parity; invalid nested input and unsupported SVG do not create persistent records. DB/schema/contract unchanged 1.1.0; staging/live not verified.
+
+R47 source candidate 1.1.0-rc.26: strict File17 reading-room page/region identity, no silent page clamp/coordinate coercion; isolated actual native PHP regression. Schema/contract remain 1.1.0; live unverified.
