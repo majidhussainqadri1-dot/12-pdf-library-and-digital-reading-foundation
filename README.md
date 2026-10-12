@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.25`
+- Software: `1.1.0-rc.26`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -109,3 +109,7 @@ Twenty scoped File12/central/companion source checks are documented in `docs/TWE
 
 ## R46 — cross-device handoff and File17 Reading Room selector integrity
 The R46 source-only candidate `1.1.0-rc.25` documents twenty bounded plan/source inspections in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R46.md` (not 20 exhaustive end-to-end audits). FUT017 Handoff now rejects malformed/negative/fractional/out-of-edition pages and untyped/out-of-bounds nested anchor regions rather than silently coercing coordinates. FUT019 Reading Room denies unreviewed SVG selectors and malformed/unknown selector types before a File17 provider receives context. Native real-PHP regression: `tests/test-r46-handoff-room-selector-safety.php`. DB/schema and integration contract remain `1.1.0`; staging/deployed Hostinger parity are unverified.
+
+
+## R47 — File17 reading-room source page and region integrity
+Twenty bounded (not E2E) File12/central/companion plan-to-code reviews are in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R47.md`. Under FUT019, reading-room page and region identity cannot be silently rebound/clamped. Native `PLDR_Future_Rooms::create/anchor` now rejects page outside edition and invalid/NaN/INF/wrong-type/out-of-page region values before local room insert or File17 provider call. `tests/test-r47-reading-room-page-region-integrity.php` executes real native PHP handlers. Software rc.26; schema/interface 1.1.0 unchanged; physical Hostinger/staging remains unverified.
