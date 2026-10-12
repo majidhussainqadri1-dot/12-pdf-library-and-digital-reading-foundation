@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.28`
+Candidate: `1.1.0-rc.29`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -228,3 +228,10 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Future_Preferences::validate_value_shape`: shared strict approved typed nested fields, no new-write DB access for malformed settings.
 - `PLDR_Future_Preferences::get`: validates historical JSON object vs list, canonical values, denies partial corrupt projections, preserves valid legacy empty state.
 - `tests/test-r49-reader-preferences-integrity.php` native PHP fixtures included in PHP CI. Source schema and integration contract 1.1.0 unchanged, no physical migration; deployed/staging unknown.
+
+
+## R50 source candidate 1.1.0-rc.29 — File16 corpus provenance
+- Review ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-12-R50.md` (20 bounded checks, not full E2E).
+- `PLDR_Future_Corpus::decode_cursor`: type-exact signed HMAC cursor bound to current File16 edition/consumer context, no page coercion.
+- `PLDR_Future_Corpus::manifest`: validates all OCR row pages are strictly increasing canonical edition pages including lookahead; fails without partial AI chunks on corruption.
+- `tests/test-r50-file16-corpus-cursor-source.php` real PHP native-method fixture, CI gate. Source DB/schema/interface 1.1.0 unchanged; installed state unverified.

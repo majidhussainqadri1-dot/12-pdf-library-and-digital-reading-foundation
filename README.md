@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.28`
+- Software: `1.1.0-rc.29`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -121,3 +121,7 @@ Twenty **bounded** governing File12/central/companion source reviews are recorde
 
 ## R49 — private synchronized Reader Preferences integrity
 Twenty bounded File12/central/companion plan-to-source inspections are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R49.md`; not 20 exhaustive WordPress E2E audits. Actual `PLDR_Future_Preferences::save` now enforces typed nested layout/contrast/sizing/TTS/Data Saver fields before DB reads and writes; `get` uses the same contract for historical JSON maps, rejects nonempty lists/corrupt values without partial private projection, and preserves legitimate empty legacy/valid settings. Regression `tests/test-r49-reader-preferences-integrity.php`. Software source candidate rc.28; source DB/schema/contract 1.1.0 unchanged. Real deployed/staging versions unverified.
+
+
+## R50 — File16 AI Corpus Manifest signed cursor and source-page integrity
+Source candidate 1.1.0-rc.29: twenty bounded requirements/source inspections in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R50.md` (not twenty independent E2E audits). The actual `PLDR_Future_Corpus::decode_cursor` now fails closed on signed-but-wrongly-typed page identities, and `manifest` rejects noncanonical/duplicated/out-of-order/beyond-edition OCR pages before constructing File16 citation/chunk metadata or next cursor. Existing rights/allowlist/File16-consumer checks remain authoritative; AI generation stays File16-owned. Native regression `tests/test-r50-file16-corpus-cursor-source.php`. Source schema/interface 1.1.0 unchanged; staging/live unverified.

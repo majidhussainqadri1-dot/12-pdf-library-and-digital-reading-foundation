@@ -328,3 +328,12 @@ Twenty bounded source checks `docs/TWENTY-ROUND-REVIEW-2026-10-12-R47.md`; softw
 | F12-FUT-001 reflow sizing/contrast, FUT002 TTS settings, FUT013 Data Saver, FUT014 RTL layouts; section 11.4 private user-scoped versioned preferences, central File00/24 | `PLDR_Future_Preferences::validate_value_shape` checks correct typed nested fields before DB read/write and rejects unknown layout/flags; `get` rejects stored JSON list/invalid private map using same rules | `tests/test-r49-reader-preferences-integrity.php` actual native GET/SAVE, historical and optimistic version updates | Real authenticated WordPress GET/POST, File00/IDOR, other account, malformed legacy MySQL rows, RTL, accessibility, browser/device saves and rollback |
 
 20 bounded checks documented in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R49.md`; software rc.28; source schema/interface 1.1.0 unchanged; no live claim.
+
+
+## R50 — F12-FUT-021 File16 AI-ready corpus source-page provenance and signed cursor
+| Governing owner / plan | Exact source method change | Executable source evidence | Real installed acceptance |
+|---|---|---|---|
+| F12-FUT-021; File12 owns document/edition/OCR source facts, File16 owns AI output; File00 rights/entitlement and File24 privacy | `PLDR_Future_Corpus::decode_cursor`: signed positive integer page only, typed canonical context; no `absint` coercion | `tests/test-r50-file16-corpus-cursor-source.php` valid/wrong typed/wrong context signed page assertions | Real File16 consumer token/authorization, HMAC key and WordPress route, consent/rights and IDOR |
+| F12-FUT-021: stable source chunk/page/citation/hash and current page owner | `PLDR_Future_Corpus::manifest`: fail-closed canonical monotonically advancing in-edition OCR pages even for lookahead; no partial AI manifest | Same test real manifest source fixture malformed/stale/duplicate/over-page | Physical MySQL/approved OCR correction provenance; real File16 corpus caller, staging and backward cursor tests |
+
+Review ledger `docs/TWENTY-ROUND-REVIEW-2026-10-12-R50.md`; software rc.29; source schema/integration 1.1.0. No live truth inferred.
