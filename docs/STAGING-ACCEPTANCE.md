@@ -1,4 +1,4 @@
-# File 12 staging acceptance checklist — 1.1.0-rc.24 (R45 source candidate; NOT YET STAGING ACCEPTED)
+# File 12 staging acceptance checklist — 1.1.0-rc.25 (R46 source candidate; NOT YET STAGING ACCEPTED)
 
 A release may not be called staging-accepted until all items below have fresh evidence on the actual Hostinger staging environment.
 
@@ -44,3 +44,5 @@ A release may not be called staging-accepted until all items below have fresh ev
 33. **R44 offline rights expiry at runtime:** insert/restore lawful and intentionally corrupt legacy rights records in isolated Hostinger staging, prove impossible dates, timezone boundaries, overdue rights and near-expiring (<2-minute) rights do not emit unsafe offline-grants; compare actual native signed access-token row `expires_at` with persisted rights and device vault `offline_valid_until`; verify no extension under concurrent rights update or credential revocation. Test File00 entitlement and offline reconnect; execute real MySQL/browser sequence with rollback and privacy evidence.
 
 34. R45 authenticated native/private REST/Web Annotation parity: in isolated real WordPress staging seed existing owner/edition-tagged rows with valid []/string tags plus corrupt maps, nested arrays and wrong-typed historical JSON. Confirm direct private items, paginated REST and W3C portable export all deny corrupt records without exposing partial notes/bookmark bodies, and valid W3C export/import round-trips correctly. Repeat under another logged-in user and anonymous access; ensure no File05 learner-private state or File06 knowledge-store duplicate. Restore/rollback after test.
+
+35. **R46 native File17 reading room and cross-device handoff:** on real installed WordPress with File00/17/20/25 contracts test negative/null/fractional/large page and malformed typed nested regions, ensure no writes/no stale handoff or room side effects; verify valid RTL spread handoff resume across two devices and real optimistic version conflict. Test actual File17 room provider with attempted SvgSelector, wrong selectors and supported TextQuote/Fragment/Css, assert no unreviewed SVG is sent/provider created, privacy/IDOR denial and compensations. Restore staged test rows and compare deployed hashes.
