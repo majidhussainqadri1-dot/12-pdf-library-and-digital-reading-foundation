@@ -311,3 +311,12 @@ Twenty bounded inspections recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R46.
 | F12-FUT-019; FUT005/017 page and precise-anchor parity, File17 canonical communication owner | `PLDR_Future_Rooms::create` rejects invalid edition pages, no silent clamp; `PLDR_Future_Rooms::anchor/valid_region_coordinate` rejects wrong typed/out-of-bounds regions, no coordinate clamp | `tests/test-r47-reading-room-page-region-integrity.php` and prior R46 | Real WordPress with File00 entitlements, File17 provider/compensation, latest deployed code/hash, restricted document/IDOR, distinct user accounts, rollback and stage review |
 
 Twenty bounded source checks `docs/TWENTY-ROUND-REVIEW-2026-10-12-R47.md`; software `1.1.0-rc.26`, source schema `1.1.0` unchanged; no claim of production acceptance.
+
+
+## R48 — FUT017 stored Handoff DTO and FUT005/019 File17 TextQuote source provenance
+| Requirement / owner | Source implementation | Executable proof | External acceptance still required |
+|---|---|---|---|
+| F12-FUT017 private session handoff and optimistic version; File00 user scope, File25 RTL | `PLDR_Future_Handoff::dto($row,$edition_pages)` canonical parser and edition bounds, fail-closed historical corrupt state without partial private projection | `tests/test-r48-stored-handoff-and-room-quote.php` actual DTO method plus older R46 save/write tests | Real DB legacy rows, File00 auth/IDOR, multi-device round-trip/current edition and Version CAS |
+| F12-FUT005 precise text source and F12-FUT019 File17 canonical communication | `PLDR_Future_Rooms::anchor` requires meaningful `TextQuoteSelector.exact` before File17 provider dispatch; page-only supported | Same R48 fixture invokes Room create/anchor and zero DB writes on bad selector | Real provider connection/compensation, published OCR source and page match, staging privacy/rollback |
+
+20 limited scope audits recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R48.md`; software rc.27; source DB/schema/contract 1.1.0 unchanged; no deployed-state evidence.
