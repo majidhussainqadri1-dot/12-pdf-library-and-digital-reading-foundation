@@ -81,7 +81,7 @@ final class PLDR_Future_Handoff {
      * owner and optimistic-concurrency reads.
      */
     private static function validate_handoff_input(array $context) {
-        $value=$context['page']??1;
+        $value=array_key_exists('page',$context)?$context['page']:1;
         if(is_int($value) && $value>=1)$page=$value;
         elseif(is_string($value) && preg_match('/^[1-9][0-9]*$/D',$value)
             && strlen($value)<=strlen((string)PHP_INT_MAX)
