@@ -88,10 +88,26 @@ final class PLDR_Future_Rooms {
 
     private static function anchor(array $anchor,int $page) {
         $out=array();
+        if(array_key_exists('type',$anchor)&&!is_string($anchor['type']))
+            return PLDR_Core::machine_error('pldr_room_selector_shape','Reading-room selector type must be a string.',400);
         $type=sanitize_text_field((string)($anchor['type']??''));
-        if(in_array($type,array('TextQuoteSelector','FragmentSelector','SvgSelector','CssSelector'),true))$out['type']=$type;
-        foreach(array('exact'=>500,'prefix'=>120,'suffix'=>120,'selection'=>500,'value'=>300) as $key=>$limit){if(isset($anchor[$key]))$out[$key]=self::limit(wp_strip_all_tags((string)$anchor[$key]),$limit);}
-        if(in_array($type,array('FragmentSelector','SvgSelector','CssSelector'),true)&&''===trim((string)($out['value']??''))&&!isset($anchor['region']))return PLDR_Core::machine_error('pldr_room_selector_value','This reading-room selector requires a bounded selector value or region.',400);
+        $supported=array('TextQuoteSelector','FragmentSelector','CssSelector');
+        // Precise Anchors and Cross-Device Handoff cannot safely preserve
+        // SVG selectors. Never pass a lossy/unreviewed SVG/XML selector to
+        // the separate File17 communication owner through this adapter.
+        if('SvgSelector'===$type)
+            return PLDR_Core::machine_error('pldr_room_svg_unsupported',
+                'SVG reading-room selectors are unavailable until a lossless, security-reviewed representation is approved.',
+                400,array('supported_selector_types'=>$supported));
+        if(''!==$type&&!in_array($type,$supported,true))
+            return PLDR_Core::machine_error('pldr_room_selector','Unsupported reading-room anchor selector.',400,array('supported_selector_types'=>$supported));
+        if(''!==$type)$out['type']=$type;
+        foreach(array('exact'=>500,'prefix'=>120,'suffix'=>120,'selection'=>500,'value'=>300) as $key=>$limit){
+            if(array_key_exists($key,$anchor) && !is_string($anchor[$key]))
+                return PLDR_Core::machine_error('pldr_room_selector_shape','Reading-room selector text must be a string.',400,array('field'=>$key));
+            if(isset($anchor[$key]))$out[$key]=self::limit(wp_strip_all_tags($anchor[$key]),$limit);
+        }
+        if(in_array($type,array('FragmentSelector','CssSelector'),true)&&''===trim((string)($out['value']??''))&&!isset($anchor['region']))return PLDR_Core::machine_error('pldr_room_selector_value','This reading-room selector requires a bounded selector value or region.',400);
         if('FragmentSelector'===$type&&!empty($out['value'])&&preg_match('/(?:^|[?&#;])page=(\d+)/',(string)$out['value'],$m)&&absint($m[1])!==$page)return PLDR_Core::machine_error('pldr_room_fragment_page','Reading-room fragment selector page identity does not match the requested page.',409);
         if(isset($anchor['region'])&&is_array($anchor['region'])){
             $region=array('x'=>max(0,min(1,(float)($anchor['region']['x']??0))),'y'=>max(0,min(1,(float)($anchor['region']['y']??0))),'w'=>max(0,min(1,(float)($anchor['region']['w']??0))),'h'=>max(0,min(1,(float)($anchor['region']['h']??0))));

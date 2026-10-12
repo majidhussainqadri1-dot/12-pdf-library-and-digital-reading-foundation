@@ -1,3 +1,16 @@
+# File12 R46 — cross-device Handoff and File17 Room selector validation (source-only rc.25)
+
+- Exact source parent: R45 PR#40 HEAD `b5e04a380aef62b7d83d15ef17079e5867d86528` (its green CI is NOT evidence for R46).
+- 20 bounded topic-based source/plan checks across amended File12 19 FR, Future-24, consolidated three central governing plans and companion File05/06/17/19/20/21/23/24/25/26; not 20 independent exhaustive E2E sessions. Source owner methods found; R46-D01 and D02 confirmed behavioral integrity defects.
+- R46 corrections: typed native FUT017 Handoff page/region and anchor values; explicit FUT019 Room SVG/unknown/malformed selector denial at File17 provider boundary; no new chat owner or physical DB changes.
+- New `tests/test-r46-handoff-room-selector-safety.php` real native PHP fixture is gated in PHP8.1/8.3/8.4 CI. Final candidate HEAD, package hash and result must be verified on R46 exact SHA, not inherited from prior run.
+- Candidate source software `1.1.0-rc.25`; source DB schema/interface contract `1.1.0` unchanged. Hostinger deployed plugin and companion runtime, physical DB/wp_options/migrations, privacy/IDOR, File17 provider behavior, backup/restore, two fresh staging cycles, Founder approval, live deploy/retest ALL UNVERIFIED.
+- Original plan internal folder `12-pdf-library-foundation` vs source ZIP `pdf-library-foundation-12` remains Founder-controlled release/rollback mismatch.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R45 — private W3C Annotation export integrity; source-only 1.1.0-rc.24
 
 - Exact frozen parent R44 PR #39 HEAD `59b7e8e73c139a8444fa3aa50a345af28e989c79`; its green CI does NOT prove this R45 source change.

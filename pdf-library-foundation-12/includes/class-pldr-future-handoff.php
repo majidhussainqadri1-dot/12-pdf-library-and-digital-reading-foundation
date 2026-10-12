@@ -22,12 +22,15 @@ final class PLDR_Future_Handoff {
         global $wpdb;
         $uid=get_current_user_id();
         if(!$uid)return PLDR_Core::machine_error('pldr_handoff_login','Log in to synchronize reading sessions.',401);
+        $input=self::validate_handoff_input($context);
+        if(is_wp_error($input))return $input;
         $edition=PLDR_Future_Data::require_edition($edition_id);if(is_wp_error($edition))return $edition;
+        if($input['page']>(int)$edition['pages'])return PLDR_Core::machine_error('pldr_handoff_page','Reading-session handoff page exceeds this edition.',400);
         $current=self::get($edition_id);if(is_wp_error($current))return $current;
         if($current && $expected<1)return PLDR_Core::machine_error('pldr_handoff_precondition','expected_version is required when updating an existing cross-device reading session.',428,array('current'=>$current));
         if(!$current && $expected>0)return PLDR_Core::machine_error('pldr_handoff_conflict','No existing reading session matches the supplied expected_version.',409,array('current'=>array()));
         if($current&&(int)$current['version']!==$expected)return PLDR_Core::machine_error('pldr_handoff_conflict','A newer reading session exists on another device.',409,array('current'=>$current));
-        $page=max(1,min((int)$edition['pages'],absint($context['page']??1)));
+        $page=$input['page'];
         $layout=sanitize_key((string)($context['layout']??'single'));
         if(!in_array($layout,array('single','continuous','spread-ltr','spread-rtl','horizontal','presentation'),true))$layout='single';
         $zoom=self::limit(sanitize_text_field((string)($context['zoom']??'page-width')),30);
@@ -72,7 +75,48 @@ final class PLDR_Future_Handoff {
         );
     }
 
+    /**
+     * FUT-017: preserve cross-device page/anchor identity. Never convert
+     * negative, fractional or structured pages into a different page before
+     * owner and optimistic-concurrency reads.
+     */
+    private static function validate_handoff_input(array $context) {
+        $value=array_key_exists('page',$context)?$context['page']:1;
+        if(is_int($value) && $value>=1)$page=$value;
+        elseif(is_string($value) && preg_match('/^[1-9][0-9]*$/D',$value)
+            && strlen($value)<=strlen((string)PHP_INT_MAX)
+            && (string)(int)$value===$value)$page=(int)$value;
+        else return PLDR_Core::machine_error('pldr_handoff_page_shape',
+            'Reading-session page must be a positive integer without coercion.',400);
+        foreach(array('layout','zoom','device') as $key){
+            if(array_key_exists($key,$context)&&!is_string($context[$key]))
+                return PLDR_Core::machine_error('pldr_handoff_text_shape',
+                    'Reading-session text options must be strings.',400,array('field'=>$key));
+        }
+        if(array_key_exists('anchor',$context) && !is_array($context['anchor']))
+            return PLDR_Core::machine_error('pldr_handoff_anchor_shape',
+                'Reading-session anchor must be a structured array.',400);
+        return array('page'=>$page);
+    }
+
+    /**
+     * Region coordinates are normalized 0..1 real numbers, not arbitrary
+     * payloads that PHP could silently cast to zero/one or clamp.
+     */
+    private static function valid_region_coordinate($value): bool {
+        if(is_bool($value)||is_array($value)||is_object($value)||null===$value)return false;
+        if(is_int($value)||is_float($value))$n=(float)$value;
+        elseif(is_string($value) && preg_match('/^(?:0(?:\\.[0-9]{1,9})?|1(?:\\.0{1,9})?)$/D',$value))$n=(float)$value;
+        else return false;
+        return is_finite($n)&&$n>=0.0&&$n<=1.0;
+    }
+
     private static function anchor(array $anchor,int $page) {
+        foreach(array('selection','type','exact','prefix','suffix','value') as $key){
+            if(array_key_exists($key,$anchor)&&!is_string($anchor[$key]))
+                return PLDR_Core::machine_error('pldr_handoff_anchor_text_shape',
+                    'Reading-session selector fields must be strings.',400,array('field'=>$key));
+        }
         $out=array();
         if(isset($anchor['selection']))$out['selection']=self::limit(wp_strip_all_tags((string)$anchor['selection']),500);
         $type='';
@@ -87,8 +131,15 @@ final class PLDR_Future_Handoff {
         if('TextQuoteSelector'===$type&&''===trim((string)($out['exact']??'')))return PLDR_Core::machine_error('pldr_handoff_exact','A text-quote handoff selector requires an exact excerpt.',400);
         if(in_array($type,array('FragmentSelector','CssSelector'),true)&&''===trim((string)($out['value']??''))&&!isset($anchor['region']))return PLDR_Core::machine_error('pldr_handoff_selector_value','This handoff selector requires a bounded selector value or region.',400);
         if('FragmentSelector'===$type&&!empty($out['value'])&&preg_match('/(?:^|[?&#;])page=(\d+)/',(string)$out['value'],$m)&&absint($m[1])!==$page)return PLDR_Core::machine_error('pldr_handoff_fragment_page','Handoff fragment selector page identity does not match the saved page.',409);
-        if(isset($anchor['region'])&&is_array($anchor['region'])){
-            $region=array('x'=>max(0,min(1,(float)($anchor['region']['x']??0))),'y'=>max(0,min(1,(float)($anchor['region']['y']??0))),'w'=>max(0,min(1,(float)($anchor['region']['w']??0))),'h'=>max(0,min(1,(float)($anchor['region']['h']??0))));
+        if(array_key_exists('region',$anchor)){
+            if(!is_array($anchor['region']))return PLDR_Core::machine_error('pldr_handoff_region_shape','Reading-session region must be a coordinate object.',400);
+            $region=array();
+            foreach(array('x'=>0,'y'=>0,'w'=>null,'h'=>null) as $axis=>$default){
+                $raw=$anchor['region'][$axis]??$default;
+                if(!self::valid_region_coordinate($raw))return PLDR_Core::machine_error('pldr_handoff_region_shape',
+                    'Reading-session region coordinate must be a normalized 0..1 number.',400,array('coordinate'=>$axis));
+                $region[$axis]=(float)$raw;
+            }
             if($region['w']<=0||$region['h']<=0||($region['x']+$region['w'])>1||($region['y']+$region['h'])>1)return PLDR_Core::machine_error('pldr_handoff_region','Reading-session handoff region must remain inside the saved page with positive dimensions.',400);
             $out['region']=$region;
         }

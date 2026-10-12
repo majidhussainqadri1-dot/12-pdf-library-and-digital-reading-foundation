@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.24`
+Candidate: `1.1.0-rc.25`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -200,3 +200,11 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `class-pldr-future-annotations.php` export of private W3C JSON-LD now refuses invalid historical `tags_json` via the canonical `PLDR_Reading::parse_stored_tags` parser; no partial output on corrupt row.
 - `tests/test-r45-annotation-export-integrity.php` real export and parser fixture added to PHP CI quality gate; source DB/schema/interface 1.1.0 unchanged, no migration.
 - Live server/backend/installed owners and plugin directory-naming conflict remain unverified for production approval.
+
+
+## R46 cross-owner handoff / reading-room source evidence
+- Plan/source ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-12-R46.md` (20 bounded topics, not full E2E).
+- `PLDR_Future_Handoff::save/anchor` checks positive typed nested page, explicit valid edition range, typed layout/anchor/region, finite normalized 0..1 region values, no silent coercion or clamp of user location.
+- `PLDR_Future_Rooms::anchor` rejects previously admitted and unsupported `SvgSelector` and malformed/unknown types; retains approved TextQuote/Fragment/Css selectors without changing File17 canonical communication owner.
+- New `tests/test-r46-handoff-room-selector-safety.php` actual native methods and no-write test, PHP CI; source schema/interface `1.1.0` unchanged, source version `1.1.0-rc.25`.
+- Deployed version, plugin folder/rename, MySQL/migration, backups, integration/staging/live verification are not established.
