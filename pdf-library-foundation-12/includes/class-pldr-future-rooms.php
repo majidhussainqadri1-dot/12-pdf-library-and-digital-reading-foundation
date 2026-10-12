@@ -124,6 +124,12 @@ final class PLDR_Future_Rooms {
                 return PLDR_Core::machine_error('pldr_room_selector_shape','Reading-room selector text must be a string.',400,array('field'=>$key));
             if(isset($anchor[$key]))$out[$key]=self::limit(wp_strip_all_tags($anchor[$key]),$limit);
         }
+        // A TextQuoteSelector without an exact source quote is a mislabeled
+        // unanchored selector: File12 precise anchors and FUT017 handoff
+        // already reject it. Do not dispatch it to the File17 provider.
+        if('TextQuoteSelector'===$type && ''===trim((string)($out['exact']??'')))
+            return PLDR_Core::machine_error('pldr_room_exact',
+                'A reading-room TextQuoteSelector requires an exact page excerpt.',400);
         if(in_array($type,array('FragmentSelector','CssSelector'),true)&&''===trim((string)($out['value']??''))&&!isset($anchor['region']))return PLDR_Core::machine_error('pldr_room_selector_value','This reading-room selector requires a bounded selector value or region.',400);
         if('FragmentSelector'===$type&&!empty($out['value'])&&preg_match('/(?:^|[?&#;])page=(\d+)/',(string)$out['value'],$m)&&absint($m[1])!==$page)return PLDR_Core::machine_error('pldr_room_fragment_page','Reading-room fragment selector page identity does not match the requested page.',409);
         if(array_key_exists('region',$anchor)){

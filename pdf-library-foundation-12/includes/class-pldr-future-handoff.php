@@ -15,7 +15,7 @@ final class PLDR_Future_Handoff {
             PLDR_Core::audit('edition',$edition_id,'handoff_read_failed',array('user_id'=>$uid));
             return PLDR_Core::machine_error('pldr_handoff_read','Cross-device reading-session state could not be read reliably.',503,array('degraded'=>true));
         }
-        return $row?self::dto($row):array();
+        return $row?self::dto($row,(int)$edition['pages']):array();
     }
 
     public static function save(int $edition_id,array $context,int $expected=0) {
@@ -53,15 +53,32 @@ final class PLDR_Future_Handoff {
                 return PLDR_Core::machine_error('pldr_handoff_store','Reading-session handoff could not be stored.',500);
             }
         }
-        return self::dto($row);
+        return self::dto($row,(int)$edition['pages']);
     }
 
-    private static function dto(array $row) {
+    private static function dto(array $row,int $edition_pages=0) {
         $raw=(string)($row['anchor_json']??'');
-        $anchor=json_decode($raw,true);
-        if(''!==trim($raw)&&!is_array($anchor)){
-            PLDR_Core::audit('edition',(int)($row['edition_id']??0),'handoff_anchor_corrupt',array('user_id'=>(int)($row['user_id']??0),'version'=>(int)($row['version']??0)));
-            return PLDR_Core::machine_error('pldr_handoff_corrupt','Stored cross-device reading anchor failed integrity validation and was not silently discarded.',500,array('version'=>(int)($row['version']??0)));
+        $page=(int)($row['page_number']??0);
+        $legacy_empty=''===trim($raw);
+        // Decode once as JSON objects to distinguish a legal empty [] from
+        // a nonempty positional list that cannot be a named selector map.
+        $native=$legacy_empty?array():json_decode($raw);
+        $anchor=$legacy_empty?array():json_decode($raw,true);
+        $valid_shape=is_array($anchor) && (
+            is_object($native) || (is_array($native)&&count($native)===0));
+        $verified=$valid_shape && $page>0 && ($edition_pages<1||$page<=$edition_pages)
+            ?self::anchor($anchor,$page):null;
+        // A malformed stored selector must not be silently normalized,
+        // truncated, stripped of markup or stripped of unknown fields.
+        // Loose array equality deliberately allows PHP's int/float JSON
+        // round-trip for 0.0 without requiring a literal decimal point.
+        if(!$valid_shape || $page<1 || ($edition_pages>0 && $page>$edition_pages)
+            || is_wp_error($verified) || !is_array($verified) || $verified!=$anchor){
+            PLDR_Core::audit('edition',(int)($row['edition_id']??0),'handoff_anchor_corrupt',
+                array('user_id'=>(int)($row['user_id']??0),'version'=>(int)($row['version']??0)));
+            return PLDR_Core::machine_error('pldr_handoff_corrupt',
+                'Stored cross-device reading page/anchor failed canonical integrity validation and was not silently rewritten or exposed.',
+                500,array('version'=>(int)($row['version']??0)));
         }
         return array(
             'edition_id'=>(int)($row['edition_id']??0),

@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.26`
+Candidate: `1.1.0-rc.27`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -214,3 +214,10 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - Review ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-12-R47.md`, twenty **scoped** inspections, not 20 exhaustive complete audits.
 - `PLDR_Future_Rooms::create/anchor` now rejects out-of-range page numbers and incorrectly shaped/typed/out-of-range region coordinates rather than silently rebinding them; no changes to File17 communication backend.
 - Native executable regression `tests/test-r47-reading-room-page-region-integrity.php` on PHP matrix. Software rc.26; schema/integration contract 1.1.0 unchanged; live acceptance not performed.
+
+
+## R48 source candidate — Future Handoff GET read/Room quote integrity
+- Twenty governing scoped inspections: `docs/TWENTY-ROUND-REVIEW-2026-10-12-R48.md`.
+- `PLDR_Future_Handoff::dto` checks historical persisted JSON object/empty list, typed canonical selection/source/region and current edition page bounds instead of exposing malformed old state.
+- `PLDR_Future_Rooms::anchor` requires nonblank TextQuoteSelector `exact`; retains empty page-only and approved selectors.
+- New native PHP regression `tests/test-r48-stored-handoff-and-room-quote.php`; source candidate rc.27; DB/schema/contract 1.1.0 unchanged; no live verification.
