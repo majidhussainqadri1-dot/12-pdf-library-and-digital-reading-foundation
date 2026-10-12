@@ -144,7 +144,10 @@ foreach($valid as $value){
     $loaded=PLDR_Future_Preferences::get('reader');
     $check(is_array($loaded)&&($loaded['version']??0)===1,
         'valid preference read/version failed');
-    $check(($loaded['value']??null)===$created['value'],
+    // JSON's numeric model does not preserve PHP float(1.0) vs int(1).
+    // The settings contract permits either finite numeric representation;
+    // strict boolean/string/collection typing is separately tested above.
+    $check(($loaded['value']??null)==$created['value'],
         'valid persisted private preferences diverged from canonical saved values');
     $new=PLDR_Future_Preferences::save('reader',$value,1);
     $check(is_array($new)&&($new['version']??0)===2,
