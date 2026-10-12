@@ -294,3 +294,12 @@ Version software 1.1.0-rc.23; schema/interface 1.1.0 unchanged. 20 checks/source
 | F12-FUT-009; F12-FR-012; central C1 private data, File05 learning bookmark separation, File06 citation domain, File25 public visualization | `PLDR_Future_Annotations::export` validates persisted tags via `PLDR_Reading::parse_stored_tags` before preparing private W3C JSON-LD; R41 direct/private REST consumers already use the same parser | `tests/test-r45-annotation-export-integrity.php` tests valid lists, rejected invalid JSON objects, nested/wrong typed tags, oversize and no partial export after corrupt row | Real WordPress with existing legacy rows, File00 account access, W3C import/export round-trip, auth/IDOR tests and approved staging/live parity |
 
 Twenty bounded source checks: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R45.md`. Software rc.24; source schema/interface 1.1.0 unchanged. Repository source truth is not deployed proof.
+
+
+## R46 — F12-FUT-017/019 Handoff page/selector integrity; File17 owner law
+| Source specification/owner | Exact new source guard | Automated tests | Staging requirements |
+|---|---|---|---|
+| F12-FUT-017 cross-device page/layout/zoom/anchor, central private File00 authorization and optimistic version | `PLDR_Future_Handoff::validate_handoff_input`, `valid_region_coordinate`, `save`, `anchor`: fail closed on invalid nested typed pages/anchors, preserve exact coordinates | `tests/test-r46-handoff-room-selector-safety.php` real method fixture | Installed File00 session ownership/permissions, historical handoff rows, RTL/low-bandwidth browser, simultaneous two devices/conflict |
+| F12-FUT-005/019, canonical File17 communication and File05/06 page/citation identity | `PLDR_Future_Rooms::anchor`: no lossy/unreviewed `SvgSelector` or unknown/malformed text allowed into external provider | Same real Room create/anchor test and mutation write counter | Actual File17 external room provider/compensation, markup/selector safety, audit/rollback after provider error |
+
+Twenty bounded inspections recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R46.md`; software rc.25; schema/integration contract 1.1.0 unchanged. Source evidence ≠ live acceptance.
