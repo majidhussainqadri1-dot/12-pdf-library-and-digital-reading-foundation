@@ -4,7 +4,7 @@ Tags: pdf, library, digital-reading, rights, accessibility, rtl, iiif, annotatio
 Requires at least: 7.0
 Tested up to: 7.0.1
 Requires PHP: 8.1
-Stable tag: 1.1.0-rc.27
+Stable tag: 1.1.0-rc.28
 License: GPLv2 or later
 
 File 12 canonical implementation for the Sabri Social Homeopathy Platform.
@@ -48,3 +48,5 @@ R46 source candidate 1.1.0-rc.25: strict Future-17 cross-device page/anchor and 
 R47 source candidate 1.1.0-rc.26: strict File17 reading-room page/region identity, no silent page clamp/coordinate coercion; isolated actual native PHP regression. Schema/contract remain 1.1.0; live unverified.
 
 R48 source candidate rc.27: validate historical private cross-device stored page/anchor DTO before exposing it, and require a non-empty TextQuoteSelector exact excerpt before File17 reading-room provider dispatch. Existing source DB/schema and integration contract 1.1.0 unchanged; live install unverified.
+
+R49 source candidate rc.28: strictly typed private reader preferences POST fields and historical persisted preference JSON integrity, rejecting invalid Data Saver/sizing/TTS shapes and preserving optimistic versions. Source schema/contract 1.1.0 unchanged; Hostinger live/staging not yet verified.
