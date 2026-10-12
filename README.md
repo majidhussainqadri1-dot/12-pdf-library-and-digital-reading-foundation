@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.27`
+- Software: `1.1.0-rc.28`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -117,3 +117,7 @@ Twenty bounded (not E2E) File12/central/companion plan-to-code reviews are in `d
 
 ## R48 — historical private cross-device handoff / File17 TextQuote selector integrity
 Twenty **bounded** governing File12/central/companion source reviews are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R48.md`; this is not 20 independent E2E audits. Native FUT017 Handoff GET now validates historic stored page/anchor against the same canonical typed validator as new writes, rejecting nonempty positional JSON arrays, unknown/malformed selectors and out-of-edition page without partial private resume state. FUT019 reading-room rejects blank/missing `TextQuoteSelector.exact` before any File17 provider call. Real PHP fixture `tests/test-r48-stored-handoff-and-room-quote.php`; source software rc.27, schema/integration 1.1.0 unchanged. Hostinger/staging/live unverified.
+
+
+## R49 — private synchronized Reader Preferences integrity
+Twenty bounded File12/central/companion plan-to-source inspections are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R49.md`; not 20 exhaustive WordPress E2E audits. Actual `PLDR_Future_Preferences::save` now enforces typed nested layout/contrast/sizing/TTS/Data Saver fields before DB reads and writes; `get` uses the same contract for historical JSON maps, rejects nonempty lists/corrupt values without partial private projection, and preserves legitimate empty legacy/valid settings. Regression `tests/test-r49-reader-preferences-integrity.php`. Software source candidate rc.28; source DB/schema/contract 1.1.0 unchanged. Real deployed/staging versions unverified.
