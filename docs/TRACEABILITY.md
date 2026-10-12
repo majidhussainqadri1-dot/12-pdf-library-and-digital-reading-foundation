@@ -320,3 +320,11 @@ Twenty bounded source checks `docs/TWENTY-ROUND-REVIEW-2026-10-12-R47.md`; softw
 | F12-FUT005 precise text source and F12-FUT019 File17 canonical communication | `PLDR_Future_Rooms::anchor` requires meaningful `TextQuoteSelector.exact` before File17 provider dispatch; page-only supported | Same R48 fixture invokes Room create/anchor and zero DB writes on bad selector | Real provider connection/compensation, published OCR source and page match, staging privacy/rollback |
 
 20 limited scope audits recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R48.md`; software rc.27; source DB/schema/contract 1.1.0 unchanged; no deployed-state evidence.
+
+
+## R49 — FUT001/002/013/014 account-private reader preference integrity
+| Written requirements/owner | Actual File12 implementation | Source regression | Real staging acceptance |
+|---|---|---|---|
+| F12-FUT-001 reflow sizing/contrast, FUT002 TTS settings, FUT013 Data Saver, FUT014 RTL layouts; section 11.4 private user-scoped versioned preferences, central File00/24 | `PLDR_Future_Preferences::validate_value_shape` checks correct typed nested fields before DB read/write and rejects unknown layout/flags; `get` rejects stored JSON list/invalid private map using same rules | `tests/test-r49-reader-preferences-integrity.php` actual native GET/SAVE, historical and optimistic version updates | Real authenticated WordPress GET/POST, File00/IDOR, other account, malformed legacy MySQL rows, RTL, accessibility, browser/device saves and rollback |
+
+20 bounded checks documented in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R49.md`; software rc.28; source schema/interface 1.1.0 unchanged; no live claim.
