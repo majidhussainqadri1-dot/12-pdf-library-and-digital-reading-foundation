@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.24`
+- Software: `1.1.0-rc.25`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -105,3 +105,7 @@ Source-only rc.23: twenty bounded requirement/source inspections are recorded in
 
 ## R45 — portable private annotations integrity (11 October 2026)
 Twenty scoped File12/central/companion source checks are documented in `docs/TWENTY-ROUND-REVIEW-2026-10-11-R45.md` (not 20 full browser E2E reviews). The portable Web Annotation export now reuses `PLDR_Reading::parse_stored_tags` so historical invalid private bookmark/note/highlight tag JSON is denied consistently across direct, REST and Future-24 export paths, without partial export or tag leakage. Regression: `tests/test-r45-annotation-export-integrity.php`. Software source candidate 1.1.0-rc.24; schema/contract 1.1.0 unchanged; live/staging unverified.
+
+
+## R46 — cross-device handoff and File17 Reading Room selector integrity
+The R46 source-only candidate `1.1.0-rc.25` documents twenty bounded plan/source inspections in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R46.md` (not 20 exhaustive end-to-end audits). FUT017 Handoff now rejects malformed/negative/fractional/out-of-edition pages and untyped/out-of-bounds nested anchor regions rather than silently coercing coordinates. FUT019 Reading Room denies unreviewed SVG selectors and malformed/unknown selector types before a File17 provider receives context. Native real-PHP regression: `tests/test-r46-handoff-room-selector-safety.php`. DB/schema and integration contract remain `1.1.0`; staging/deployed Hostinger parity are unverified.
