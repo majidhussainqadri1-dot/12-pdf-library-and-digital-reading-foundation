@@ -303,3 +303,11 @@ Twenty bounded source checks: `docs/TWENTY-ROUND-REVIEW-2026-10-11-R45.md`. Soft
 | F12-FUT-005/019, canonical File17 communication and File05/06 page/citation identity | `PLDR_Future_Rooms::anchor`: no lossy/unreviewed `SvgSelector` or unknown/malformed text allowed into external provider | Same real Room create/anchor test and mutation write counter | Actual File17 external room provider/compensation, markup/selector safety, audit/rollback after provider error |
 
 Twenty bounded inspections recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R46.md`; software rc.25; schema/integration contract 1.1.0 unchanged. Source evidence ≠ live acceptance.
+
+
+## R47 — FUT019 room exact document/page/anchor boundary (File17)
+| Governing File12 / central requirement | Native code | Source regression | Real release gate |
+|---|---|---|---|
+| F12-FUT-019; FUT005/017 page and precise-anchor parity, File17 canonical communication owner | `PLDR_Future_Rooms::create` rejects invalid edition pages, no silent clamp; `PLDR_Future_Rooms::anchor/valid_region_coordinate` rejects wrong typed/out-of-bounds regions, no coordinate clamp | `tests/test-r47-reading-room-page-region-integrity.php` and prior R46 | Real WordPress with File00 entitlements, File17 provider/compensation, latest deployed code/hash, restricted document/IDOR, distinct user accounts, rollback and stage review |
+
+Twenty bounded source checks `docs/TWENTY-ROUND-REVIEW-2026-10-12-R47.md`; software `1.1.0-rc.26`, source schema `1.1.0` unchanged; no claim of production acceptance.
