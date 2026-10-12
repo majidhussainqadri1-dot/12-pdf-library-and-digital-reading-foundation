@@ -1,3 +1,15 @@
+# File12 R50 — File16 AI Corpus source/cursor integrity; source-only 1.1.0-rc.29
+
+- Twenty **bounded topical** File12 original-plan, three central plans and companion File00/05/06/16/20/21/23/24/25/26/CF04 requirement/source checks recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R50.md`; NOT 20 independently complete E2E audits.
+- R50-D01 Signed AI Corpus cursor HMAC verified but invalid positive-page type coerced through `absint` -> now require canonical integer and exact consumer context without coercion.
+- R50-D02 Persisted OCR historical source rows could produce wrong/out-of-edition/duplicate chunk/page citations -> now validate full rows including lookahead before any File16 corpus projection, fail closed, no partial manifest.
+- Native PHP regression `tests/test-r50-file16-corpus-cursor-source.php`, PHP8.1/8.3/8.4 and package CI; candidate source 1.1.0-rc.29, source schema and interface 1.1.0 unchanged.
+- No merge/deploy. Actual deployed Hostinger file/version/checksum, physical DB/wp_options/migrations, installed File16 consumer and other plugins, backup, keys, scanner, staging real AI corpus/IDOR and live parity remain UNVERIFIED; plugin-folder mismatch remains Founder release gate.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R49 — typed private Reader Preferences and historical JSON integrity, source-only rc.28
 
 - Frozen parent R48 PR#43 exact SHA `37dc2b6ef18914714c804274b61f260f924ddf8c` whose green CI was parent-only. R49 final HEAD CI must be checked separately.
