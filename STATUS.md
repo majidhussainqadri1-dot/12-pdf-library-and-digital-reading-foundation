@@ -1,3 +1,14 @@
+# File12 R48 — historical cross-device DTO and scholarly Reading Room quote integrity, source-only 1.1.0-rc.27
+
+- Twenty bounded original File12 FR001–019/FUT017/005/019, consolidated central and companion File00/05/06/17/20/21/23/24/25/26/CF04 source checks recorded: `docs/TWENTY-ROUND-REVIEW-2026-10-12-R48.md` (NOT twenty entire independent E2E reviews).
+- R48-D01: previously persisted malformed `session_handoffs.anchor_json` accepted merely because JSON decoded as array; new DTO uses native exact page and canonical anchor validation, fails closed without partial reader state. R48-D02: File17 Reading Room mislabeled `TextQuoteSelector` with no `exact` accepted; now denies before provider call.
+- Regression `tests/test-r48-stored-handoff-and-room-quote.php` invokes actual native Handoff DTO and Room create/anchor; PHP8.1/8.3/8.4 quality gate. R48 immutable CI/ZIP evidence pending until successful exact SHA.
+- Source software `1.1.0-rc.27`; source DB/schema/integration contract `1.1.0` unchanged, no physical migration. Main bootstrap-only, draft PR stack unmerged. Plugin-root discrepancy, Hostinger installed version/DB and companion actual integration, IDOR/RTL/offline/backup/staging/live checks remain unverified.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R47 — File17 reading-room page/region integrity; source-only rc.26
 
 - 20 bounded File12 FR001–019/FUT017/019, central + File00/05/06/17/20/21/23/24/25/26/CF04 source-owner checks; not 20 exhaustive whole-repo/real-E2E reviews. R47-D01 out-of-range room page silently clamped; R47-D02 nested region values wrong-typed/clamped before File17 room provider. Corrected only after inspections.
