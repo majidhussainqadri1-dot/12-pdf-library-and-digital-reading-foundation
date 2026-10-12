@@ -1,4 +1,4 @@
-# File 12 staging acceptance checklist — 1.1.0-rc.27 (R48 source candidate; NOT YET STAGING ACCEPTED)
+# File 12 staging acceptance checklist — 1.1.0-rc.28 (R49 source candidate; NOT YET STAGING ACCEPTED)
 
 A release may not be called staging-accepted until all items below have fresh evidence on the actual Hostinger staging environment.
 
@@ -50,3 +50,5 @@ A release may not be called staging-accepted until all items below have fresh ev
 36. **R47 File17 native reading-room page and normalized region parity:** on a real installed WordPress staging edition with 12 pages, reject 0/-1/13+ page and malformed/NaN/INF/boolean/array/negative/>1/cross-page/zero-area region inputs; confirm no row insert, provider invocation, outbox event or leaked private room. Confirm valid fractional regions, exact page identity, File00 rights, File17 provider and rollback compensation, File20/25 RTL and real browser edge cases. Preserve Hostinger deployment checksums/DB/migration evidence before the final release gate.
 
 37. **R48 historical Handoff and File17 TextQuote source parity:** on independent Hostinger staging (not source fixture), seed safely isolated owned historical session_handoffs with malformed JSON, nonempty positional list, unknown/SVG selectors, wrong Fragment page, wrong region and out-of-edition page; GET and optimistic-version save must deny partial private reading state with proper logs/IDOR controls. Prove legitimate RTL history, empty legacy handoff and valid TextQuote/region still round-trip. Before File17 provider call reject missing/blank `TextQuoteSelector.exact`; verify actual provider state, OCR source-match, page-only rooms, transaction compensation, backups and rollback evidence; repeat in a second independent staging review cycle.
+
+38. R49 actual installed WordPress/Hostinger private preferences: verify unknown/nested/boolean-string/number-string Data Saver/RTL layout/Text Size/TTS REST POST failures with zero DB writes and no private state reads; seed existing corrupt user-scoped preference_json arrays, noncanonical maps and valid empty legacy []/{}, verify GET denies corrupt rows with audit/version and no cross-user/private cache leakage. Confirm legitimate text-first/Data Saver and RTL settings, rate/voice, version conflicts, low-bandwidth/accessible UI, restore/rollback and deployed checksum/DB migration parity.

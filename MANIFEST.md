@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.27`
+Candidate: `1.1.0-rc.28`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -221,3 +221,10 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Future_Handoff::dto` checks historical persisted JSON object/empty list, typed canonical selection/source/region and current edition page bounds instead of exposing malformed old state.
 - `PLDR_Future_Rooms::anchor` requires nonblank TextQuoteSelector `exact`; retains empty page-only and approved selectors.
 - New native PHP regression `tests/test-r48-stored-handoff-and-room-quote.php`; source candidate rc.27; DB/schema/contract 1.1.0 unchanged; no live verification.
+
+
+## R49 user-private Reader Preferences, source rc.28
+- Twenty bounded governing checks: `docs/TWENTY-ROUND-REVIEW-2026-10-12-R49.md`.
+- `PLDR_Future_Preferences::validate_value_shape`: shared strict approved typed nested fields, no new-write DB access for malformed settings.
+- `PLDR_Future_Preferences::get`: validates historical JSON object vs list, canonical values, denies partial corrupt projections, preserves valid legacy empty state.
+- `tests/test-r49-reader-preferences-integrity.php` native PHP fixtures included in PHP CI. Source schema and integration contract 1.1.0 unchanged, no physical migration; deployed/staging unknown.

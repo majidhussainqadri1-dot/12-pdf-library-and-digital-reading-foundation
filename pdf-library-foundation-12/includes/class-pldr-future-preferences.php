@@ -18,10 +18,21 @@ final class PLDR_Future_Preferences {
             return PLDR_Core::machine_error('pldr_future_pref_read','Synchronized reading preferences could not be read reliably.',503,array('degraded'=>true));
         }
         if(!$row)return array('value'=>array(),'version'=>0);
-        $decoded=json_decode((string)$row['preference_json'],true);
-        if(!is_array($decoded)){
+        $raw=(string)$row['preference_json'];
+        $native=json_decode($raw);
+        $decoded=json_decode($raw,true);
+        // A stored preference must be a named map, not an arbitrary JSON
+        // list. The empty legacy [] remains valid for no preferences.
+        $valid_container=is_object($native)||(is_array($native)&&count($native)===0);
+        $valid_values=is_array($decoded)?self::validate_value_shape($decoded):false;
+        $canonical=is_array($decoded)&&!is_wp_error($valid_values)
+            ?self::sanitize($decoded):null;
+        if(!$valid_container || !is_array($decoded) || is_wp_error($valid_values)
+            || $canonical!=$decoded){
             PLDR_Core::audit('user',$uid,'future_preference_corrupt',array('preference_key'=>$key,'version'=>(int)$row['version']));
-            return PLDR_Core::machine_error('pldr_future_pref_corrupt','Stored reading preferences failed integrity validation and were not silently replaced.',500,array('version'=>(int)$row['version']));
+            return PLDR_Core::machine_error('pldr_future_pref_corrupt',
+                'Stored private reading preferences failed canonical shape/integrity validation; no partial preferences were returned.',
+                500,array('version'=>(int)$row['version']));
         }
         return array('value'=>$decoded,'version'=>(int)$row['version'],'updated_at'=>$row['updated_at']);
     }
@@ -32,6 +43,8 @@ final class PLDR_Future_Preferences {
         if(!$uid)return PLDR_Core::machine_error('pldr_future_pref_login','Log in to synchronize advanced reading preferences.',401);
         $key=self::key($key);
         if(is_wp_error($key))return $key;
+        $shape=self::validate_value_shape($value);
+        if(is_wp_error($shape))return $shape;
         $current=self::get($key);
         if(is_wp_error($current))return $current;
         $current_version=(int)($current['version']??0);
@@ -63,6 +76,49 @@ final class PLDR_Future_Preferences {
         $key=sanitize_key($key);
         if(!in_array($key,self::KEYS,true))return PLDR_Core::machine_error('pldr_future_pref_key','Unsupported advanced-reading preference key.',400);
         return $key;
+    }
+
+    /**
+     * FUT-001/002/013/014: enforce the same typed settings contract for both
+     * new writes and historical account-private synchronized values.
+     * Numeric values may be clamped by sanitize(), but they must first be
+     * real finite numbers, never arrays, booleans or misleading strings.
+     */
+    private static function validate_value_shape(array $value) {
+        $known=array('layout','text_size','line_height','column_width','contrast',
+            'data_saver','tts_rate','tts_voice','language');
+        $layouts=array('single','continuous','spread-ltr','spread-rtl','horizontal','presentation');
+        $contrasts=array('default','high','soft','dark');
+        foreach($value as $key=>$item) {
+            if(!is_string($key)||!in_array($key,$known,true))
+                return PLDR_Core::machine_error('pldr_future_pref_shape',
+                    'Unknown or positional reading-preference field.',400,array('field'=>(string)$key));
+            if('layout'===$key||'contrast'===$key){
+                $enum='layout'===$key?$layouts:$contrasts;
+                if(!is_string($item)||!in_array($item,$enum,true))
+                    return PLDR_Core::machine_error('pldr_future_pref_shape',
+                        'Reading layout/contrast must be an approved string value.',400,array('field'=>$key));
+            }elseif(in_array($key,array('tts_voice','language'),true)){
+                if(!is_string($item))
+                    return PLDR_Core::machine_error('pldr_future_pref_shape',
+                        'Reader voice and language values must be strings.',400,array('field'=>$key));
+            }elseif('data_saver'===$key){
+                if(!is_bool($item))
+                    return PLDR_Core::machine_error('pldr_future_pref_shape',
+                        'Data Saver must be a JSON boolean.',400,array('field'=>$key));
+            }elseif('tts_rate'===$key){
+                if((!is_int($item)&&!is_float($item))||!is_finite((float)$item))
+                    return PLDR_Core::machine_error('pldr_future_pref_shape',
+                        'Speech rate must be a finite JSON number.',400,array('field'=>$key));
+            }else{
+                if((!is_int($item)&&!is_float($item))||!is_finite((float)$item)
+                    ||floor((float)$item)!==(float)$item
+                    ||abs((float)$item)>(float)PHP_INT_MAX)
+                    return PLDR_Core::machine_error('pldr_future_pref_shape',
+                        'Reader sizing must be a finite whole JSON number.',400,array('field'=>$key));
+            }
+        }
+        return true;
     }
 
     private static function sanitize(array $value):array {

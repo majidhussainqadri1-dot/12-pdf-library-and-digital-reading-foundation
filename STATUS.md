@@ -1,3 +1,14 @@
+# File12 R49 — typed private Reader Preferences and historical JSON integrity, source-only rc.28
+
+- Frozen parent R48 PR#43 exact SHA `37dc2b6ef18914714c804274b61f260f924ddf8c` whose green CI was parent-only. R49 final HEAD CI must be checked separately.
+- 20 bounded requirement-to-source inspections of supplied amended File12 FR001–019/FUT001/002/013/014, consolidated governing three central plans, File00/05/06/20/21/23/24/25/26/CF04. Not 20 full independent end-to-end checks. 18 source method areas found; R49-D01/D02 confirmed native new/historical preference shape inconsistencies and corrected after reviewing.
+- Native `PLDR_Future_Preferences::save/get` shares typed input and historical canonical validity checks. New regression `tests/test-r49-reader-preferences-integrity.php` exercises actual native PHP under isolated WordPress DB fixtures, including invalid nested inputs no reads/writes, malformed stored JSON, valid RTL/TTS/data saver and optimistic-version updates.
+- Candidate source software `1.1.0-rc.28`; source DB schema/interface `1.1.0` unchanged. Main bootstrap only; unmerged draft PR stack. Folder naming conflict, Hostinger installed versions/DB/wp_options/migrations and all staging/live gates unverified.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R48 — historical cross-device DTO and scholarly Reading Room quote integrity, source-only 1.1.0-rc.27
 
 - Twenty bounded original File12 FR001–019/FUT017/005/019, consolidated central and companion File00/05/06/17/20/21/23/24/25/26/CF04 source checks recorded: `docs/TWENTY-ROUND-REVIEW-2026-10-12-R48.md` (NOT twenty entire independent E2E reviews).
