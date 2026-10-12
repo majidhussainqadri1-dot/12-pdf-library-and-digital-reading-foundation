@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.26`
+- Software: `1.1.0-rc.27`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -113,3 +113,7 @@ The R46 source-only candidate `1.1.0-rc.25` documents twenty bounded plan/source
 
 ## R47 — File17 reading-room source page and region integrity
 Twenty bounded (not E2E) File12/central/companion plan-to-code reviews are in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R47.md`. Under FUT019, reading-room page and region identity cannot be silently rebound/clamped. Native `PLDR_Future_Rooms::create/anchor` now rejects page outside edition and invalid/NaN/INF/wrong-type/out-of-page region values before local room insert or File17 provider call. `tests/test-r47-reading-room-page-region-integrity.php` executes real native PHP handlers. Software rc.26; schema/interface 1.1.0 unchanged; physical Hostinger/staging remains unverified.
+
+
+## R48 — historical private cross-device handoff / File17 TextQuote selector integrity
+Twenty **bounded** governing File12/central/companion source reviews are recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R48.md`; this is not 20 independent E2E audits. Native FUT017 Handoff GET now validates historic stored page/anchor against the same canonical typed validator as new writes, rejecting nonempty positional JSON arrays, unknown/malformed selectors and out-of-edition page without partial private resume state. FUT019 reading-room rejects blank/missing `TextQuoteSelector.exact` before any File17 provider call. Real PHP fixture `tests/test-r48-stored-handoff-and-room-quote.php`; source software rc.27, schema/integration 1.1.0 unchanged. Hostinger/staging/live unverified.
