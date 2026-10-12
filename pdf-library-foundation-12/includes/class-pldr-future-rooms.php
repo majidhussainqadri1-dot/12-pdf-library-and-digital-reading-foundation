@@ -16,7 +16,11 @@ final class PLDR_Future_Rooms {
             catch(Throwable $e){PLDR_Core::audit('edition',$edition_id,'reading_room_patient_policy_provider_failed',array('provider_failure'=>1),$uid);return PLDR_Core::machine_error('pldr_room_policy_provider','Reading-room patient-case policy could not be verified; room creation was denied.',503,array('degraded'=>true,'provider_failure'=>true));}
             if(!$patient_case_allowed)return PLDR_Core::machine_error('pldr_room_patient_case','Patient-case documents require separate privacy approval before a reading room can be created.',403);
         }
-        $page=max(1,min((int)$edition['pages'],$page));
+        // FUT-019 / File17: an immutable document/page/anchor identity.
+        // Never convert out-of-range pages to a different authorized location.
+        if($page<1||$page>(int)$edition['pages'])
+            return PLDR_Core::machine_error('pldr_room_page',
+                'Reading-room page must identify an existing page in this edition.',400);
         $anchor=self::anchor($anchor,$page);
         if(is_wp_error($anchor))return $anchor;
         $anchor_match=self::anchor_belongs($edition_id,$page,$anchor,$edition);
@@ -86,6 +90,19 @@ final class PLDR_Future_Rooms {
         return array('room_key'=>$room_key,'status'=>'active','provider_ref'=>$provider_ref,'source_bound'=>true,'selector_value_preserved'=>isset($anchor['value']),'messaging_owner'=>'File 17 / shared communication contract','file_12_owns_only_anchor_context'=>true);
     }
 
+    /**
+     * FUT-019 uses the same normalized coordinate policy as FUT-017 Handoff.
+     * Reject bool/array/object, NaN, INF, out-of-range and lossy strings.
+     */
+    private static function valid_region_coordinate($value): bool {
+        if(is_bool($value)||is_array($value)||is_object($value)||null===$value)return false;
+        if(is_int($value)||is_float($value))$n=(float)$value;
+        elseif(is_string($value)&&preg_match('/^(?:0(?:\\.[0-9]{1,9})?|1(?:\\.0{1,9})?)$/D',$value))
+            $n=(float)$value;
+        else return false;
+        return is_finite($n)&&$n>=0.0&&$n<=1.0;
+    }
+
     private static function anchor(array $anchor,int $page) {
         $out=array();
         if(array_key_exists('type',$anchor)&&!is_string($anchor['type']))
@@ -109,10 +126,25 @@ final class PLDR_Future_Rooms {
         }
         if(in_array($type,array('FragmentSelector','CssSelector'),true)&&''===trim((string)($out['value']??''))&&!isset($anchor['region']))return PLDR_Core::machine_error('pldr_room_selector_value','This reading-room selector requires a bounded selector value or region.',400);
         if('FragmentSelector'===$type&&!empty($out['value'])&&preg_match('/(?:^|[?&#;])page=(\d+)/',(string)$out['value'],$m)&&absint($m[1])!==$page)return PLDR_Core::machine_error('pldr_room_fragment_page','Reading-room fragment selector page identity does not match the requested page.',409);
-        if(isset($anchor['region'])&&is_array($anchor['region'])){
-            $region=array('x'=>max(0,min(1,(float)($anchor['region']['x']??0))),'y'=>max(0,min(1,(float)($anchor['region']['y']??0))),'w'=>max(0,min(1,(float)($anchor['region']['w']??0))),'h'=>max(0,min(1,(float)($anchor['region']['h']??0))));
-            if($region['w']<=0||$region['h']<=0)return PLDR_Core::machine_error('pldr_room_region','Reading-room anchor region must have a positive width and height.',400);
-            if(($region['x']+$region['w'])>1||($region['y']+$region['h'])>1)return PLDR_Core::machine_error('pldr_room_region_bounds','Reading-room anchor region must remain fully inside the requested page.',400);
+        if(array_key_exists('region',$anchor)){
+            if(!is_array($anchor['region']))
+                return PLDR_Core::machine_error('pldr_room_region_shape',
+                    'Reading-room region must be a normalized coordinate object.',400);
+            $region=array();
+            foreach(array('x'=>0,'y'=>0,'w'=>null,'h'=>null) as $axis=>$default){
+                $raw=array_key_exists($axis,$anchor['region'])?$anchor['region'][$axis]:$default;
+                if(!self::valid_region_coordinate($raw))
+                    return PLDR_Core::machine_error('pldr_room_region_shape',
+                        'Reading-room region coordinate must be a finite number between zero and one.',
+                        400,array('coordinate'=>$axis));
+                $region[$axis]=(float)$raw;
+            }
+            if($region['w']<=0||$region['h']<=0)
+                return PLDR_Core::machine_error('pldr_room_region',
+                    'Reading-room anchor region must have a positive width and height.',400);
+            if(($region['x']+$region['w'])>1||($region['y']+$region['h'])>1)
+                return PLDR_Core::machine_error('pldr_room_region_bounds',
+                    'Reading-room anchor region must remain fully inside the requested page.',400);
             $out['region']=$region;
         }
         return $out;

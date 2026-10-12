@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.25`
+Candidate: `1.1.0-rc.26`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -208,3 +208,9 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Future_Rooms::anchor` rejects previously admitted and unsupported `SvgSelector` and malformed/unknown types; retains approved TextQuote/Fragment/Css selectors without changing File17 canonical communication owner.
 - New `tests/test-r46-handoff-room-selector-safety.php` actual native methods and no-write test, PHP CI; source schema/interface `1.1.0` unchanged, source version `1.1.0-rc.25`.
 - Deployed version, plugin folder/rename, MySQL/migration, backups, integration/staging/live verification are not established.
+
+
+## R47 — File17 page-region owner integrity source evidence
+- Review ledger: `docs/TWENTY-ROUND-REVIEW-2026-10-12-R47.md`, twenty **scoped** inspections, not 20 exhaustive complete audits.
+- `PLDR_Future_Rooms::create/anchor` now rejects out-of-range page numbers and incorrectly shaped/typed/out-of-range region coordinates rather than silently rebinding them; no changes to File17 communication backend.
+- Native executable regression `tests/test-r47-reading-room-page-region-integrity.php` on PHP matrix. Software rc.26; schema/integration contract 1.1.0 unchanged; live acceptance not performed.
