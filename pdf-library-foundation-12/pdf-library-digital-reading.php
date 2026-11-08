@@ -47,6 +47,7 @@ $pldr_files = array(
     'class-pldr-future.php',
     'class-pldr-future-rest.php',
     'class-pldr-plugin.php',
+    'class-pldr-file06-sources.php',
 );
 
 foreach ($pldr_files as $pldr_file) {
@@ -74,4 +75,5 @@ add_action('plugins_loaded', static function (): void {
     PLDR_Privacy_Extension::hooks();
     PLDR_Operations_Policy::hooks();
     PLDR_Plugin::instance()->run();
+    PLDR_File06_Sources::hooks();
 }, 60);
