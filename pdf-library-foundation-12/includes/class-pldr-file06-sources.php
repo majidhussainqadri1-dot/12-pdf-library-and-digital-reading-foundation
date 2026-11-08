@@ -106,7 +106,16 @@ final class PLDR_File06_Sources {
 		$exact=(string)($claim['exact']??'');
 		if(!$edition_id||!$page||strlen($exact)<4||strlen($exact)>3000)return null;
 		$pair=self::edition_gate($edition_id);
-		if(!$pair||$page>(int)$pair['edition']['pages']
+		$approved_mapping=false;
+		$related=get_option(self::link_key((string)$claim['concept_public_id']),array());
+		foreach(array_slice(is_array($related)?$related:array(),0,12) as $candidate) {
+			if(!is_array($candidate))continue;
+			if((int)($candidate['edition_id']??0)!==$edition_id||(int)($candidate['page']??0)!==$page)continue;
+			$verified=self::approved_link($candidate,array('id'=>$claim['concept_public_id'],
+				'version'=>absint($claim['concept_version']??0)));
+			if($verified){$approved_mapping=true;break;}
+		}
+		if(!$approved_mapping||!$pair||$page>(int)$pair['edition']['pages']
 			||(int)($claim['edition_version']??0)!==(int)$pair['edition']['version']
 			||!hash_equals((string)$pair['edition']['sha256'],(string)($claim['edition_sha256']??'')))return null;
 		$proof=get_option(self::quote_key($claim),null);
@@ -194,7 +203,16 @@ final class PLDR_File06_Sources {
 			return PLDR_Core::machine_error('pldr_f06_quote_invalid','Current rights, source page and exact bounded excerpt required',422);
 		$claim['edition_version']=(int)$pair['edition']['version'];
 		$claim['edition_sha256']=(string)$pair['edition']['sha256'];
-		$concept=apply_filters('he_v12_file06_concept_assertion_v1',null,$claim['concept_public_id'],absint($data['concept_version']??0));
+		$claim['concept_version']=absint($data['concept_version']??0);
+		$concept=apply_filters('he_v12_file06_concept_assertion_v1',null,$claim['concept_public_id'],$claim['concept_version']);
+		$link_ready=false;
+		foreach((array)get_option(self::link_key($claim['concept_public_id']),array()) as $link) {
+			if(!is_array($link))continue;
+			if((int)($link['edition_id']??0)!==$claim['edition_id']
+				||(int)($link['page']??0)!==$claim['page'])continue;
+			if(self::approved_link($link,array('id'=>$claim['concept_public_id'],'version'=>$claim['concept_version']))){$link_ready=true;break;}
+		}
+		if(!$link_ready)return PLDR_Core::machine_error('pldr_f06_quote_mapping_missing','An independently approved File06-to-edition/page mapping is required before any quotation is approved',409);
 		if(!is_array($concept)||true!==($concept['published']??false))return PLDR_Core::machine_error('pldr_f06_concept_unverified','Current File06 concept proof required',503);
 		// The pending proof is not approved until the source really contains the quotation.
 		global $wpdb;$wpdb->last_error='';
