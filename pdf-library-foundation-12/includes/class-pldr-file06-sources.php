@@ -138,6 +138,8 @@ final class PLDR_File06_Sources {
 			'edition_id'=>$edition_id,'edition_version'=>(int)$pair['edition']['version'],
 			'edition_sha256'=>(string)$pair['edition']['sha256'],
 			'document_public_id'=>(string)$pair['document']['public_id'],
+			'source_title'=>(string)$pair['document']['title'],
+			'edition_label'=>(string)$pair['edition']['edition_label'],
 			'page'=>$page,'exact'=>$exact,
 			'rights_basis'=>(string)$pair['edition']['rights_basis'],
 			'rights_evidence_ref'=>(string)$proof['rights_evidence_ref'],
