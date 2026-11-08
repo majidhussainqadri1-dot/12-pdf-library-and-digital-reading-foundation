@@ -25,6 +25,7 @@ function wp_http_validate_url($v){return str_starts_with($v,'https://');}
 function sanitize_text_field($s){return trim((string)$s);}
 function is_wp_error($x){return $x instanceof WP_Error;}
 function must($truth,$name){$GLOBALS['checks']++;if(!$truth){fwrite(STDERR,"FAILED {$name}\n");exit(1);}}
+$wpdb=new class { public $last_error=''; };
 $uuid='11111111-1111-4111-8111-111111111111';
 $GLOBALS['checks']=0;$GLOBALS['rights_on']=true;$GLOBALS['public_read']=true;
 $GLOBALS['doc']=array('id'=>11,'status'=>'published','public_id'=>'pdf_published_0001','title'=>'Original Sources','version'=>6);
