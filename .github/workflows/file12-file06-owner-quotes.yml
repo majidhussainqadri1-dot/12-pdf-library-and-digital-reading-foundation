@@ -1,0 +1,26 @@
+name: File12 File06 Rights and Source-Quote
+on:
+  push:
+    branches: [ 'fix/file12-file06-approved-edition-quote-20261108' ]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quote:
+    strategy:
+      matrix:
+        php: ['8.1','8.3','8.4']
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: Verify exact source and PHP syntax
+        run: |
+          set -euo pipefail
+          echo "SOURCE_HEAD=$(git rev-parse HEAD)"
+          find pdf-library-foundation-12 tests -name '*.php' -type f -print0 | sort -z | xargs -0 -n1 php -l >/dev/null
+      - name: Exact lawful OCR PDF edition/page integration
+        run: php tests/test-file06-approved-edition-quote.php
