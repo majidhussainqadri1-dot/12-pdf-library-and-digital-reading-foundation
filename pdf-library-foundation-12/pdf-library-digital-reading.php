@@ -47,11 +47,15 @@ $pldr_files = array(
     'class-pldr-future.php',
     'class-pldr-future-rest.php',
     'class-pldr-plugin.php',
+    'class-pldr-file26-connector.php',
 );
 
 foreach ($pldr_files as $pldr_file) {
     require_once PLDR_DIR . 'includes/' . $pldr_file;
 }
+
+// Owner connector advertises proposed-only public library visibility, never a download grant.
+PLDR_File26_Connector::register();
 
 register_activation_hook(PLDR_FILE, array('PLDR_Schema', 'activate'));
 register_deactivation_hook(PLDR_FILE, array('PLDR_Schema', 'deactivate'));
