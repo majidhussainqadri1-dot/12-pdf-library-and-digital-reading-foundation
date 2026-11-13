@@ -15,6 +15,7 @@ function absint($s):int{return abs((int)$s);}
 function wp_json_encode($v,$flags=0){return json_encode($v,$flags);}
 class PLDR_Core {
     public static function authorize($name,$id=0,$uid=0):bool{return $uid===7;}
+    public static function table($name):string{return 'wp_pldr_'.$name;}
     public static function founder($id):bool{return false;}
     public static function machine_error($name,$msg,$status=400,$context=array()){return new WP_Error($name,$msg);}
     public static function sanitize_json_list($v):array{return is_array($v)?$v:array();}
