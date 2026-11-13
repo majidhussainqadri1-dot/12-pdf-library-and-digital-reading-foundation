@@ -48,6 +48,9 @@ $pldr_files = array(
     'class-pldr-future-rest.php',
     'class-pldr-plugin.php',
     'class-pldr-file06-sources.php',
+    // File26 connector is compiled but deliberately NOT registered while
+    // rights-version/tombstone search cutover and deployed parity are unverified.
+    'class-pldr-file26-connector.php',
 );
 
 foreach ($pldr_files as $pldr_file) {

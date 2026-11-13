@@ -142,6 +142,10 @@ jobs:
         run: php tests/test-r49-reader-preferences-integrity.php
       - name: R50 signed File16 corpus cursor and OCR source-page identity
         run: php tests/test-r50-file16-corpus-cursor-source.php
+      - name: File06 strict source/quotation identity regression
+        run: php tests/test-file06-approved-edition-quote.php
+      - name: Dormant File26 rights-reviewed catalog regression
+        run: php tests/test-file26-catalog-proposal.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions

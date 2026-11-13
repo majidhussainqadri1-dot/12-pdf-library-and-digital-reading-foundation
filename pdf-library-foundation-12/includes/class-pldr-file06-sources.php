@@ -15,6 +15,10 @@ final class PLDR_File06_Sources {
 		add_filter('he_v12_file12_quote_assertion_v1',array(__CLASS__,'quote_assertion'),10,2);
 		add_action('rest_api_init',array(__CLASS__,'routes'));
 	}
+	/** Reject numeric coercion: JSON identifiers must be actual positive integers. */
+	private static function positive_id($value):int {
+		return is_int($value)&&$value>0?$value:0;
+	}
 	private static function uuid($s):bool {
 		return is_string($s)&&(bool)preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',$s);
 	}
@@ -45,6 +49,9 @@ final class PLDR_File06_Sources {
 	}
 
 	private static function approved_link(array $entry,array $concept) {
+		foreach(array('concept_version','document_id','edition_id','edition_version','page','reviewer_id') as $field){
+			if(!is_int($entry[$field]??null)||$entry[$field]<1)return null;
+		}
 		if(true!==($entry['approved']??false)
 			||!self::uuid((string)($concept['id']??''))
 			||!hash_equals(strtolower((string)$concept['id']),(string)($entry['concept_public_id']??''))
@@ -100,7 +107,10 @@ final class PLDR_File06_Sources {
 	 * This does not assert an independent translation or a new book.
 	 */
 	public static function quote_assertion($result,$claim) {
-		if(!is_array($claim)||!self::uuid((string)($claim['concept_public_id']??'')))return null;
+		if(!is_array($claim)||!self::uuid((string)($claim['concept_public_id']??''))
+			||!is_int($claim['edition_id']??null)||!is_int($claim['page']??null)
+			||!is_int($claim['concept_version']??null)
+			||!is_string($claim['exact']??null)||!is_string($claim['rights_evidence_ref']??null))return null;
 		$edition_id=absint($claim['edition_id']??0);
 		$page=absint($claim['page']??0);
 		$exact=(string)($claim['exact']??'');
@@ -162,11 +172,16 @@ final class PLDR_File06_Sources {
 	public static function approve_source($request) {
 		$data=self::data($request);
 		if(null===$data)return PLDR_Core::machine_error('pldr_f06_nonce','Current session nonce required',403);
-		$uuid=strtolower(sanitize_text_field((string)($data['concept_public_id']??'')));
-		$cv=absint($data['concept_version']??0);
-		$edition_id=absint($data['edition_id']??0);
-		$page=absint($data['page']??0);
-		$rights=sanitize_text_field((string)($data['rights_evidence_ref']??''));
+		if(!is_string($data['concept_public_id']??null)||!is_string($data['rights_evidence_ref']??null)
+			||!self::positive_id($data['concept_version']??null)
+			||!self::positive_id($data['edition_id']??null)
+			||!self::positive_id($data['page']??null))
+			return PLDR_Core::machine_error('pldr_f06_input','Canonical positive integer IDs and typed source evidence required',422);
+		$uuid=strtolower(sanitize_text_field($data['concept_public_id']));
+		$cv=self::positive_id($data['concept_version']);
+		$edition_id=self::positive_id($data['edition_id']);
+		$page=self::positive_id($data['page']);
+		$rights=sanitize_text_field($data['rights_evidence_ref']);
 		$pair=self::edition_gate($edition_id);
 		$actor=get_current_user_id();
 		if(!$actor||!self::uuid($uuid)||!$cv||!$pair||!$page||$page>(int)$pair['edition']['pages']
@@ -192,10 +207,16 @@ final class PLDR_File06_Sources {
 	public static function approve_quote($request) {
 		$data=self::data($request);
 		if(null===$data)return PLDR_Core::machine_error('pldr_f06_nonce','Current session nonce required',403);
-		$claim=array('concept_public_id'=>strtolower(sanitize_text_field((string)($data['concept_public_id']??''))),
-			'edition_id'=>absint($data['edition_id']??0),'page'=>absint($data['page']??0),
-			'exact'=>(string)($data['original_excerpt']??''),
-			'rights_evidence_ref'=>sanitize_text_field((string)($data['rights_evidence_ref']??'')));
+		if(!is_string($data['concept_public_id']??null)||!is_string($data['original_excerpt']??null)
+			||!is_string($data['rights_evidence_ref']??null)
+			||!self::positive_id($data['concept_version']??null)
+			||!self::positive_id($data['edition_id']??null)
+			||!self::positive_id($data['page']??null))
+			return PLDR_Core::machine_error('pldr_f06_quote_invalid','Canonical positive integer IDs and a typed exact quotation are required',422);
+		$claim=array('concept_public_id'=>strtolower(sanitize_text_field($data['concept_public_id'])),
+			'edition_id'=>self::positive_id($data['edition_id']),'page'=>self::positive_id($data['page']),
+			'exact'=>$data['original_excerpt'],
+			'rights_evidence_ref'=>sanitize_text_field($data['rights_evidence_ref']));
 		$pair=self::edition_gate((int)$claim['edition_id']);
 		if(!$pair||!self::uuid($claim['concept_public_id'])
 			||!PLDR_Core::authorize('rights',(int)$pair['document']['id'],get_current_user_id())
@@ -205,7 +226,7 @@ final class PLDR_File06_Sources {
 			return PLDR_Core::machine_error('pldr_f06_quote_invalid','Current rights, source page and exact bounded excerpt required',422);
 		$claim['edition_version']=(int)$pair['edition']['version'];
 		$claim['edition_sha256']=(string)$pair['edition']['sha256'];
-		$claim['concept_version']=absint($data['concept_version']??0);
+		$claim['concept_version']=self::positive_id($data['concept_version']);
 		$concept=apply_filters('he_v12_file06_concept_assertion_v1',null,$claim['concept_public_id'],$claim['concept_version']);
 		$link_ready=false;
 		foreach((array)get_option(self::link_key($claim['concept_public_id']),array()) as $link) {
