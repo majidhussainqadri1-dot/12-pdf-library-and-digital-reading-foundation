@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.33`
+- Software: `1.1.0-rc.34`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -139,3 +139,6 @@ Source-only candidate `1.1.0-rc.32` closes three File06 citation-integrity error
 
 ## R54 — truthful proposed File26 contract (13 November 2026)
 R54 source-only software `1.1.0-rc.33` corrects two proven File26 connector contract defects. It removes the unimplemented `book_pack` entity from the PDF-only source manifest, and reports `state=disabled` while its rights-versioned deletion/tombstone cutover remains unapproved. Deliberate RED regression at `6add1132b32928e9770f44f074cafb5765b07f0c` was confirmed in run `43357047338`; the corrected source is in `03bdebba50d914a3c6fdf8b5db1031f618df4532`. File26 remains physically unregistered, schema/contract declaration is `1.1.0`, and no live changes were made.
+
+## R55 strict File06 owner attestation, source-only rc.34
+Red-first CI SHA 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, workflow 43367072985 exposed forged owner related-resource edition_id acceptance. All 12 canonical owner, edition, version, page, rights/eligibility, URL and label fields must now match the freshly rights-reviewed mapping with strict typed equality. Test adds 11 invalid source mutations. No deployed or real File06 integration acceptance; File26 rights/tombstone and book_pack owner-contract blockers remain.

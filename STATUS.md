@@ -1,3 +1,8 @@
+# R55 source-only strict File06 owner attestation (2026-11-13)
+Candidate 1.1.0-rc.34; declared DB/schema/contract 1.1.0 unchanged. Parent R54 40ca7e2e510b7a63727a77bdda443c0d1163121b. Red-first SHA 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, workflow 43367072985. Replaced caller-provided coercible edition/page with exact comparison across 12 fresh owner fields. New exact HEAD CI required. No merge/deploy; installed version/physical DB/migration unverified.
+
+---
+
 # R54 proposed File26 manifest/health truthful release gate — rc.33 (2026-11-13)
 
 - Two source manifest defects identified by red-first regression: unsupported `book_pack` advertised although only PDFs can be fetched; `healthy` returned although the adapter was unregistered and not approved.

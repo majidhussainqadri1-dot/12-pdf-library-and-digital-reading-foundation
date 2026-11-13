@@ -68,3 +68,10 @@ A release may not be called staging-accepted until all items below have fresh ev
 - [ ] Real File26 consumer acknowledges `entity_types=['pdf']` only; no `book_pack` indexing, query or preview is falsely advertised.
 - [ ] Proposed File26 adapter reports `disabled` on source-ready hosts until the owner approves versioned rights/deletion tombstone cutover; schema failure remains degraded.
 - [ ] Real File26 index and public search have no references to disabled connector; later activation requires explicit independent rights-revocation/cache-purge staging approval.
+
+
+## R55 exact owner attestation extension (outside original 39 gates)
+- [ ] Real installed File06 and File12 accept the current lawfully approved canonical related resource DTO.
+- [ ] Wrong-typed or changed edition_id, page, owner_id, source_version, owner_version, eligible, rights_ok and label all fail attestation with no URL/metadata false proof.
+- [ ] After edition/source bytes, rights or concept version change, stale prior related-resource links fail and disappear on requery.
+- [ ] Independent multilingual, browser and rights reviewers confirm exact current interface, not only isolated source fixtures.

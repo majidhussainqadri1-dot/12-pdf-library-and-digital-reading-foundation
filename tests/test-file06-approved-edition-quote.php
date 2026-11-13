@@ -141,4 +141,26 @@ must(null===PLDR_File06_Sources::quote_assertion(null,$claim),
     'Quote proof must be reapproved when its independently approved source-rights evidence changes');
 $GLOBALS['options'][$key][0]=$sourceRow;
 
+// R55 negative: owner attestation must preserve *all* canonical, rights-sensitive
+// identity fields, not just the URL/hash plus coercible edition/page numbers.
+$canonicalLink=PLDR_File06_Sources::collect(array(),$dto)[0];
+must(PLDR_File06_Sources::attest(false,$canonicalLink,$dto)===true,'Canonical complete File12 resource attested');
+foreach(array(
+    array('edition_id','27spoof'),
+    array('page','84garbage'),
+    array('owner_id','fabricated-document-id'),
+    array('owner_version','6spoof'),
+    array('source_version','3spoof'),
+    array('eligible',false),
+    array('rights_ok',false),
+    array('owner_version',999),
+    array('source_version',999),
+    array('owner_id',array('fabricated')),
+    array('edition_id',27.1)
+) as $mutation){
+    $forged=$canonicalLink;$forged[$mutation[0]]=$mutation[1];
+    must(PLDR_File06_Sources::attest(false,$forged,$dto)===false,
+        'File12 canonical owner attestation refuses mutated '.$mutation[0]);
+}
+
 echo "File12→File06 source and quotation: {$GLOBALS['checks']} isolated checks PASS.\n";

@@ -93,10 +93,20 @@ final class PLDR_File06_Sources {
 		foreach(array_slice(is_array($rows)?$rows:array(),0,12) as $row) {
 			if(!is_array($row))continue;
 			$fresh=self::approved_link($row,$dto);
-			if($fresh&&hash_equals((string)$fresh['url'],(string)($link['url']??''))
-				&&hash_equals((string)$fresh['edition_sha256'],(string)($link['edition_sha256']??''))
-				&&(int)$fresh['edition_id']===(int)($link['edition_id']??0)
-				&&(int)$fresh['page']===(int)($link['page']??0))return true;
+			// The caller-provided related-resource DTO is untrusted. Never coerce
+			// identifiers or attest mismatched rights, owner or display metadata.
+			// The approved owner projection is the only canonical representation.
+			if(!$fresh)continue;
+			$fields=array('owner_file','owner_id','edition_id','edition_version',
+				'edition_sha256','page','owner_version','source_version',
+				'eligible','rights_ok','url','label');
+			$identical=true;
+			foreach($fields as $field){
+				if(!array_key_exists($field,$link)||$fresh[$field]!==$link[$field]){
+					$identical=false;break;
+				}
+			}
+			if($identical)return true;
 		}
 		return false;
 	}
