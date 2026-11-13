@@ -75,3 +75,11 @@ A release may not be called staging-accepted until all items below have fresh ev
 - [ ] Wrong-typed or changed edition_id, page, owner_id, source_version, owner_version, eligible, rights_ok and label all fail attestation with no URL/metadata false proof.
 - [ ] After edition/source bytes, rights or concept version change, stale prior related-resource links fail and disappear on requery.
 - [ ] Independent multilingual, browser and rights reviewers confirm exact current interface, not only isolated source fixtures.
+
+
+## R61 actual WordPress Book Pack register boundary (additional scope; original 39 tests intact)
+- [ ] On installed File12 and real WP/MySQL, guest and unsigned user trying Book Pack REST registration are denied before source/DB operations and no record or outbox is written.
+- [ ] Member/doctor without File12 management rights is denied; a guessed/supplied Founder actor ID does not grant another caller permissions.
+- [ ] Authenticated Founder/manager can register a lawful complete Book Pack via governed REST, with immutable version, rights evidence, checksum and exactly one event; wrong evidence/duplicate conflict denied.
+- [ ] Controlled installed plugin bundled-manifest loader (when owner-authorized) remains available in its intended administrative lifecycle, never as a publicly writable upload directory, with fail-closed scanner/rights check.
+- [ ] File26 rights-reviewed Book Pack projection and search/withdrawal tombstones still separately required; Book Pack internal registration event is not an index grant.
