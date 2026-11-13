@@ -1,3 +1,12 @@
+# R63 source-only auditable bundled Book Content Packs — rc.42 (2026-11-13)
+- Draft PR #56 stacked after #55, not `main`. Original README-only HEAD and deployed WP version distinct.
+- Source defects addressed in importer: silent invalid JSON, silent private writer error, symlink-following; new `tests/test-r63-bundled-book-pack-audit.php` executes on PHP 8.1/8.3/8.4.
+- Never record original book bytes, private file content, secrets or author user metadata in audit records; only safe source filename digest and machine code.
+- Software candidate `1.1.0-rc.42`, source schema/contract `1.1.0`, staged and deployed versions still unverified.
+- File26 owner `book_pack` contract, rights/tombstone acknowledged consumer, CF04, 39 staging + 54 requirement + 10 shared gates still not accepted; NO_GO.
+
+---
+
 # R62 source-only Book Pack canonical identity, rc.41 (2026-11-13)
 - New stacked Draft PR #55 on parent PR #54 exact `f35bc055489e0764925a8a7b6009e2fe06b41405`; no `main` merge.
 - Confirmed source integrity defect: raw nonempty Book Pack key/version/metadata might normalize to empty or exceed schema varchar limits before entering DB; wrong-typed rights/checksum could reach dangerous conversions. RED-first DB trap failed, corrected exact-code run 43377002228 green (4 jobs) on source rc.40; new rc.41 exact-head CI required.

@@ -47,7 +47,7 @@ $checks++;
 if(!$private->isPrivate()){fwrite(STDERR,"R61 FAIL: Bundled persistence method must remain private\\n");exit(1);}
 $rightsSource=file_get_contents(dirname(__DIR__).'/pdf-library-foundation-12/includes/class-pldr-rights.php');
 $checks++;
-if(!str_contains($rightsSource,'if(is_array($manifest))self::persist_authorized($manifest,0);')){
+if(!str_contains($rightsSource,'self::persist_authorized($manifest,0);')){
     fwrite(STDERR,"R61 FAIL: Trusted bundle importer does not use private controlled path\\n");exit(1);
 }
 echo "R61 Book Pack actor authority: $checks fail-closed isolated cases PASS.\n";

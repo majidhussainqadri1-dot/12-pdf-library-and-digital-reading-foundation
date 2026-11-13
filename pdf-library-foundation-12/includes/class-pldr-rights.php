@@ -341,9 +341,37 @@ final class PLDR_Book_Packs {
         $files=glob($dir.'/*.json')?:array();
         if(count($files)>100){PLDR_Core::audit('book_pack',0,'bundled_manifest_count_exceeded',array('count'=>count($files),'limit'=>100));$files=array_slice($files,0,100);}
         foreach($files as $file){
-            $size=@filesize($file);if(false===$size||$size>1048576){PLDR_Core::audit('book_pack',0,'bundled_manifest_file_rejected',array('file'=>basename($file),'size'=>false===$size?null:(int)$size,'max_bytes'=>1048576));continue;}
-            $raw=file_get_contents($file);if(false===$raw)continue;
-            $manifest=json_decode((string)$raw,true);if(is_array($manifest))self::persist_authorized($manifest,0);
+            // An installed plugin bundle is trusted only as files within its
+            // controlled directory. Never follow a symlink to another source.
+            $file_ref=substr(hash('sha256',basename($file)),0,24);
+            if(is_link($file)){
+                PLDR_Core::audit('book_pack',0,'bundled_manifest_symlink_rejected',array('file_ref'=>$file_ref));
+                continue;
+            }
+            if(!is_file($file)||!is_readable($file)){
+                PLDR_Core::audit('book_pack',0,'bundled_manifest_file_unreadable',array('file_ref'=>$file_ref));
+                continue;
+            }
+            $size=@filesize($file);
+            if(false===$size||$size>1048576){
+                PLDR_Core::audit('book_pack',0,'bundled_manifest_file_rejected',array('file_ref'=>$file_ref,'size'=>false===$size?null:(int)$size,'max_bytes'=>1048576));
+                continue;
+            }
+            $raw=@file_get_contents($file);
+            if(false===$raw){
+                PLDR_Core::audit('book_pack',0,'bundled_manifest_file_unreadable',array('file_ref'=>$file_ref));
+                continue;
+            }
+            $manifest=json_decode((string)$raw,true);
+            if(!is_array($manifest)){
+                PLDR_Core::audit('book_pack',0,'bundled_manifest_invalid_json',array('file_ref'=>$file_ref,'json_error'=>json_last_error()));
+                continue;
+            }
+            $result=self::persist_authorized($manifest,0);
+            if(is_wp_error($result)){
+                PLDR_Core::audit('book_pack',0,'bundled_manifest_registration_rejected',array(
+                    'file_ref'=>$file_ref,'error_code'=>sanitize_key((string)$result->get_error_code())));
+            }
         }
     }
 }

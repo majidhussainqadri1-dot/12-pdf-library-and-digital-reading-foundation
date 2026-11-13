@@ -83,3 +83,11 @@ A release may not be called staging-accepted until all items below have fresh ev
 - [ ] Authenticated Founder/manager can register a lawful complete Book Pack via governed REST, with immutable version, rights evidence, checksum and exactly one event; wrong evidence/duplicate conflict denied.
 - [ ] Controlled installed plugin bundled-manifest loader (when owner-authorized) remains available in its intended administrative lifecycle, never as a publicly writable upload directory, with fail-closed scanner/rights check.
 - [ ] File26 rights-reviewed Book Pack projection and search/withdrawal tombstones still separately required; Book Pack internal registration event is not an index grant.
+
+
+## R63 additional pack-bundle import acceptance (not included in the original 39 numbered gates)
+- [ ] At real installed plugin directory, bundled JSON is loaded only from a controlled path with restrictive ownership; symlinked `*.json` entries are rejected and logged, no external file read.
+- [ ] Incomplete/invalid JSON, unsafe pack identity, invalid checksum and rights policy refusal leave no DB partial registration/outbox event; audit has bounded filename hash + machine code, never book text or original JSON.
+- [ ] Confirm a *legitimate* packaged Book Content Pack registers atomically with immutable canonical SHA and idempotent activation; test old manifests against rc.42 normalization changes.
+- [ ] Simulate unreadable files, >1 MB metadata, >100 bundles, disk failures and interrupted activation; verify bounded audit, retry/repair, idempotency and no old-version overwritten.
+- [ ] Review plugin directory permissions and symlink race assumptions separately from the source-only refusal check.

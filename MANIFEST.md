@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.41`
+Candidate: `1.1.0-rc.42`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -297,3 +297,10 @@ Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d2
 - RED-first source SHA `f410c0789accf008f14a70f994ef5c98b248e561`, run `43376844903`: invalid slug reached DB `prepare()` trap.
 - Corrected source SHA `854e69e5e533ac6e25df7d2c7dd5fe962643bb6d`, run `43377002228` four jobs succeeded; no installed WordPress validation.
 - 10 deliberately malformed identity cases in `tests/test-r62-book-pack-canonical-identity.php`, no DB access allowed. New full version/package CI to be obtained on rc.41 exact SHA.
+
+## R63 — Bundled JSON provenance & audit fail-closed — source rc.42
+- 3 source findings in one scoped importer: invalid JSON silently ignored, rejected private manifest writer result unobserved, and symlinked `*.json` file not refused.
+- RED-first exact SHA `4907fcf967e400e42beca6217fa88d0e57f01b35` workflow `43378011293`: PHP 8.1/8.3/8.4 fail at missing `bundled_manifest_invalid_json` audit.
+- Fix `3863cb7011aec7a2691714478523949b42f03451`: deny symlink, audit invalid/unreadable/rejected using only basename SHA-derived reference, bounded error code, never raw data.
+- R61 private-import invariant test updated to inspect the private call independently of old exact formatting (SHA `2dca9c4b614a647a6406ba0bd7d921aaf1e840d9`).
+- Full rc.42 CI and ZIP digest must be validated on final exact SHA. Original staging 39 and live gates remain unverified.

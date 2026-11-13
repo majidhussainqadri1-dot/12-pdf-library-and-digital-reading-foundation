@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.41`
+- Software: `1.1.0-rc.42`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -164,3 +164,6 @@ Source-only corrective candidate `1.1.0-rc.40` closes a confirmed caller authori
 
 ## R62 — canonical Book Content Pack identity before DB and events (2026-11-13)
 Source-only candidate `1.1.0-rc.41`: the immutable pack key and version must be schema-length compatible and not silently normalized, basic source bibliographic identity must remain nonempty after safe text normalization, and the rights/checksum/identity fields must be actual strings. Source code now denies malformed inputs **before SQL or event emission**. The new native PHP fixture `tests/test-r62-book-pack-canonical-identity.php` first reproduced that malformed slug made the writer reach the DB in RED SHA `f410c0789accf008f14a70f994ef5c98b248e561`, workflow `43376844903`. Corrective source SHA `854e69e5e533ac6e25df7d2c7dd5fe962643bb6d` passed all four GitHub jobs in run `43377002228`. Final rc.41 requires its own exact-head successful CI and ZIP SHA. No File26 activation, migration or live change.
+
+## R63 — Book Content Pack bundle boundaries and auditable failures (2026-11-13)
+The candidate `1.1.0-rc.42` explicitly declines symlinked bundled `*.json` files, logs unreadable/invalid JSON, and logs normalization/rights rejections returned from the private importer using only a bounded filename hash and safe machine error code. It does not store raw JSON or protected book content in audit records. RED-first test `tests/test-r63-bundled-book-pack-audit.php` demonstrated missing invalid-JSON audit in GitHub Actions run `43378011293` at SHA `4907fcf967e400e42beca6217fa88d0e57f01b35`; corrective source SHA `3863cb7011aec7a2691714478523949b42f03451` and an inherited R61 test compatible with the new private-path call remain included. Real installed plugin path permissions, TOCTOU race defense and actual book-content ingestion must be checked in staging. R62 canonical-identity and all preceding fixes retained.
