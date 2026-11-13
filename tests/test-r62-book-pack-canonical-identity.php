@@ -2,6 +2,7 @@
 /** R62 red-first: Book Content Pack normalized identity must be validated before DB access. */
 declare(strict_types=1);
 define('ABSPATH',__DIR__);
+define('ARRAY_A','ARRAY_A');
 class WP_Error {
     private string $code;
     public function __construct($code,$message='',$data=array()){$this->code=(string)$code;}
