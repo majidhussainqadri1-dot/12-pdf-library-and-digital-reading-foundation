@@ -31,6 +31,11 @@ foreach($tables as $def){
    if($environment===''||in_array($environment,array('HOSTINGER_STAGING_REQUIRED','UNVERIFIED','PENDING','NOT_OBSERVED'),true)
        ||$observed===''||in_array($observed,array('NOT_OBSERVED','UNVERIFIED','PENDING','NOT_RUN'),true))continue;
   }
+  // A recorded defect cannot become a release PASS until its exact repaired
+  // scenario has a reviewed and successful re-test in this same ledger.
+  if($def['file']==='docs/R57-FILE12-V121-39-STAGING-GATES.csv'
+      &&''!==trim((string)($r['defect_id']??''))
+      &&'PASS'!==strtoupper(trim((string)($r['retest_status']??''))))continue;
   $ok++;$ready++;
  }
  fclose($h);
