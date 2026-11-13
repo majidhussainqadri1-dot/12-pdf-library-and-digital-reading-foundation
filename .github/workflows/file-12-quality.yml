@@ -166,6 +166,8 @@ jobs:
         run: php tests/test-r63-bundled-book-pack-audit.php
       - name: R64 release evidence context and NO_GO anti-forgery regression
         run: php tests/test-r64-release-evidence-context.php
+      - name: R65 release gate rejects untested defect corrections
+        run: php tests/test-r65-staging-defect-retest-proof.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
