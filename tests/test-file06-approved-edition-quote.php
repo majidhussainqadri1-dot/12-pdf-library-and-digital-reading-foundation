@@ -104,4 +104,41 @@ $badClaim=$claim;$badClaim['edition_id']='27';
 must(null===PLDR_File06_Sources::quote_assertion(null,$badClaim),'String edition ID in quote assertion denied');
 $badClaim=$claim;$badClaim['page']=-84;
 must(null===PLDR_File06_Sources::quote_assertion(null,$badClaim),'Negative page in quote assertion denied');
+
+// R53 red tests: canonical File06 identity and source-rights evidence must
+// remain bound to *both* the approved link and each approved exact quote.
+function apply_filters($hook,$value,...$args){
+    return $hook==='he_v12_file06_concept_assertion_v1'?$GLOBALS['f06_canonical']:$value;
+}
+function update_option($key,$row,$autoload=false){
+    $GLOBALS['approval_writes']++;
+    $GLOBALS['options'][$key]=$row;
+    return true;
+}
+function rest_ensure_response($result){return $result;}
+$GLOBALS['approval_writes']=0;
+$GLOBALS['f06_canonical']=array('published'=>true,'owner_file'=>'file-06','public_id'=>$uuid);
+$ok=PLDR_File06_Sources::approve_quote(new R51_Request($validQuote));
+must(is_array($ok)&&($ok['approved']??false)===true,'Valid current File06 quote request approved');
+$writes=$GLOBALS['approval_writes'];
+$bad=$validQuote;$bad['rights_evidence_ref']='rights:unreviewed-evidence';
+must(PLDR_File06_Sources::approve_quote(new R51_Request($bad)) instanceof WP_Error,
+    'Quote with rights evidence different from independently approved mapping denied');
+must($GLOBALS['approval_writes']===$writes,'Mismatched rights do not create a proof row');
+$GLOBALS['f06_canonical']['owner_file']='untrusted-owner';
+must(PLDR_File06_Sources::approve_quote(new R51_Request($validQuote)) instanceof WP_Error,
+    'Quote must verify File06 canonical owner, not just publication boolean');
+must($GLOBALS['approval_writes']===$writes,'Wrong canonical owner makes no quote write');
+$GLOBALS['f06_canonical']['owner_file']='file-06';
+$GLOBALS['f06_canonical']['public_id']='22222222-2222-4222-8222-222222222222';
+must(PLDR_File06_Sources::approve_quote(new R51_Request($validQuote)) instanceof WP_Error,
+    'Quote must verify exact File06 concept public UUID');
+must($GLOBALS['approval_writes']===$writes,'Mismatched File06 UUID makes no quote write');
+$GLOBALS['f06_canonical']['public_id']=$uuid;
+// Historical approved quotation cannot outlive a separately changed rights-evidence mapping.
+$GLOBALS['options'][$key][0]['rights_evidence_ref']='rights:new-approval-2026';
+must(null===PLDR_File06_Sources::quote_assertion(null,$claim),
+    'Quote proof must be reapproved when its independently approved source-rights evidence changes');
+$GLOBALS['options'][$key][0]=$sourceRow;
+
 echo "File12→File06 source and quotation: {$GLOBALS['checks']} isolated checks PASS.\n";
