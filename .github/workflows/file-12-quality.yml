@@ -160,6 +160,8 @@ jobs:
         run: php tests/test-r60-release-no-go.php
       - name: R61 unauthorized Book Pack registration must fail closed
         run: php tests/test-r61-book-pack-actor-authority.php
+      - name: R62 Book Pack canonical identity and schema-safe preflight
+        run: php tests/test-r62-book-pack-canonical-identity.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
