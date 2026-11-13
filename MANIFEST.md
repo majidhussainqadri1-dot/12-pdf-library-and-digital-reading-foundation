@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.29`
+Candidate: `1.1.0-rc.31`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -235,3 +235,16 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_Future_Corpus::decode_cursor`: type-exact signed HMAC cursor bound to current File16 edition/consumer context, no page coercion.
 - `PLDR_Future_Corpus::manifest`: validates all OCR row pages are strictly increasing canonical edition pages including lookahead; fails without partial AI chunks on corruption.
 - `tests/test-r50-file16-corpus-cursor-source.php` real PHP native-method fixture, CI gate. Source DB/schema/interface 1.1.0 unchanged; installed state unverified.
+
+
+## R51 consolidated source candidate 1.1.0-rc.30
+- Parent: File06 PR #46 exact `c1247100462ea7a0aac5f5a02b721d5f87fa5606`; independent File26 PR #47 code sourced by blob SHA; this is a unique source/package identity distinct from R50 rc.29.
+- File06 approvals now deny malformed typed source/quote IDs before source reads; historic source/quote mapping pages also fail closed on wrong types. Native source test: `tests/test-file06-approved-edition-quote.php`.
+- File26 proposed connector PHP definition included but **not registered**; versioned rights/tombstone and File26 index cutover remain stop-ship. Native test `tests/test-file26-catalog-proposal.php`.
+- New PHP8.1/8.3/8.4 exact-SHA QA and new ZIP digest required; no Hostinger staging or live evidence.
+
+
+## R52 review in R51 Draft — proposed-only File26 hard release guard, rc.31
+- `PLDR_File26_Connector::register/append/ready` refuse to advertise/register while status=proposed and tombstone/event contract pending; no bootstrap call.
+- `list_batch` rejects unknown/nonempty scope and wrong-typed/bad limit before SQL; `can_view` refuses coerced stored index versions.
+- Native `tests/test-file26-catalog-proposal.php` negative guards in PHP 8.1/8.3/8.4 CI; source-only with no installed File26 consumer or live index evidence.

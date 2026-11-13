@@ -1,3 +1,23 @@
+# R52 source-only File26 proposal hard guard — candidate 1.1.0-rc.31 (2026-11-13)
+
+- Four proven source contract integrity gaps corrected on the stacked R51 Draft #48: `register/append/ready` premature proposal activation; unknown `scope` widening; malformed `limit` coercion; stale `object_version` coercion. Real File26 installed consumer and tombstone cutover still unverified.
+- New fixture negative cases; fresh exact-head CI required. R51 File06 correction remains included and source-reviewed.
+- No new schema migration; no production/staging deploy. Original folder mismatch and HTTP530/Jetpack disconnect blocker unchanged.
+
+---
+
+# R51 — safe File06 source identities + dormant File26 catalog (source only 1.1.0-rc.30; 2026-11-13)
+
+- New branch PR #48 is stacked on PR #46 exact `c1247100462ea7a0aac5f5a02b721d5f87fa5606`; File26 sibling PR #47 source integrated as a proposed, **not registered** PHP class.
+- Source defect addressed: File06 approval negative/fractional/string/bool/list identifier coercion and persisted historic link misbinding; typed positive int preflight and native regression added.
+- File26 search indexing remains **disabled** pending versioned rights/tombstone reconciliation; both current-rights checks and search-cache invalidation must be independently proven on real WP/MySQL.
+- Software candidate **1.1.0-rc.30** (unique; R50 was rc.29); source DB/schema/contract **1.1.0** unchanged. CI exact SHA and package checksum require fresh results.
+- Hostinger Jetpack is disconnected, WPVibe connection returned HTTP 530, exact active code/DB/migration/keys and real staging/live verification unavailable. No production diagnosis or deployment, folder-root mismatch remains.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File12 R50 — File16 AI Corpus source/cursor integrity; source-only 1.1.0-rc.29
 
 - Twenty **bounded topical** File12 original-plan, three central plans and companion File00/05/06/16/20/21/23/24/25/26/CF04 requirement/source checks recorded in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R50.md`; NOT 20 independently complete E2E audits.

@@ -3,7 +3,7 @@
 declare(strict_types=1);define('ABSPATH',__DIR__);
 class WP_Error{public function __construct($c,$m='',$data=array()){}}
 class PLDR_Core {
-	public static function edition($id){return $GLOBALS['edition'];}
+	public static function edition($id){$GLOBALS['edition_reads']=($GLOBALS['edition_reads']??0)+1;return $GLOBALS['edition'];}
 	public static function document($id){return $GLOBALS['doc'];}
 	public static function route_url($type,$args){return 'https://example.org/pdf/'.$args['id'];}
 	public static function normalize_search($txt){return trim(mb_strtolower((string)$txt,'UTF-8'));}
@@ -64,4 +64,44 @@ $wrong=$claim;$wrong['page']=3;
 must(null===PLDR_File06_Sources::quote_assertion(null,$wrong),'Unapproved source page rejected');
 $GLOBALS['edition']['sha256']=str_repeat('b',64);
 must(null===PLDR_File06_Sources::quote_assertion(null,$claim),'New source bytes invalidate old quote');
+// R51: malformed request identifiers must be denied before even a source lookup.
+function wp_verify_nonce($value,$action){return true;}
+function get_current_user_id(){return 8;}
+class R51_Request {
+    private array $data;
+    public function __construct(array $data){$this->data=$data;}
+    public function get_header($name){return 'valid-nonce';}
+    public function get_json_params(){return $this->data;}
+}
+$GLOBALS['edition']['sha256']=str_repeat('a',64);
+$GLOBALS['edition_reads']=0;
+$validSource=array('concept_public_id'=>$uuid,'concept_version'=>3,'edition_id'=>27,
+    'page'=>84,'rights_evidence_ref'=>'rights:document-2026');
+$validQuote=$validSource+array('original_excerpt'=>$exact);
+foreach(array(-27,0,27.5,'27',true,array(27),array('id'=>27)) as $bad){
+    foreach(array('edition_id','page','concept_version') as $field){
+        $s=$validSource;$s[$field]=$bad;
+        $before=$GLOBALS['edition_reads'];
+        must(PLDR_File06_Sources::approve_source(new R51_Request($s)) instanceof WP_Error,'Malformed source ID denied');
+        must($GLOBALS['edition_reads']===$before,'No source edition reads before malformed ID rejection');
+        $q=$validQuote;$q[$field]=$bad;
+        $before=$GLOBALS['edition_reads'];
+        must(PLDR_File06_Sources::approve_quote(new R51_Request($q)) instanceof WP_Error,'Malformed quote ID denied');
+        must($GLOBALS['edition_reads']===$before,'No quote edition reads before malformed ID rejection');
+    }
+}
+foreach(array(array('concept_public_id'=>array($uuid)),array('rights_evidence_ref'=>array('rights'))) as $mutation){
+    $s=array_merge($validSource,$mutation);
+    $before=$GLOBALS['edition_reads'];
+    must(PLDR_File06_Sources::approve_source(new R51_Request($s)) instanceof WP_Error,'Malformed source string field denied');
+    must($GLOBALS['edition_reads']===$before,'Source field failure has no edition lookup');
+}
+$sourceRow=$GLOBALS['options'][$key][0];
+$GLOBALS['options'][$key][0]['page']=-84;
+must(PLDR_File06_Sources::collect(array(),$dto)===array(),'Malformed historical signed page cannot coerce to a positive page');
+$GLOBALS['options'][$key][0]=$sourceRow;
+$badClaim=$claim;$badClaim['edition_id']='27';
+must(null===PLDR_File06_Sources::quote_assertion(null,$badClaim),'String edition ID in quote assertion denied');
+$badClaim=$claim;$badClaim['page']=-84;
+must(null===PLDR_File06_Sources::quote_assertion(null,$badClaim),'Negative page in quote assertion denied');
 echo "File12→File06 source and quotation: {$GLOBALS['checks']} isolated checks PASS.\n";
