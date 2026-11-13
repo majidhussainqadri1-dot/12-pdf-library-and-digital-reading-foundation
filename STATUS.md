@@ -1,3 +1,10 @@
+# R62 source-only Book Pack canonical identity, rc.41 (2026-11-13)
+- New stacked Draft PR #55 on parent PR #54 exact `f35bc055489e0764925a8a7b6009e2fe06b41405`; no `main` merge.
+- Confirmed source integrity defect: raw nonempty Book Pack key/version/metadata might normalize to empty or exceed schema varchar limits before entering DB; wrong-typed rights/checksum could reach dangerous conversions. RED-first DB trap failed, corrected exact-code run 43377002228 green (4 jobs) on source rc.40; new rc.41 exact-head CI required.
+- This is not a live exploit. File26 PDF + book_pack owner mismatch (File26 issue #23) and tombstone consumer ack (File12 issue #53) remain stop-ship. All 39 Staging gates, 54 requirement gates, and 10 CF04 shared gates are unverified. Live physical DB / deployed package / migrations unverified.
+
+---
+
 # R61 Book Pack registration identity and permission boundary — rc.40 (2026-11-13)
 
 - One root-cause source authorization defect with two demonstrated input forms: anonymous `actor_id=0` bypass and anonymous caller supplying an authorized third-party actor ID.

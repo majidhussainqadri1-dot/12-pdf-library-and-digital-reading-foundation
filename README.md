@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.40`
+- Software: `1.1.0-rc.41`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -161,3 +161,6 @@ Run php scripts/file12-release-no-go.php predeploy or postdeploy for a report, n
 
 ## R61 — Book Content Pack registration authority (2026-11-13)
 Source-only corrective candidate `1.1.0-rc.40` closes a confirmed caller authorization integrity gap. `PLDR_Book_Packs::register` skipped its authority check when `actor_id=0`; a second red regression established that a code caller could instead supply someone else's manager user ID while the current session remained anonymous. Now a public Book Pack registration requires a logged-in session, the requested actor must equal the actual current session ID, and the session must hold File12 management or founder rights. Only `scan_bundled_manifests`, which reads controlled installed plugin manifest files, can invoke the private `persist_authorized` path with system actor 0. See `docs/R61-RED-FIRST-BOOK-PACK-AUTHORITY-2026-11-13.md`. **No live exploit or patch/deployment is claimed.**
+
+## R62 — canonical Book Content Pack identity before DB and events (2026-11-13)
+Source-only candidate `1.1.0-rc.41`: the immutable pack key and version must be schema-length compatible and not silently normalized, basic source bibliographic identity must remain nonempty after safe text normalization, and the rights/checksum/identity fields must be actual strings. Source code now denies malformed inputs **before SQL or event emission**. The new native PHP fixture `tests/test-r62-book-pack-canonical-identity.php` first reproduced that malformed slug made the writer reach the DB in RED SHA `f410c0789accf008f14a70f994ef5c98b248e561`, workflow `43376844903`. Corrective source SHA `854e69e5e533ac6e25df7d2c7dd5fe962643bb6d` passed all four GitHub jobs in run `43377002228`. Final rc.41 requires its own exact-head successful CI and ZIP SHA. No File26 activation, migration or live change.
