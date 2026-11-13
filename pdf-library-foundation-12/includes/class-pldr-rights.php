@@ -283,6 +283,22 @@ final class PLDR_Book_Packs {
         global $wpdb;
         $required=array('pack_key','version','title','author','language','rights','checksum','update_manifest');
         foreach($required as $field)if(empty($manifest[$field]))return PLDR_Core::machine_error('pldr_pack_required','Book Content Pack manifest is incomplete.',400,array('field'=>$field));
+        // The DB identity is immutable: do not let sanitizers collapse distinct
+        // pack keys/versions, truncate varchar columns, or cast JSON arrays to strings.
+        foreach(array('pack_key','version','title','author','language','rights','checksum') as $field){
+            if(!isset($manifest[$field])||!is_string($manifest[$field]))
+                return PLDR_Core::machine_error('pldr_pack_identity','Book Content Pack identity, rights and checksum fields must be strings.',400,array('field'=>$field));
+        }
+        $pack_key=$manifest['pack_key'];$pack_version=$manifest['version'];
+        if($pack_key!==sanitize_key($pack_key)||strlen($pack_key)>120
+            ||!preg_match('/^[a-z0-9][a-z0-9_-]*$/D',$pack_key))
+            return PLDR_Core::machine_error('pldr_pack_identity','Book Content Pack key must be a canonical ASCII slug of 1–120 bytes.',400,array('field'=>'pack_key'));
+        if(strlen($pack_version)>40||!preg_match('/^[A-Za-z0-9][A-Za-z0-9._+-]*$/D',$pack_version))
+            return PLDR_Core::machine_error('pldr_pack_identity','Book Content Pack version must be an immutable canonical identifier of 1–40 bytes.',400,array('field'=>'version'));
+        foreach(array('title','author','language') as $field){
+            if(''===sanitize_text_field($manifest[$field]))
+                return PLDR_Core::machine_error('pldr_pack_identity','Book Content Pack identity must remain nonempty after safe normalization.',400,array('field'=>$field));
+        }
         $rights=sanitize_key((string)$manifest['rights']);
         if(!in_array($rights,array('founder-owned','public-domain','permission','licensed','open-license'),true))return PLDR_Core::machine_error('pldr_pack_rights','Book Content Pack has no approved rights basis.',400);
         if(!preg_match('/^[a-f0-9]{64}$/i',(string)$manifest['checksum']))return PLDR_Core::machine_error('pldr_pack_checksum','Book Content Pack checksum must be SHA-256.',400);
