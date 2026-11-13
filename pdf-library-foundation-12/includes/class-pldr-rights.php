@@ -264,10 +264,14 @@ final class PLDR_Rights {
 final class PLDR_Book_Packs {
     /** Public or REST callers must be an authenticated, authorized manager. */
     public static function register(array $manifest,int $actor_id=0) {
-        $actor_id=$actor_id?:get_current_user_id();
-        if($actor_id<1 || (!PLDR_Core::authorize('manage',0,$actor_id) && !PLDR_Core::founder($actor_id)))
-            return PLDR_Core::machine_error('pldr_pack_forbidden','Book Content Pack registration requires File 12 management authority.',403);
-        return self::persist_authorized($manifest,$actor_id);
+        $session_actor=get_current_user_id();
+        $actor_id=$actor_id?:$session_actor;
+        // Caller-supplied IDs never confer privilege on an unauthenticated
+        // session or allow a different manager to be impersonated.
+        if($session_actor<1 || $actor_id!==$session_actor
+            || (!PLDR_Core::authorize('manage',0,$session_actor) && !PLDR_Core::founder($session_actor)))
+            return PLDR_Core::machine_error('pldr_pack_forbidden','Book Content Pack registration requires the current authorized manager session.',403);
+        return self::persist_authorized($manifest,$session_actor);
     }
 
     /**
