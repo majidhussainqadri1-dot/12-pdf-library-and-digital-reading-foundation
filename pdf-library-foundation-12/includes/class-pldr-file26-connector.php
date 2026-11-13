@@ -26,7 +26,7 @@ final class PLDR_File26_Connector {
     public static function manifest(){
         return array(
             'slug'=>self::SLUG,'owner_file'=>'File 12','contract_version'=>'1.0',
-            'entity_types'=>array('pdf','book_pack'),
+            'entity_types'=>array('pdf'), // Do not advertise book_pack until a real fetch/list implementation exists.
             'privacy_classes'=>array('public'),'visibility_fields'=>array('public'),
             'deletion_semantics'=>'rights_and_policy_versioned_tombstone_gate_pending',
             'status'=>'proposed',
@@ -116,8 +116,16 @@ final class PLDR_File26_Connector {
         return is_array($fresh)&&is_int($fresh['object_version'])&&$fresh['object_version']===$version;
     }
     public static function health(){
-        return self::source_ready()
-            ? array('state'=>'healthy','owner_file'=>'File 12','rights_checked'=>true,'status'=>'proposed','policy_event_gate_approved'=>false)
-            : array('state'=>'degraded','owner_file'=>'File 12','reason'=>'library_schema_or_rights_policy_unverified');
+        if(!self::source_ready()){
+            return array('state'=>'degraded','owner_file'=>'File 12',
+                'reason'=>'library_schema_or_rights_policy_unverified','status'=>'proposed');
+        }
+        if(!self::cutover_approved()){
+            return array('state'=>'disabled','owner_file'=>'File 12',
+                'reason'=>'file26_rights_tombstone_cutover_unapproved',
+                'rights_checked'=>true,'status'=>'proposed','policy_event_gate_approved'=>false);
+        }
+        return array('state'=>'healthy','owner_file'=>'File 12',
+            'rights_checked'=>true,'status'=>'approved','policy_event_gate_approved'=>true);
     }
 }
