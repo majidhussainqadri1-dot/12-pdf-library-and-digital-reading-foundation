@@ -1,3 +1,11 @@
+# R57 stage evidence ledger, source-only rc.36 (2026-11-13)
+
+- All original 39 V12.1 staging tests entered into a versioned machine-readable CSV and guarded by native PHP CI. Each is UNVERIFIED and no invented pass/fail.
+- No live WordPress, physical DB or original source/rights acceptance. File26 Book Pack mismatch issue #23 open; File26 integration dormant.
+- Unique candidate rc.36; declared source DB/contract 1.1.0.
+
+---
+
 # R56 source-only safe deployed parity evidence tool, candidate rc.35 (2026-11-13)
 
 - Added owner-run read-only WP-CLI/DB query script, restricted-only evidence scope, PHP static guard and bash syntax CI.

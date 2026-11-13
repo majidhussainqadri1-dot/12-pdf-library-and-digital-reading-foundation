@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.35`
+- Software: `1.1.0-rc.36`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -145,3 +145,6 @@ Red-first CI SHA 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, workflow 43367072985 
 
 ## R56 read-only Hostinger Live Reality Freeze tooling (2026-11-13)
 Unique source/software candidate 1.1.0-rc.35 includes an owner-executed read-only WP-CLI/SQL and deployed source checksum collector at scripts/file12-live-reality-freeze-readonly.sh, static safety test at tests/test-r56-live-freeze-readonly.php, and usage/limits at docs/R56-LIVE-REALITY-FREEZE-READONLY-2026-11-13.md. This tool is NOT run on Hostinger and supplies no evidence until an authorized terminal executes it; Source QA is not Deployment Parity. File26 book_pack and rights/tombstones remain stop-ship.
+
+## R57 exact 39-gate staging execution matrix (2026-11-13)
+Source-only release candidate rc.36 contains docs/R57-FILE12-V121-39-STAGING-GATES.csv tracking plan T-01..T-39, each unverified with an explicit dependency, observed-state placeholder, evidence ID, defect, retest and reviewer. tests/test-r57-39-gates-ledger.php validates count/identity and prevents false PASS/FAIL without evidence and reviewer. No Hostinger tests executed; source CI green alone cannot close a gate.

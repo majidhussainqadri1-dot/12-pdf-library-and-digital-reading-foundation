@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.35`
+Candidate: `1.1.0-rc.36`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -266,3 +266,8 @@ Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d2
 - New non-shipped operational helper scripts/file12-live-reality-freeze-readonly.sh, and tests/test-r56-live-freeze-readonly.php; CI must prove bash syntax and static non-mutation guard.
 - Tool records authorized Hostinger WP/CLI and File12 deployment/physical schema facts without collecting patient rows/PDF bytes/secret option values or raw logs. This tool has not been run on Hostinger; no deployed parity is established.
 - New software label 1.1.0-rc.35 on a unique source candidate; source schema/interface remain 1.1.0.
+
+## R57 39-gate source-only acceptance evidence register
+- docs/R57-FILE12-V121-39-STAGING-GATES.csv enumerates all T-01..T-39 from the owner Word plan, each UNVERIFIED and with empty runtime evidence.
+- tests/test-r57-39-gates-ledger.php enforces unique count, valid lifecycle and no PASS/FAIL without evidence and reviewer. It is a **source ledger test**, not staging acceptance.
+- Candidate rc.36, source schema/integration 1.1.0 unchanged; no live deployment or migration.
