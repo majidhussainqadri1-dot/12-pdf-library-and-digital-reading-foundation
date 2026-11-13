@@ -1,3 +1,13 @@
+# R61 Book Pack registration identity and permission boundary — rc.40 (2026-11-13)
+
+- One root-cause source authorization defect with two demonstrated input forms: anonymous `actor_id=0` bypass and anonymous caller supplying an authorized third-party actor ID.
+- RED-first CI runs `43370025549` and `43370196026`; expected failures on PHP8.1/8.3/8.4 before production code correction.
+- New source fix `PLDR_Book_Packs::register` binds requested actor to actual login session and approved manager/founder capability. Controlled, installed bundled manifests use private persistence path; no external/public actor bypass.
+- Native fixture adds two negative variants and authorized positive validation plus static check of private bundle path. Exact HEAD PHP matrix+ZIP required before source acceptance.
+- Software candidate `1.1.0-rc.40`, declared DB/contract `1.1.0`. No Hostinger/deployed/DB/migration/live validation, no File26 activation.
+
+---
+
 # R60 default fail-closed release evidence gate — source-only rc.39 (2026-11-13)
 
 - Added scripts/file12-release-no-go.php predeploy/postdeploy, docs/R60-RELEASE-APPROVAL-STATE.json with all UNVERIFIED and empty evidence, plus native PHP negative CI.

@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.39`
+Candidate: `1.1.0-rc.40`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -286,3 +286,8 @@ Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d2
 - scripts/file12-release-no-go.php checks 39 Staging, 54 requirement and 10 CF04 shared security registers, independent Founder and current/staged/deployed parity proof. It never deploys.
 - docs/R60-RELEASE-APPROVAL-STATE.json intentionally UNVERIFIED; tests/test-r60-release-no-go.php must PASS only when both CLI modes refuse to release, not when the website is accepted.
 - Distinct source candidate rc.39; DB/interface declarations remain 1.1.0; live state unknown.
+
+## R61 source-only Book Pack authority correction, rc.40
+- Confirmed red-first authorization errors: actor=0 reached manifest validation without File12 manage capability; caller-supplied privileged actor=14 could bypass actual anonymous session. CI runs 43370025549 and 43370196026, with exact red tests.
+- Source fix now requires current logged-in session identity equals requested actor; authorization revalidated. Plugin-controlled Book Pack imports moved to a private method only callable by trusted scanner.
+- Expanded fixture checks anonymous/other-user denial, valid manager proceeds to manifest validation, bundled-only method remains private. No new DB schema, package root, File26 activation or live use.

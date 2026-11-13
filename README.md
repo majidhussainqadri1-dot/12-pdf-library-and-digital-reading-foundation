@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.39`
+- Software: `1.1.0-rc.40`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -157,3 +157,7 @@ No new production storage ownership or false activation: docs/R59-V121-CF04-STO1
 
 ## R60 explicit predeploy/postdeploy NO_GO evidence guard (2026-11-13)
 Run php scripts/file12-release-no-go.php predeploy or postdeploy for a report, never a deployment. With current 39 Staging tests, 54 requirements, 10 CF04 controls and unset Founder/Hostinger parity evidence, both modes must return NO_GO (exit 2). Native tests/test-r60-release-no-go.php proves that source safety invariant in CI. Source candidate rc.39 is not production ready by virtue of its green CI.
+
+
+## R61 — Book Content Pack registration authority (2026-11-13)
+Source-only corrective candidate `1.1.0-rc.40` closes a confirmed caller authorization integrity gap. `PLDR_Book_Packs::register` skipped its authority check when `actor_id=0`; a second red regression established that a code caller could instead supply someone else's manager user ID while the current session remained anonymous. Now a public Book Pack registration requires a logged-in session, the requested actor must equal the actual current session ID, and the session must hold File12 management or founder rights. Only `scan_bundled_manifests`, which reads controlled installed plugin manifest files, can invoke the private `persist_authorized` path with system actor 0. See `docs/R61-RED-FIRST-BOOK-PACK-AUTHORITY-2026-11-13.md`. **No live exploit or patch/deployment is claimed.**
