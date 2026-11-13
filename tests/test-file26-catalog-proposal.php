@@ -57,6 +57,10 @@ must(PLDR_File26_Connector::append(array('existing'))===array('existing'),'Pendi
 $registry=new class{public function register($x){$GLOBALS['registrations']++;}};
 must(PLDR_File26_Connector::ready($registry)===false&&$GLOBALS['registrations']===0,'Ready hook cannot register proposed connector');
 $manifest=PLDR_File26_Connector::manifest();
+// R54 expected RED: a proposed-only adapter may not claim unimplemented book packs
+// or advertise healthy operational state before its rights/tombstone cutover.
+must($manifest['entity_types']===array('pdf'),'File26 catalog manifest must not claim unsupported book_pack entity type');
+must(PLDR_File26_Connector::health()['state']==='disabled','Proposed unregistered File26 connector must not report healthy operational state');
 must($manifest['status']==='proposed'&&str_contains($manifest['deletion_semantics'],'pending'),
     'Cutover metadata cannot claim release readiness');
 $batch=PLDR_File26_Connector::list_batch('',50,array());

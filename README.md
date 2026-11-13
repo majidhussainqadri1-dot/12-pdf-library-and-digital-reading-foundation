@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.31`
+- Software: `1.1.0-rc.33`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -132,4 +132,10 @@ A new stacked **source-only** R51 candidate has a unique software version `1.1.0
 
 
 ## R52 focused review on same R51 Draft (2026-11-13)
-Software source candidate `1.1.0-rc.31` hardens the dormant File26 proposal: calling registration or manifest hooks cannot activate pending search indexing; invalid partial scope and malformed batch limit are denied before SQL; stored index versions cannot be silently numeric-coerced on fresh-rights recheck. Native negative cases added. The PR remains draft/source-only; live and staging unverified.
+Software source candidate `1.1.0-rc.32` hardens the dormant File26 proposal: calling registration or manifest hooks cannot activate pending search indexing; invalid partial scope and malformed batch limit are denied before SQL; stored index versions cannot be silently numeric-coerced on fresh-rights recheck. Native negative cases added. The PR remains draft/source-only; live and staging unverified.
+
+## R53 — independently approved source evidence and exact quote verification (2026-11-13)
+Source-only candidate `1.1.0-rc.32` closes three File06 citation-integrity errors: a quote's `rights_evidence_ref` must match the independently approved edition/page link at approval; the File06 canonical assertion must match `owner_file=file-06` and the exact concept UUID; and any change to the approved link's evidence invalidates a previous quote assertion. Red-first regression at SHA `0d7d8541cf244e5c92213fd52de992e1ff607ffc` demonstrated the rights mismatch, with PHP 8.1/8.3/8.4 failing expected test `tests/test-file06-approved-edition-quote.php`. Corrective commit `2079f006778bb4a75031c4ee1638b2b7df27ffdc` supplies the focused code fix; a **fresh exact-sha CI** must pass before source-only acceptance. OCR substring checking is not original scan/facsimile validation, which requires independent human review and real staging evidence.
+
+## R54 — truthful proposed File26 contract (13 November 2026)
+R54 source-only software `1.1.0-rc.33` corrects two proven File26 connector contract defects. It removes the unimplemented `book_pack` entity from the PDF-only source manifest, and reports `state=disabled` while its rights-versioned deletion/tombstone cutover remains unapproved. Deliberate RED regression at `6add1132b32928e9770f44f074cafb5765b07f0c` was confirmed in run `43357047338`; the corrected source is in `03bdebba50d914a3c6fdf8b5db1031f618df4532`. File26 remains physically unregistered, schema/contract declaration is `1.1.0`, and no live changes were made.
