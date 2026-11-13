@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.37`
+Candidate: `1.1.0-rc.38`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -276,3 +276,8 @@ Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d2
 - docs/R58-FILE12-V121-54-REQUIREMENTS.csv preserves the first canonical 19 FR, 10 NFR, 24 FUT traceability entries and one governing F12-CEN-01 owner policy.
 - tests/test-r58-54-requirements-ledger.php prevents claims of runtime PASS/FAIL without evidence and reviewer. Source anchor = documented implementation claim only.
 - All real Hostinger staging/live statuses unverified. Unique software source candidate rc.37, declared DB/contract 1.1.0.
+
+## R59 common CF04 secured binary and rights acceptance (STO01..10)
+- Versioned owner security ledger docs/R59-V121-CF04-STO10-SHARED-SECURITY-GATES.csv, 10 controls distinct from 39 Staging tests and 54 File12 requirement IDs.
+- All 10 host/runtime gates unverified; CF04 exact source Draft PR5 HEAD af8098374de9aa8f7b0910f5c9cf24121a1b491f currently disabled by default.
+- tests/test-r59-sto10-shared-security.php in exact CI; no new external capability, source schema 1.1.0 unchanged, no live installation.

@@ -4,7 +4,7 @@ Tags: pdf, library, digital-reading, rights, accessibility, rtl, iiif, annotatio
 Requires at least: 7.0
 Tested up to: 7.0.1
 Requires PHP: 8.1
-Stable tag: 1.1.0-rc.37
+Stable tag: 1.1.0-rc.38
 License: GPLv2 or later
 
 File 12 canonical implementation for the Sabri Social Homeopathy Platform.

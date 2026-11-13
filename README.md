@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.37`
+- Software: `1.1.0-rc.38`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -151,3 +151,6 @@ Source-only release candidate rc.36 contains docs/R57-FILE12-V121-39-STAGING-GAT
 
 ## R58 original V12.1 54-requirement evidence matrix (2026-11-13)
 Read docs/R58-FILE12-V121-54-REQUIREMENTS.csv for the 19 FR, 10 NFR, 24 FUT and 1 CEN requirements with original traceability source anchors, non-runtime source status and empty staging/live proof. CI test tests/test-r58-54-requirements-ledger.php enforces exact count, identity and rejection of unsupported PASSED/FAILED claims. This is not a completion percentage or Hostinger acceptance.
+
+## R59 V12.1 STO-01..10 shared CF04 security evidence register (2026-11-13)
+No new production storage ownership or false activation: docs/R59-V121-CF04-STO10-SHARED-SECURITY-GATES.csv tracks 10 central V12.1 security requirements with original CF04 ownership, no Staging/Live evidence. tests/test-r59-sto10-shared-security.php prevents missing IDs and false PASS/FAIL without evidence/reviewer. CF04 Draft PR #5 source runtime remains disabled pending actual Hostinger/provider acceptance.

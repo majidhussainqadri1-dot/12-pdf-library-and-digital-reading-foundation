@@ -1,3 +1,11 @@
+# R59 shared CF04 STO-01..10 source-only release evidence — candidate rc.38 (2026-11-13)
+
+- V12.1 STO-01..10 owner controls catalogued in standalone machine-readable 10-row source/evidence register; all Staging/Live statuses UNVERIFIED.
+- Compared CF04 current Draft PR #5 source/runtime governance; declared disabled, not live. Added PHP anti-false-acceptance registry test.
+- File12 outbox sent not proven File26 consumer receipt (Issue #53); File26 Book Pack owner mismatch (issue #23); no live DB/plug-in parity.
+
+---
+
 # R58 54-requirement source-to-acceptance evidence matrix — rc.37 (2026-11-13)
 
 - Original 53 unique FR/NFR/FUT IDs extracted from the first rows in docs/TRACEABILITY.md, plus F12-CEN-01 from the governing rights/storage policy, all tracked in a new versioned CSV.
