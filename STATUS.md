@@ -1,3 +1,11 @@
+# R52 source-only File26 proposal hard guard — candidate 1.1.0-rc.31 (2026-11-13)
+
+- Four proven source contract integrity gaps corrected on the stacked R51 Draft #48: `register/append/ready` premature proposal activation; unknown `scope` widening; malformed `limit` coercion; stale `object_version` coercion. Real File26 installed consumer and tombstone cutover still unverified.
+- New fixture negative cases; fresh exact-head CI required. R51 File06 correction remains included and source-reviewed.
+- No new schema migration; no production/staging deploy. Original folder mismatch and HTTP530/Jetpack disconnect blocker unchanged.
+
+---
+
 # R51 — safe File06 source identities + dormant File26 catalog (source only 1.1.0-rc.30; 2026-11-13)
 
 - New branch PR #48 is stacked on PR #46 exact `c1247100462ea7a0aac5f5a02b721d5f87fa5606`; File26 sibling PR #47 source integrated as a proposed, **not registered** PHP class.

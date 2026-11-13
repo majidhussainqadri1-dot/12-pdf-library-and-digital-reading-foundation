@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.30`
+- Software: `1.1.0-rc.31`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -129,3 +129,7 @@ Source candidate 1.1.0-rc.29: twenty bounded requirements/source inspections in 
 
 ## R51 — File06 typed source identity and proposed File26 integration (2026-11-13)
 A new stacked **source-only** R51 candidate has a unique software version `1.1.0-rc.30` (DB/interface still 1.1.0). File06 source/quote reviewers reject malformed numeric JSON identities before source reads and deny corrupt historical identity rather than silently remap page/edition. The File26 public catalog adapter is present as a **proposed but dormant** class: it is not registered by this bootstrap while signed/versioned rights-withdrawal tombstone propagation, real index removal and staging remain unverified. See `docs/R51-SOURCE-INTEGRATION-2026-11-13.md`. No main merge or deploy.
+
+
+## R52 focused review on same R51 Draft (2026-11-13)
+Software source candidate `1.1.0-rc.31` hardens the dormant File26 proposal: calling registration or manifest hooks cannot activate pending search indexing; invalid partial scope and malformed batch limit are denied before SQL; stored index versions cannot be silently numeric-coerced on fresh-rights recheck. Native negative cases added. The PR remains draft/source-only; live and staging unverified.

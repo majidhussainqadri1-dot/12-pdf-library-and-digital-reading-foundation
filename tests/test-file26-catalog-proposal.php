@@ -47,6 +47,15 @@ $GLOBALS['rows']=array($GLOBALS['doc']);
 $GLOBALS['edition']=array('id'=>31,'status'=>'published','document_status'=>'published');
 $GLOBALS['policy']=array('audience'=>'public');
 require dirname(__DIR__).'/pdf-library-foundation-12/includes/class-pldr-file26-connector.php';
+function add_filter($name,$handler,$priority=10){$GLOBALS['registrations']++;}
+function add_action($name,$handler,$priority=10){$GLOBALS['registrations']++;}
+function sabri_file26_register_connector($manifest){$GLOBALS['registrations']++;}
+$GLOBALS['registrations']=0;
+must(PLDR_File26_Connector::register()===false,'Proposed connector must refuse explicit registration');
+must($GLOBALS['registrations']===0,'No File26 hook or direct registry side effects');
+must(PLDR_File26_Connector::append(array('existing'))===array('existing'),'Pending manifest not advertised');
+$registry=new class{public function register($x){$GLOBALS['registrations']++;}};
+must(PLDR_File26_Connector::ready($registry)===false&&$GLOBALS['registrations']===0,'Ready hook cannot register proposed connector');
 $manifest=PLDR_File26_Connector::manifest();
 must($manifest['status']==='proposed'&&str_contains($manifest['deletion_semantics'],'pending'),
     'Cutover metadata cannot claim release readiness');
@@ -72,6 +81,14 @@ must(PLDR_File26_Connector::can_view($entry,array())===false,'Stale document ver
 $GLOBALS['rows']=array($GLOBALS['doc']);
 must(PLDR_File26_Connector::list_batch('nope',50,array()) instanceof WP_Error,'Malformed cursor denied');
 must(PLDR_File26_Connector::list_batch('',50,array('object_id'=>$uuid)) instanceof WP_Error,'Unapproved partial scope denied');
+must(PLDR_File26_Connector::list_batch('',50,array('topic'=>'homeopathy')) instanceof WP_Error,'Unknown partial scope cannot expand into full snapshot');
+foreach(array(false,'50',50.1,array(50),0,-1) as $badLimit){
+    must(PLDR_File26_Connector::list_batch('',$badLimit,array()) instanceof WP_Error,'Wrong-typed/nonpositive limit denied');
+}
+$malformed=$entry;$malformed['object_version']='6junk';
+must(PLDR_File26_Connector::can_view($malformed,array())===false,'Invalid stored index version cannot coerce to current version');
+$malformed=$entry;$malformed['object_version']=6.5;
+must(PLDR_File26_Connector::can_view($malformed,array())===false,'Fractional stored index version denied');
 $GLOBALS['options']['pldr_db_version']='0';
 must(PLDR_File26_Connector::health()['state']==='degraded','Stale DB schema fails closed');
 $bootstrap=file_get_contents(dirname(__DIR__).'/pdf-library-foundation-12/pdf-library-digital-reading.php');

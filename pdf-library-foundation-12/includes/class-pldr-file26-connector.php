@@ -9,10 +9,19 @@
 defined('ABSPATH') || exit;
 final class PLDR_File26_Connector {
     const SLUG='file12-public-pdfs';
+    /** Cannot release a proposed connector without a versioned tombstone/event bridge. */
+    private static function cutover_approved():bool {
+        $m=self::manifest();
+        return ($m['status']??'')==='approved'
+            && ($m['deletion_semantics']??'')==='versioned_rights_tombstones_verified'
+            && ($m['event_contract']??'')==='PDFDocumentAccessChanged.v1';
+    }
     public static function register(){
+        if(!self::cutover_approved())return false;
         add_filter('sabri_file26_connector_manifests',array(__CLASS__,'append'),20);
         add_action('sabri_file26_connectors_ready',array(__CLASS__,'ready'),20);
         if(function_exists('sabri_file26_register_connector')){sabri_file26_register_connector(self::manifest());}
+        return true;
     }
     public static function manifest(){
         return array(
@@ -31,10 +40,12 @@ final class PLDR_File26_Connector {
     }
     public static function append($manifests){
         $manifests=is_array($manifests)?$manifests:array();
+        if(!self::cutover_approved())return $manifests;
         foreach($manifests as $item){if(is_array($item)&&($item['slug']??'')===self::SLUG){return $manifests;}}
         $manifests[]=self::manifest();return $manifests;
     }
     public static function ready($registry){
+        if(!self::cutover_approved())return false;
         if(is_object($registry)&&method_exists($registry,'register')){$registry->register(self::manifest());}
     }
     private static function source_ready(){
@@ -79,9 +90,10 @@ final class PLDR_File26_Connector {
     public static function list_batch($cursor='',$limit=50,$scope=array()){
         global $wpdb;
         if(!self::source_ready()){return new WP_Error('file12_search_schema_unverified','Library database and rights policy must be verified.');}
-        if(!is_array($scope)||isset($scope['object_id'])){return new WP_Error('file12_search_partial_scope','Only full rights-aware catalog snapshots supported.');}
+        if(!is_array($scope)||$scope!==array()){return new WP_Error('file12_search_partial_scope','Only an explicitly empty full-catalog scope is supported.');}
+        if(!is_int($limit)||$limit<1){return new WP_Error('file12_search_limit_invalid','Catalog batch limit must be a positive integer.');}
         if($cursor!==''&&(!is_string($cursor)||!preg_match('/^[0-9]{1,18}$/D',$cursor))){return new WP_Error('file12_search_cursor_invalid','Invalid catalog cursor.');}
-        $table=PLDR_Core::table('documents');$limit=max(1,min(50,(int)$limit));$current=(int)$cursor;
+        $table=PLDR_Core::table('documents');$limit=min(50,$limit);$current=(int)$cursor;
         $wpdb->last_error='';
         $rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM $table WHERE id>%d ORDER BY id ASC LIMIT %d",$current,$limit+1),ARRAY_A);
         if(!is_array($rows)||$wpdb->last_error){return new WP_Error('file12_search_catalog_unreadable','PDF catalog could not be scanned.');}
@@ -98,8 +110,10 @@ final class PLDR_File26_Connector {
     public static function can_view($document,$audience=array()){
         if(!is_array($document)||($document['connector_slug']??'')!==self::SLUG||
             ($document['visibility']??'')!=='public'){return false;}
+        $version=$document['object_version']??null;
+        if(!is_int($version)||$version<1)return false;
         $fresh=self::fetch_object((string)($document['entity_type']??''),(string)($document['object_id']??''));
-        return is_array($fresh)&&(int)$fresh['object_version']===(int)($document['object_version']??0);
+        return is_array($fresh)&&is_int($fresh['object_version'])&&$fresh['object_version']===$version;
     }
     public static function health(){
         return self::source_ready()

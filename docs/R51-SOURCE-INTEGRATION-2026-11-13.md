@@ -26,3 +26,10 @@
 - Live-first five truths remain: Repository HEAD (this branch exact SHA after build), Deployed Version UNVERIFIED, DB Version UNVERIFIED, Migration State UNVERIFIED, Live Verification NOT PERFORMED.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+
+## Focused R52 review and immutable release candidate
+- New source candidate `1.1.0-rc.31` (R51 parent candidate `1.1.0-rc.30`; no identical-version different-code reuse).
+- File26 registration and manifest hooks fail closed while `status=proposed`, rights/tombstone event semantics pending. The PHP class is loaded only; **never enabled by this release**.
+- Invalid batch `limit` types or unknown partial `scope` are rejected, not silently expanded. `can_view` refuses malformed stored numeric object versions rather than casting to valid.
+- New direct-native isolated tests prove registration side effects stay zero, source ACL still current, and bad requests fail before SQL. Not a substitute for real staging.
