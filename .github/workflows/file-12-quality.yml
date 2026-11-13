@@ -164,6 +164,8 @@ jobs:
         run: php tests/test-r62-book-pack-canonical-identity.php
       - name: R63 bundled Book Pack malformed/symlink audit regression
         run: php tests/test-r63-bundled-book-pack-audit.php
+      - name: R64 release evidence context and NO_GO anti-forgery regression
+        run: php tests/test-r64-release-evidence-context.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
