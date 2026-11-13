@@ -1,3 +1,11 @@
+# R56 source-only safe deployed parity evidence tool, candidate rc.35 (2026-11-13)
+
+- Added owner-run read-only WP-CLI/DB query script, restricted-only evidence scope, PHP static guard and bash syntax CI.
+- Existing R55 strong canonical owner attestation repair remains inherited. Candidate version 1.1.0-rc.35; source DB/contract version 1.1.0 unchanged.
+- Hostinger Jetpack status disconnected; WPVibe returned HTTP530; installed File12 code/DB/migrations still unverified. Script is NOT executed against production. No main merge or deploy.
+
+---
+
 # R55 source-only strict File06 owner attestation (2026-11-13)
 Candidate 1.1.0-rc.34; declared DB/schema/contract 1.1.0 unchanged. Parent R54 40ca7e2e510b7a63727a77bdda443c0d1163121b. Red-first SHA 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, workflow 43367072985. Replaced caller-provided coercible edition/page with exact comparison across 12 fresh owner fields. New exact HEAD CI required. No merge/deploy; installed version/physical DB/migration unverified.
 

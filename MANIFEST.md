@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.34`
+Candidate: `1.1.0-rc.35`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -261,3 +261,8 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 
 ## R55 owner attestation integrity, software rc.34
 Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, run 43367072985: malformed edition_id attested under earlier integer coercion. Now 12 canonical fields require strict PHP identity, without source changes or DB migration. Exact CI and package checksum to be established on final HEAD. File26 search stays disabled.
+
+## R56 source-only read-only Live Reality Freeze utility
+- New non-shipped operational helper scripts/file12-live-reality-freeze-readonly.sh, and tests/test-r56-live-freeze-readonly.php; CI must prove bash syntax and static non-mutation guard.
+- Tool records authorized Hostinger WP/CLI and File12 deployment/physical schema facts without collecting patient rows/PDF bytes/secret option values or raw logs. This tool has not been run on Hostinger; no deployed parity is established.
+- New software label 1.1.0-rc.35 on a unique source candidate; source schema/interface remain 1.1.0.

@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.34`
+- Software: `1.1.0-rc.35`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -142,3 +142,6 @@ R54 source-only software `1.1.0-rc.33` corrects two proven File26 connector cont
 
 ## R55 strict File06 owner attestation, source-only rc.34
 Red-first CI SHA 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, workflow 43367072985 exposed forged owner related-resource edition_id acceptance. All 12 canonical owner, edition, version, page, rights/eligibility, URL and label fields must now match the freshly rights-reviewed mapping with strict typed equality. Test adds 11 invalid source mutations. No deployed or real File06 integration acceptance; File26 rights/tombstone and book_pack owner-contract blockers remain.
+
+## R56 read-only Hostinger Live Reality Freeze tooling (2026-11-13)
+Unique source/software candidate 1.1.0-rc.35 includes an owner-executed read-only WP-CLI/SQL and deployed source checksum collector at scripts/file12-live-reality-freeze-readonly.sh, static safety test at tests/test-r56-live-freeze-readonly.php, and usage/limits at docs/R56-LIVE-REALITY-FREEZE-READONLY-2026-11-13.md. This tool is NOT run on Hostinger and supplies no evidence until an authorized terminal executes it; Source QA is not Deployment Parity. File26 book_pack and rights/tombstones remain stop-ship.
