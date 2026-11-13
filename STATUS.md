@@ -1,3 +1,11 @@
+# R64/R65 — staging reality before pass and completed retest — candidate rc.43 (2026-11-13)
+- Source Draft PR #57 stacked on #56; explicit independent RED-first source reproductions for false staging PASS and missing defect retest, corrected in non-deploying CLI.
+- 2 newly demonstrated source release-governance defects fixed. Original real ledgers remain all UNVERIFIED, no proof invented; R60/R64/R65 native PHPUnit-free PHP fixtures pass.
+- Version `1.1.0-rc.43`, source schema/contract `1.1.0`, deployed version/DB/migrations/live tests unknown. No main merge/deploy.
+- File26 PDF+book_pack consumer, acknowledged tombstone/revocation, File00/CF04, filesystem/DB/backup and 39 staging tests remain stop-ship.
+
+---
+
 # R63 source-only auditable bundled Book Content Packs — rc.42 (2026-11-13)
 - Draft PR #56 stacked after #55, not `main`. Original README-only HEAD and deployed WP version distinct.
 - Source defects addressed in importer: silent invalid JSON, silent private writer error, symlink-following; new `tests/test-r63-bundled-book-pack-audit.php` executes on PHP 8.1/8.3/8.4.

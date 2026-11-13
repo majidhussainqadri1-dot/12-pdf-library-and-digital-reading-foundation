@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.42`
+Candidate: `1.1.0-rc.43`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -304,3 +304,8 @@ Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d2
 - Fix `3863cb7011aec7a2691714478523949b42f03451`: deny symlink, audit invalid/unreadable/rejected using only basename SHA-derived reference, bounded error code, never raw data.
 - R61 private-import invariant test updated to inspect the private call independently of old exact formatting (SHA `2dca9c4b614a647a6406ba0bd7d921aaf1e840d9`).
 - Full rc.42 CI and ZIP digest must be validated on final exact SHA. Original staging 39 and live gates remain unverified.
+
+## R64 + R65 — no fake staging proof or un-retested defect release (candidate rc.43)
+- R64 original source failure: 39 staging rows `status=PASS` with nonempty reviewer/evidence could be counted while `environment=HOSTINGER_STAGING_REQUIRED` and `observed=NOT_OBSERVED`. RED `e547345e0be37f63006fc3b2eca7665b642b0172`, Actions `43378939348`: both pre/post modes incorrectly return SOURCE_LEDGER_GO. Fix `e2f87799a0c1b370bafc389ff9024227a8b9c1fa`.
+- R65 original source failure: a named `defect_id` with `retest_status=NOT_RUN` was also counted as PASS. RED `df0dd5908492dc0c081e03a2e23a53ec20e544a2`, Actions `43379286000`, reproduced both release modes. Fix `baf0d5bfef6e1d3f62f368dde629ff52b519e355`.
+- R64/R65 source only, CI `43379434645` green 4/4 on parent rc.42 software. Distinct new rc.43 release/package hash and full QA still required. Release script performs *no deployment*, still requires independent human proof validation.

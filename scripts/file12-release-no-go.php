@@ -22,6 +22,20 @@ foreach($tables as $def){
   $r=array_combine($header,$values);
   $key=$mode==='postdeploy'&&$def['live']?$def['live']:$def['stage'];
   if(($r[$key]??'')!=='PASS'||empty($r['evidence_id'])||empty($r['reviewer']))continue;
+  // The original 39-test ledger carries an explicit staging environment and
+  // observed result. A fabricated PASS must never override untouched
+  // HOSTINGER_STAGING_REQUIRED / NOT_OBSERVED evidence placeholders.
+  if($def['file']==='docs/R57-FILE12-V121-39-STAGING-GATES.csv'){
+   $environment=strtoupper(trim((string)($r['environment']??'')));
+   $observed=strtoupper(trim((string)($r['observed']??'')));
+   if($environment===''||in_array($environment,array('HOSTINGER_STAGING_REQUIRED','UNVERIFIED','PENDING','NOT_OBSERVED'),true)
+       ||$observed===''||in_array($observed,array('NOT_OBSERVED','UNVERIFIED','PENDING','NOT_RUN'),true))continue;
+  }
+  // A recorded defect cannot become a release PASS until its exact repaired
+  // scenario has a reviewed and successful re-test in this same ledger.
+  if($def['file']==='docs/R57-FILE12-V121-39-STAGING-GATES.csv'
+      &&''!==trim((string)($r['defect_id']??''))
+      &&'PASS'!==strtoupper(trim((string)($r['retest_status']??''))))continue;
   $ok++;$ready++;
  }
  fclose($h);
