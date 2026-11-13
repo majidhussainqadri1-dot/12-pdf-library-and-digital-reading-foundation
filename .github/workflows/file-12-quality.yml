@@ -162,6 +162,8 @@ jobs:
         run: php tests/test-r61-book-pack-actor-authority.php
       - name: R62 Book Pack canonical identity and schema-safe preflight
         run: php tests/test-r62-book-pack-canonical-identity.php
+      - name: R63 bundled Book Pack malformed/symlink audit regression
+        run: php tests/test-r63-bundled-book-pack-audit.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
