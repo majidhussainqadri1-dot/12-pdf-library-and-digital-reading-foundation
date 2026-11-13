@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.38`
+Candidate: `1.1.0-rc.39`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -281,3 +281,8 @@ Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d2
 - Versioned owner security ledger docs/R59-V121-CF04-STO10-SHARED-SECURITY-GATES.csv, 10 controls distinct from 39 Staging tests and 54 File12 requirement IDs.
 - All 10 host/runtime gates unverified; CF04 exact source Draft PR5 HEAD af8098374de9aa8f7b0910f5c9cf24121a1b491f currently disabled by default.
 - tests/test-r59-sto10-shared-security.php in exact CI; no new external capability, source schema 1.1.0 unchanged, no live installation.
+
+## R60 evidence-first NO_GO release guard
+- scripts/file12-release-no-go.php checks 39 Staging, 54 requirement and 10 CF04 shared security registers, independent Founder and current/staged/deployed parity proof. It never deploys.
+- docs/R60-RELEASE-APPROVAL-STATE.json intentionally UNVERIFIED; tests/test-r60-release-no-go.php must PASS only when both CLI modes refuse to release, not when the website is accepted.
+- Distinct source candidate rc.39; DB/interface declarations remain 1.1.0; live state unknown.

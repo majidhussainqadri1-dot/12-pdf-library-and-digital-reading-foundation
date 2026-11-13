@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.38`
+- Software: `1.1.0-rc.39`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -154,3 +154,6 @@ Read docs/R58-FILE12-V121-54-REQUIREMENTS.csv for the 19 FR, 10 NFR, 24 FUT and 
 
 ## R59 V12.1 STO-01..10 shared CF04 security evidence register (2026-11-13)
 No new production storage ownership or false activation: docs/R59-V121-CF04-STO10-SHARED-SECURITY-GATES.csv tracks 10 central V12.1 security requirements with original CF04 ownership, no Staging/Live evidence. tests/test-r59-sto10-shared-security.php prevents missing IDs and false PASS/FAIL without evidence/reviewer. CF04 Draft PR #5 source runtime remains disabled pending actual Hostinger/provider acceptance.
+
+## R60 explicit predeploy/postdeploy NO_GO evidence guard (2026-11-13)
+Run php scripts/file12-release-no-go.php predeploy or postdeploy for a report, never a deployment. With current 39 Staging tests, 54 requirements, 10 CF04 controls and unset Founder/Hostinger parity evidence, both modes must return NO_GO (exit 2). Native tests/test-r60-release-no-go.php proves that source safety invariant in CI. Source candidate rc.39 is not production ready by virtue of its green CI.

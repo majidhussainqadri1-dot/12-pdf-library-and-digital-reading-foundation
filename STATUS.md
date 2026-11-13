@@ -1,3 +1,11 @@
+# R60 default fail-closed release evidence gate — source-only rc.39 (2026-11-13)
+
+- Added scripts/file12-release-no-go.php predeploy/postdeploy, docs/R60-RELEASE-APPROVAL-STATE.json with all UNVERIFIED and empty evidence, plus native PHP negative CI.
+- Predeploy requires 39+54+10 Staging reviewer evidence and Founder/security/rights/provenance approvals. Postdeploy adds deployed SHA, physical migration parity and Live retest. Both must NO_GO until real evidence arrives.
+- Source schema and integration contract 1.1.0 unchanged; no plugin deploy or DB mutation.
+
+---
+
 # R59 shared CF04 STO-01..10 source-only release evidence — candidate rc.38 (2026-11-13)
 
 - V12.1 STO-01..10 owner controls catalogued in standalone machine-readable 10-row source/evidence register; all Staging/Live statuses UNVERIFIED.
