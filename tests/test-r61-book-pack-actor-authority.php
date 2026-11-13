@@ -28,4 +28,9 @@ $GLOBALS['actor']=14;
 require_forbidden(PLDR_Book_Packs::register(array(),0),'authenticated non-manager');
 $GLOBALS['actor']=0;
 require_forbidden(PLDR_Book_Packs::register(array(),14),'explicit forged non-manager');
+// An arbitrary actor ID supplied from another code path is not login proof.
+$GLOBALS['permit']=true;
+$GLOBALS['actor']=0;
+require_forbidden(PLDR_Book_Packs::register(array(),14),'anonymous caller supplying an authorized third-party actor ID');
+$GLOBALS['permit']=false;
 echo "R61 Book Pack actor authority: $checks fail-closed isolated cases PASS.\n";
