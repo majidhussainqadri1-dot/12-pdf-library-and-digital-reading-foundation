@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.31`
+Candidate: `1.1.0-rc.32`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -248,3 +248,8 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - `PLDR_File26_Connector::register/append/ready` refuse to advertise/register while status=proposed and tombstone/event contract pending; no bootstrap call.
 - `list_batch` rejects unknown/nonempty scope and wrong-typed/bad limit before SQL; `can_view` refuses coerced stored index versions.
 - Native `tests/test-file26-catalog-proposal.php` negative guards in PHP 8.1/8.3/8.4 CI; source-only with no installed File26 consumer or live index evidence.
+
+## R53 evidence-bound exact scholarly citations — rc.32
+- Red regression HEAD `0d7d8541cf244e5c92213fd52de992e1ff607ffc`, GitHub Actions `43355942223`: PHP 8.1/8.3/8.4 failed the mismatched source-rights evidence test as expected.
+- Fix on separate source commit `2079f006778bb4a75031c4ee1638b2b7df27ffdc`: rights-evidence comparison enforced on writing and reading scholarly quote proofs; File06 canonical owner/public concept identity required.
+- Must rerun full PHP matrix, package and independent source review on final exact SHA; no staging/live acceptance, no File26 activation, no schema changes.

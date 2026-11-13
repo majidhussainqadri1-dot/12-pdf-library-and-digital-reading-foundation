@@ -1,3 +1,11 @@
+# R53 source-only quote provenance repair — candidate rc.32 (2026-11-13)
+
+- Source parent R52 `70085803f3f094f045851e800f717b85ba8bb6f2`; R53 new Draft PR #50; deliberately RED regression `0d7d8541cf244e5c92213fd52de992e1ff607ffc` reproduced unreviewed quote evidence acceptance.
+- Corrections: bind quote rights evidence to source link both on approval and read; require current File06 canonical owner and public UUID. R51/R52 and dormant File26 remain retained.
+- Software `1.1.0-rc.32`; source schema/contract `1.1.0`. No runtime or live completeness claim.
+
+---
+
 # R52 source-only File26 proposal hard guard — candidate 1.1.0-rc.31 (2026-11-13)
 
 - Four proven source contract integrity gaps corrected on the stacked R51 Draft #48: `register/append/ready` premature proposal activation; unknown `scope` widening; malformed `limit` coercion; stale `object_version` coercion. Real File26 installed consumer and tombstone cutover still unverified.

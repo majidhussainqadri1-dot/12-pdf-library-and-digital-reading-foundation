@@ -54,3 +54,11 @@ A release may not be called staging-accepted until all items below have fresh ev
 38. R49 actual installed WordPress/Hostinger private preferences: verify unknown/nested/boolean-string/number-string Data Saver/RTL layout/Text Size/TTS REST POST failures with zero DB writes and no private state reads; seed existing corrupt user-scoped preference_json arrays, noncanonical maps and valid empty legacy []/{}, verify GET denies corrupt rows with audit/version and no cross-user/private cache leakage. Confirm legitimate text-first/Data Saver and RTL settings, rate/voice, version conflicts, low-bandwidth/accessible UI, restore/rollback and deployed checksum/DB migration parity.
 
 39. **R50 File16 genuine AI corpus manifest / File12 page-citation integrity:** on independently verified installed Hostinger staging validate legitimate File16 consumer entitlement and per-edition allowlist, patient-case opt-in denial, current rights, signed cursor replay/cross-user/context/invalid HMAC and source-page changes; safely seed isolated OCR rows with duplicate/descending/beyond-edition/malformed page states where schema allows, and confirm no partial chunk/hash/citation or next cursor. Validate real File16 consumer contract/read-only metadata, no generated medical decisions in File12, rollback/restore, two separate staging review rounds, deployed checksum/DB parity.
+
+
+## R53 independent File06 scholarly quotation acceptance (appendix, outside original 39 numbered gates)
+- [ ] On real File06+File12 connected Hostinger staging, attempt a quote with a different rights-evidence reference from the independently approved source-page link: deny without writing approval or leaking a proof.
+- [ ] Reject wrong File06 canonical owner and wrong concept UUID even when provider says `published=true`; test provider unavailable and stale version.
+- [ ] Withdraw/reapprove a source mapping with new legal-rights evidence: an old proof must become ineligible until independently approved again.
+- [ ] Verify the actual printed facsimile and compare the excerpt with the scan. Lawful corrected OCR is a derived artifact, not proof of the printed words.
+- [ ] Exercise roles, caching, rights withdrawal, restore, stored old option rows and concurrent reviews; preserve no private notes/PII.
