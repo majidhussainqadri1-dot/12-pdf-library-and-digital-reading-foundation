@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.40`
+Candidate: `1.1.0-rc.41`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -291,3 +291,9 @@ Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d2
 - Confirmed red-first authorization errors: actor=0 reached manifest validation without File12 manage capability; caller-supplied privileged actor=14 could bypass actual anonymous session. CI runs 43370025549 and 43370196026, with exact red tests.
 - Source fix now requires current logged-in session identity equals requested actor; authorization revalidated. Plugin-controlled Book Pack imports moved to a private method only callable by trusted scanner.
 - Expanded fixture checks anonymous/other-user denial, valid manager proceeds to manifest validation, bundled-only method remains private. No new DB schema, package root, File26 activation or live use.
+
+## R62 — Canonical Book Content Pack identity acceptance, rc.41
+- Root cause: required fields were checked for raw nonemptiness before `sanitize_key` / `sanitize_text_field`, so a nonempty string could normalize to empty; `pack_key varchar(120)` and `pack_version varchar(40)` were not bounded before database access; numeric/array rights and checksum could be coerced/throw.
+- RED-first source SHA `f410c0789accf008f14a70f994ef5c98b248e561`, run `43376844903`: invalid slug reached DB `prepare()` trap.
+- Corrected source SHA `854e69e5e533ac6e25df7d2c7dd5fe962643bb6d`, run `43377002228` four jobs succeeded; no installed WordPress validation.
+- 10 deliberately malformed identity cases in `tests/test-r62-book-pack-canonical-identity.php`, no DB access allowed. New full version/package CI to be obtained on rc.41 exact SHA.
