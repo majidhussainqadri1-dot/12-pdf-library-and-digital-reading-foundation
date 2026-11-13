@@ -158,6 +158,8 @@ jobs:
         run: php tests/test-r59-sto10-shared-security.php
       - name: R60 fail-closed pre/post deployment proof gate
         run: php tests/test-r60-release-no-go.php
+      - name: R61 unauthorized Book Pack registration must fail closed
+        run: php tests/test-r61-book-pack-actor-authority.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
