@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.42`
+- Software: `1.1.0-rc.43`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -167,3 +167,6 @@ Source-only candidate `1.1.0-rc.41`: the immutable pack key and version must be 
 
 ## R63 — Book Content Pack bundle boundaries and auditable failures (2026-11-13)
 The candidate `1.1.0-rc.42` explicitly declines symlinked bundled `*.json` files, logs unreadable/invalid JSON, and logs normalization/rights rejections returned from the private importer using only a bounded filename hash and safe machine error code. It does not store raw JSON or protected book content in audit records. RED-first test `tests/test-r63-bundled-book-pack-audit.php` demonstrated missing invalid-JSON audit in GitHub Actions run `43378011293` at SHA `4907fcf967e400e42beca6217fa88d0e57f01b35`; corrective source SHA `3863cb7011aec7a2691714478523949b42f03451` and an inherited R61 test compatible with the new private-path call remain included. Real installed plugin path permissions, TOCTOU race defense and actual book-content ingestion must be checked in staging. R62 canonical-identity and all preceding fixes retained.
+
+## R64/R65 — evidence context and mandatory defect re-test before release (2026-11-13)
+Source-only version `1.1.0-rc.43` strengthens the non-deploying CLI `scripts/file12-release-no-go.php`. Release evidence rows with staged `PASS` are no longer counted while environment is still `HOSTINGER_STAGING_REQUIRED` or result is `NOT_OBSERVED`; a row naming any defect also requires a new explicit `retest_status=PASS`. R64 RED-first test `tests/test-r64-release-evidence-context.php` reproduced false `SOURCE_LEDGER_GO` on fake passed ledgers (SHA `e547345e0be37f63006fc3b2eca7665b642b0172`, run `43378939348`); R65 RED-first `tests/test-r65-staging-defect-retest-proof.php` reproduced the un-retested defect case (SHA `df0dd5908492dc0c081e03a2e23a53ec20e544a2`, run `43379286000`). Both fixes have 4/4 GREEN jobs in run `43379434645` at SHA `baf0d5bfef6e1d3f62f368dde629ff52b519e355`. **Neither source-only proof validation nor arbitrary evidence strings independently establish true host observations or human acceptance.** All original 39 Staging, 54 requirement and 10 shared safety gates remain unverified. No real site deployment.

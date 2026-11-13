@@ -91,3 +91,10 @@ A release may not be called staging-accepted until all items below have fresh ev
 - [ ] Confirm a *legitimate* packaged Book Content Pack registers atomically with immutable canonical SHA and idempotent activation; test old manifests against rc.42 normalization changes.
 - [ ] Simulate unreadable files, >1 MB metadata, >100 bundles, disk failures and interrupted activation; verify bounded audit, retry/repair, idempotency and no old-version overwritten.
 - [ ] Review plugin directory permissions and symlink race assumptions separately from the source-only refusal check.
+
+
+## R64/R65 Release proof preservation (additional to 39 original numbered tests)
+- [ ] Every staged `PASS` must name the actually observed Hostinger staging environment, test date/role, observed result and reviewer/evidence reference; untouched `HOSTINGER_STAGING_REQUIRED` or `NOT_OBSERVED` must fail release preflight.
+- [ ] A staged test with nonempty `defect_id` must have `retest_status=PASS` after exact repair and reviewer confirmation; `NOT_RUN` is a hard NO_GO.
+- [ ] Proof IDs and labels are not independently authenticated by source-only CLI; human and third-party verification against actual build SHA, MySQL tables and browser/log/role evidence remains mandatory.
+- [ ] Predeploy and postdeploy release decisions require dated founder signoff, actual deployed version/DB/migration and signed rollback evidence. Source-only GO labels never deploy or prove live repair.
