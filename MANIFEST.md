@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.32`
+Candidate: `1.1.0-rc.33`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -253,3 +253,8 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 - Red regression HEAD `0d7d8541cf244e5c92213fd52de992e1ff607ffc`, GitHub Actions `43355942223`: PHP 8.1/8.3/8.4 failed the mismatched source-rights evidence test as expected.
 - Fix on separate source commit `2079f006778bb4a75031c4ee1638b2b7df27ffdc`: rights-evidence comparison enforced on writing and reading scholarly quote proofs; File06 canonical owner/public concept identity required.
 - Must rerun full PHP matrix, package and independent source review on final exact SHA; no staging/live acceptance, no File26 activation, no schema changes.
+
+## R54 source-only File26 public PDF contract accuracy — rc.33
+- Source RED regression `6add1132b32928e9770f44f074cafb5765b07f0c` failed `File26 catalog manifest must not claim unsupported book_pack entity type`; it also tests unapproved connector not claiming `healthy`.
+- Fix `03bdebba50d914a3c6fdf8b5db1031f618df4532`: manifest claims only PDF, health returns disabled if pending; source-ready failures remain degraded.
+- Native `tests/test-file26-catalog-proposal.php` and fresh exact candidate PHP/ZIP CI required; no live activation or rights-versioned tombstone release bridge exists.

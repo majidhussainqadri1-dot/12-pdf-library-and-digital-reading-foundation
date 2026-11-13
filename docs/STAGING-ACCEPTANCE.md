@@ -62,3 +62,9 @@ A release may not be called staging-accepted until all items below have fresh ev
 - [ ] Withdraw/reapprove a source mapping with new legal-rights evidence: an old proof must become ineligible until independently approved again.
 - [ ] Verify the actual printed facsimile and compare the excerpt with the scan. Lawful corrected OCR is a derived artifact, not proof of the printed words.
 - [ ] Exercise roles, caching, rights withdrawal, restore, stored old option rows and concurrent reviews; preserve no private notes/PII.
+
+
+## R54 contract consistency (additional source-to-consumer acceptance outside the numbered 39)
+- [ ] Real File26 consumer acknowledges `entity_types=['pdf']` only; no `book_pack` indexing, query or preview is falsely advertised.
+- [ ] Proposed File26 adapter reports `disabled` on source-ready hosts until the owner approves versioned rights/deletion tombstone cutover; schema failure remains degraded.
+- [ ] Real File26 index and public search have no references to disabled connector; later activation requires explicit independent rights-revocation/cache-purge staging approval.

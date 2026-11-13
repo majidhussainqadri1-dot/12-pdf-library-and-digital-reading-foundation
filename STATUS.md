@@ -1,3 +1,12 @@
+# R54 proposed File26 manifest/health truthful release gate — rc.33 (2026-11-13)
+
+- Two source manifest defects identified by red-first regression: unsupported `book_pack` advertised although only PDFs can be fetched; `healthy` returned although the adapter was unregistered and not approved.
+- Corrective source now advertises PDF only and reports disabled while cutover is pending; no registration path enabled.
+- R53 File06 provenance fixes retained. Software candidate `1.1.0-rc.33`; source DB/contract `1.1.0` unchanged. Exact HEAD QA required.
+- Physical Hostinger, installed File26 owner, rights/tombstone/cache purge and all 39 staging tests remain unverified. Do not merge/deploy.
+
+---
+
 # R53 source-only quote provenance repair — candidate rc.32 (2026-11-13)
 
 - Source parent R52 `70085803f3f094f045851e800f717b85ba8bb6f2`; R53 new Draft PR #50; deliberately RED regression `0d7d8541cf244e5c92213fd52de992e1ff607ffc` reproduced unreviewed quote evidence acceptance.
