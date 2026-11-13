@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.34`
+- Software: `1.1.0-rc.39`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -142,3 +142,18 @@ R54 source-only software `1.1.0-rc.33` corrects two proven File26 connector cont
 
 ## R55 strict File06 owner attestation, source-only rc.34
 Red-first CI SHA 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, workflow 43367072985 exposed forged owner related-resource edition_id acceptance. All 12 canonical owner, edition, version, page, rights/eligibility, URL and label fields must now match the freshly rights-reviewed mapping with strict typed equality. Test adds 11 invalid source mutations. No deployed or real File06 integration acceptance; File26 rights/tombstone and book_pack owner-contract blockers remain.
+
+## R56 read-only Hostinger Live Reality Freeze tooling (2026-11-13)
+Unique source/software candidate 1.1.0-rc.35 includes an owner-executed read-only WP-CLI/SQL and deployed source checksum collector at scripts/file12-live-reality-freeze-readonly.sh, static safety test at tests/test-r56-live-freeze-readonly.php, and usage/limits at docs/R56-LIVE-REALITY-FREEZE-READONLY-2026-11-13.md. This tool is NOT run on Hostinger and supplies no evidence until an authorized terminal executes it; Source QA is not Deployment Parity. File26 book_pack and rights/tombstones remain stop-ship.
+
+## R57 exact 39-gate staging execution matrix (2026-11-13)
+Source-only release candidate rc.36 contains docs/R57-FILE12-V121-39-STAGING-GATES.csv tracking plan T-01..T-39, each unverified with an explicit dependency, observed-state placeholder, evidence ID, defect, retest and reviewer. tests/test-r57-39-gates-ledger.php validates count/identity and prevents false PASS/FAIL without evidence and reviewer. No Hostinger tests executed; source CI green alone cannot close a gate.
+
+## R58 original V12.1 54-requirement evidence matrix (2026-11-13)
+Read docs/R58-FILE12-V121-54-REQUIREMENTS.csv for the 19 FR, 10 NFR, 24 FUT and 1 CEN requirements with original traceability source anchors, non-runtime source status and empty staging/live proof. CI test tests/test-r58-54-requirements-ledger.php enforces exact count, identity and rejection of unsupported PASSED/FAILED claims. This is not a completion percentage or Hostinger acceptance.
+
+## R59 V12.1 STO-01..10 shared CF04 security evidence register (2026-11-13)
+No new production storage ownership or false activation: docs/R59-V121-CF04-STO10-SHARED-SECURITY-GATES.csv tracks 10 central V12.1 security requirements with original CF04 ownership, no Staging/Live evidence. tests/test-r59-sto10-shared-security.php prevents missing IDs and false PASS/FAIL without evidence/reviewer. CF04 Draft PR #5 source runtime remains disabled pending actual Hostinger/provider acceptance.
+
+## R60 explicit predeploy/postdeploy NO_GO evidence guard (2026-11-13)
+Run php scripts/file12-release-no-go.php predeploy or postdeploy for a report, never a deployment. With current 39 Staging tests, 54 requirements, 10 CF04 controls and unset Founder/Hostinger parity evidence, both modes must return NO_GO (exit 2). Native tests/test-r60-release-no-go.php proves that source safety invariant in CI. Source candidate rc.39 is not production ready by virtue of its green CI.

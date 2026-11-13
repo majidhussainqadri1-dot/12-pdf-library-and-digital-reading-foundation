@@ -1,0 +1,19 @@
+{
+  "source": "F12 V12.1 release approval evidence record",
+  "status": {
+    "current_live_freeze": "UNVERIFIED",
+    "staging_parity": "UNVERIFIED",
+    "backup_restore": "UNVERIFIED",
+    "rollback_rehearsal": "UNVERIFIED",
+    "founder_signoff": "UNVERIFIED",
+    "rights_cutover": "UNVERIFIED",
+    "file26_book_pack_contract": "UNVERIFIED",
+    "cf04_owner_ready": "UNVERIFIED",
+    "deployment_parity": "UNVERIFIED",
+    "migration_state": "UNVERIFIED",
+    "live_retest": "UNVERIFIED"
+  },
+  "proofs": {},
+  "release_candidate_git_sha": null,
+  "deployed_package_sha256": null
+}

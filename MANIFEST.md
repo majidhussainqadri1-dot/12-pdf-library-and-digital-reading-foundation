@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.34`
+Candidate: `1.1.0-rc.39`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -261,3 +261,28 @@ Large PDF/book binaries, secrets, private runbooks and external corpus payloads 
 
 ## R55 owner attestation integrity, software rc.34
 Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, run 43367072985: malformed edition_id attested under earlier integer coercion. Now 12 canonical fields require strict PHP identity, without source changes or DB migration. Exact CI and package checksum to be established on final HEAD. File26 search stays disabled.
+
+## R56 source-only read-only Live Reality Freeze utility
+- New non-shipped operational helper scripts/file12-live-reality-freeze-readonly.sh, and tests/test-r56-live-freeze-readonly.php; CI must prove bash syntax and static non-mutation guard.
+- Tool records authorized Hostinger WP/CLI and File12 deployment/physical schema facts without collecting patient rows/PDF bytes/secret option values or raw logs. This tool has not been run on Hostinger; no deployed parity is established.
+- New software label 1.1.0-rc.35 on a unique source candidate; source schema/interface remain 1.1.0.
+
+## R57 39-gate source-only acceptance evidence register
+- docs/R57-FILE12-V121-39-STAGING-GATES.csv enumerates all T-01..T-39 from the owner Word plan, each UNVERIFIED and with empty runtime evidence.
+- tests/test-r57-39-gates-ledger.php enforces unique count, valid lifecycle and no PASS/FAIL without evidence and reviewer. It is a **source ledger test**, not staging acceptance.
+- Candidate rc.36, source schema/integration 1.1.0 unchanged; no live deployment or migration.
+
+## R58 V12.1 54 requirement evidence registry
+- docs/R58-FILE12-V121-54-REQUIREMENTS.csv preserves the first canonical 19 FR, 10 NFR, 24 FUT traceability entries and one governing F12-CEN-01 owner policy.
+- tests/test-r58-54-requirements-ledger.php prevents claims of runtime PASS/FAIL without evidence and reviewer. Source anchor = documented implementation claim only.
+- All real Hostinger staging/live statuses unverified. Unique software source candidate rc.37, declared DB/contract 1.1.0.
+
+## R59 common CF04 secured binary and rights acceptance (STO01..10)
+- Versioned owner security ledger docs/R59-V121-CF04-STO10-SHARED-SECURITY-GATES.csv, 10 controls distinct from 39 Staging tests and 54 File12 requirement IDs.
+- All 10 host/runtime gates unverified; CF04 exact source Draft PR5 HEAD af8098374de9aa8f7b0910f5c9cf24121a1b491f currently disabled by default.
+- tests/test-r59-sto10-shared-security.php in exact CI; no new external capability, source schema 1.1.0 unchanged, no live installation.
+
+## R60 evidence-first NO_GO release guard
+- scripts/file12-release-no-go.php checks 39 Staging, 54 requirement and 10 CF04 shared security registers, independent Founder and current/staged/deployed parity proof. It never deploys.
+- docs/R60-RELEASE-APPROVAL-STATE.json intentionally UNVERIFIED; tests/test-r60-release-no-go.php must PASS only when both CLI modes refuse to release, not when the website is accepted.
+- Distinct source candidate rc.39; DB/interface declarations remain 1.1.0; live state unknown.

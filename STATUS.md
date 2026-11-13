@@ -1,3 +1,43 @@
+# R60 default fail-closed release evidence gate — source-only rc.39 (2026-11-13)
+
+- Added scripts/file12-release-no-go.php predeploy/postdeploy, docs/R60-RELEASE-APPROVAL-STATE.json with all UNVERIFIED and empty evidence, plus native PHP negative CI.
+- Predeploy requires 39+54+10 Staging reviewer evidence and Founder/security/rights/provenance approvals. Postdeploy adds deployed SHA, physical migration parity and Live retest. Both must NO_GO until real evidence arrives.
+- Source schema and integration contract 1.1.0 unchanged; no plugin deploy or DB mutation.
+
+---
+
+# R59 shared CF04 STO-01..10 source-only release evidence — candidate rc.38 (2026-11-13)
+
+- V12.1 STO-01..10 owner controls catalogued in standalone machine-readable 10-row source/evidence register; all Staging/Live statuses UNVERIFIED.
+- Compared CF04 current Draft PR #5 source/runtime governance; declared disabled, not live. Added PHP anti-false-acceptance registry test.
+- File12 outbox sent not proven File26 consumer receipt (Issue #53); File26 Book Pack owner mismatch (issue #23); no live DB/plug-in parity.
+
+---
+
+# R58 54-requirement source-to-acceptance evidence matrix — rc.37 (2026-11-13)
+
+- Original 53 unique FR/NFR/FUT IDs extracted from the first rows in docs/TRACEABILITY.md, plus F12-CEN-01 from the governing rights/storage policy, all tracked in a new versioned CSV.
+- Source status remains DOCUMENTED_NOT_RUNTIME_ACCEPTED. All 54 staging/live statuses are UNVERIFIED. Existing R57 39 staging checks remain distinct and also unverified.
+- New exact SHA CI required. Candidate software rc.37, source DB/interface 1.1.0; source branch only and zero live deployment.
+
+---
+
+# R57 stage evidence ledger, source-only rc.36 (2026-11-13)
+
+- All original 39 V12.1 staging tests entered into a versioned machine-readable CSV and guarded by native PHP CI. Each is UNVERIFIED and no invented pass/fail.
+- No live WordPress, physical DB or original source/rights acceptance. File26 Book Pack mismatch issue #23 open; File26 integration dormant.
+- Unique candidate rc.36; declared source DB/contract 1.1.0.
+
+---
+
+# R56 source-only safe deployed parity evidence tool, candidate rc.35 (2026-11-13)
+
+- Added owner-run read-only WP-CLI/DB query script, restricted-only evidence scope, PHP static guard and bash syntax CI.
+- Existing R55 strong canonical owner attestation repair remains inherited. Candidate version 1.1.0-rc.35; source DB/contract version 1.1.0 unchanged.
+- Hostinger Jetpack status disconnected; WPVibe returned HTTP530; installed File12 code/DB/migrations still unverified. Script is NOT executed against production. No main merge or deploy.
+
+---
+
 # R55 source-only strict File06 owner attestation (2026-11-13)
 Candidate 1.1.0-rc.34; declared DB/schema/contract 1.1.0 unchanged. Parent R54 40ca7e2e510b7a63727a77bdda443c0d1163121b. Red-first SHA 4d21b65fd7d9ceda0d25e3c7a839b6aa4b0e6018, workflow 43367072985. Replaced caller-provided coercible edition/page with exact comparison across 12 fresh owner fields. New exact HEAD CI required. No merge/deploy; installed version/physical DB/migration unverified.
 
