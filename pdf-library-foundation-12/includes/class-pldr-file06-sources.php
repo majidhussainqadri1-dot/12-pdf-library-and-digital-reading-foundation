@@ -123,7 +123,10 @@ final class PLDR_File06_Sources {
 			if((int)($candidate['edition_id']??0)!==$edition_id||(int)($candidate['page']??0)!==$page)continue;
 			$verified=self::approved_link($candidate,array('id'=>$claim['concept_public_id'],
 				'version'=>absint($claim['concept_version']??0)));
-			if($verified){$approved_mapping=true;break;}
+			if($verified&&is_string($candidate['rights_evidence_ref']??null)
+				&&hash_equals($candidate['rights_evidence_ref'],$claim['rights_evidence_ref'])){
+				$approved_mapping=true;break;
+			}
 		}
 		if(!$approved_mapping||!$pair||$page>(int)$pair['edition']['pages']
 			||(int)($claim['edition_version']??0)!==(int)$pair['edition']['version']
@@ -233,10 +236,18 @@ final class PLDR_File06_Sources {
 			if(!is_array($link))continue;
 			if((int)($link['edition_id']??0)!==$claim['edition_id']
 				||(int)($link['page']??0)!==$claim['page'])continue;
-			if(self::approved_link($link,array('id'=>$claim['concept_public_id'],'version'=>$claim['concept_version']))){$link_ready=true;break;}
+			if(self::approved_link($link,array('id'=>$claim['concept_public_id'],'version'=>$claim['concept_version']))
+				&&is_string($link['rights_evidence_ref']??null)
+				&&hash_equals($link['rights_evidence_ref'],$claim['rights_evidence_ref'])){
+				$link_ready=true;break;
+			}
 		}
 		if(!$link_ready)return PLDR_Core::machine_error('pldr_f06_quote_mapping_missing','An independently approved File06-to-edition/page mapping is required before any quotation is approved',409);
-		if(!is_array($concept)||true!==($concept['published']??false))return PLDR_Core::machine_error('pldr_f06_concept_unverified','Current File06 concept proof required',503);
+		if(!is_array($concept)||true!==($concept['published']??false)
+			||'file-06'!==($concept['owner_file']??'')
+			||!is_string($concept['public_id']??null)
+			||!hash_equals($claim['concept_public_id'],strtolower($concept['public_id'])))
+			return PLDR_Core::machine_error('pldr_f06_concept_unverified','Current File06 owner and exact canonical concept identity required',503);
 		// The pending proof is not approved until the source really contains the quotation.
 		global $wpdb;$wpdb->last_error='';
 		$rows=PLDR_Future_Data::ocr_pages((int)$claim['edition_id'],(int)$claim['page'],1,0);
