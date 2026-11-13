@@ -262,10 +262,21 @@ final class PLDR_Rights {
 }
 
 final class PLDR_Book_Packs {
+    /** Public or REST callers must be an authenticated, authorized manager. */
     public static function register(array $manifest,int $actor_id=0) {
-        global $wpdb;
         $actor_id=$actor_id?:get_current_user_id();
-        if($actor_id && !PLDR_Core::authorize('manage',0,$actor_id) && !PLDR_Core::founder($actor_id))return PLDR_Core::machine_error('pldr_pack_forbidden','Book Content Pack registration requires File 12 management authority.',403);
+        if($actor_id<1 || (!PLDR_Core::authorize('manage',0,$actor_id) && !PLDR_Core::founder($actor_id)))
+            return PLDR_Core::machine_error('pldr_pack_forbidden','Book Content Pack registration requires File 12 management authority.',403);
+        return self::persist_authorized($manifest,$actor_id);
+    }
+
+    /**
+     * Internal persistence path. Only the canonical bundled importer, which
+     * reads manifests from this installed plugin's controlled files, may use
+     * an actor-less import. Never expose this method to routes/filters.
+     */
+    private static function persist_authorized(array $manifest,int $actor_id) {
+        global $wpdb;
         $required=array('pack_key','version','title','author','language','rights','checksum','update_manifest');
         foreach($required as $field)if(empty($manifest[$field]))return PLDR_Core::machine_error('pldr_pack_required','Book Content Pack manifest is incomplete.',400,array('field'=>$field));
         $rights=sanitize_key((string)$manifest['rights']);
@@ -312,7 +323,7 @@ final class PLDR_Book_Packs {
         foreach($files as $file){
             $size=@filesize($file);if(false===$size||$size>1048576){PLDR_Core::audit('book_pack',0,'bundled_manifest_file_rejected',array('file'=>basename($file),'size'=>false===$size?null:(int)$size,'max_bytes'=>1048576));continue;}
             $raw=file_get_contents($file);if(false===$raw)continue;
-            $manifest=json_decode((string)$raw,true);if(is_array($manifest))self::register($manifest,0);
+            $manifest=json_decode((string)$raw,true);if(is_array($manifest))self::persist_authorized($manifest,0);
         }
     }
 }
