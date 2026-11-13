@@ -1,3 +1,11 @@
+# R58 54-requirement source-to-acceptance evidence matrix — rc.37 (2026-11-13)
+
+- Original 53 unique FR/NFR/FUT IDs extracted from the first rows in docs/TRACEABILITY.md, plus F12-CEN-01 from the governing rights/storage policy, all tracked in a new versioned CSV.
+- Source status remains DOCUMENTED_NOT_RUNTIME_ACCEPTED. All 54 staging/live statuses are UNVERIFIED. Existing R57 39 staging checks remain distinct and also unverified.
+- New exact SHA CI required. Candidate software rc.37, source DB/interface 1.1.0; source branch only and zero live deployment.
+
+---
+
 # R57 stage evidence ledger, source-only rc.36 (2026-11-13)
 
 - All original 39 V12.1 staging tests entered into a versioned machine-readable CSV and guarded by native PHP CI. Each is UNVERIFIED and no invented pass/fail.

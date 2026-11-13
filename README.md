@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.36`
+- Software: `1.1.0-rc.37`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -148,3 +148,6 @@ Unique source/software candidate 1.1.0-rc.35 includes an owner-executed read-onl
 
 ## R57 exact 39-gate staging execution matrix (2026-11-13)
 Source-only release candidate rc.36 contains docs/R57-FILE12-V121-39-STAGING-GATES.csv tracking plan T-01..T-39, each unverified with an explicit dependency, observed-state placeholder, evidence ID, defect, retest and reviewer. tests/test-r57-39-gates-ledger.php validates count/identity and prevents false PASS/FAIL without evidence and reviewer. No Hostinger tests executed; source CI green alone cannot close a gate.
+
+## R58 original V12.1 54-requirement evidence matrix (2026-11-13)
+Read docs/R58-FILE12-V121-54-REQUIREMENTS.csv for the 19 FR, 10 NFR, 24 FUT and 1 CEN requirements with original traceability source anchors, non-runtime source status and empty staging/live proof. CI test tests/test-r58-54-requirements-ledger.php enforces exact count, identity and rejection of unsupported PASSED/FAILED claims. This is not a completion percentage or Hostinger acceptance.

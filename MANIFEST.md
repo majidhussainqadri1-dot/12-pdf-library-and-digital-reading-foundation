@@ -1,6 +1,6 @@
 # File 12 Candidate Manifest
 
-Candidate: `1.1.0-rc.36`
+Candidate: `1.1.0-rc.37`
 
 Database schema: `1.1.0`
 Integration contract: `1.1.0`
@@ -271,3 +271,8 @@ Source fix 0ad635609d141c3182faaa640b5b6c75104c9979. Expected red regression 4d2
 - docs/R57-FILE12-V121-39-STAGING-GATES.csv enumerates all T-01..T-39 from the owner Word plan, each UNVERIFIED and with empty runtime evidence.
 - tests/test-r57-39-gates-ledger.php enforces unique count, valid lifecycle and no PASS/FAIL without evidence and reviewer. It is a **source ledger test**, not staging acceptance.
 - Candidate rc.36, source schema/integration 1.1.0 unchanged; no live deployment or migration.
+
+## R58 V12.1 54 requirement evidence registry
+- docs/R58-FILE12-V121-54-REQUIREMENTS.csv preserves the first canonical 19 FR, 10 NFR, 24 FUT traceability entries and one governing F12-CEN-01 owner policy.
+- tests/test-r58-54-requirements-ledger.php prevents claims of runtime PASS/FAIL without evidence and reviewer. Source anchor = documented implementation claim only.
+- All real Hostinger staging/live statuses unverified. Unique software source candidate rc.37, declared DB/contract 1.1.0.
