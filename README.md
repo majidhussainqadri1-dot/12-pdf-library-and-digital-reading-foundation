@@ -4,7 +4,7 @@ This branch contains the **R33 source-only corrective candidate** for File 12, b
 
 ## Candidate identity
 
-- Software: `1.1.0-rc.29`
+- Software: `1.1.0-rc.30`
 - Database schema: `1.1.0`
 - Contract: `1.1.0`
 - Future enhancement contract: `F12-FUT-001` through `F12-FUT-024`
@@ -125,3 +125,7 @@ Twenty bounded File12/central/companion plan-to-source inspections are recorded 
 
 ## R50 — File16 AI Corpus Manifest signed cursor and source-page integrity
 Source candidate 1.1.0-rc.29: twenty bounded requirements/source inspections in `docs/TWENTY-ROUND-REVIEW-2026-10-12-R50.md` (not twenty independent E2E audits). The actual `PLDR_Future_Corpus::decode_cursor` now fails closed on signed-but-wrongly-typed page identities, and `manifest` rejects noncanonical/duplicated/out-of-order/beyond-edition OCR pages before constructing File16 citation/chunk metadata or next cursor. Existing rights/allowlist/File16-consumer checks remain authoritative; AI generation stays File16-owned. Native regression `tests/test-r50-file16-corpus-cursor-source.php`. Source schema/interface 1.1.0 unchanged; staging/live unverified.
+
+
+## R51 — File06 typed source identity and proposed File26 integration (2026-11-13)
+A new stacked **source-only** R51 candidate has a unique software version `1.1.0-rc.30` (DB/interface still 1.1.0). File06 source/quote reviewers reject malformed numeric JSON identities before source reads and deny corrupt historical identity rather than silently remap page/edition. The File26 public catalog adapter is present as a **proposed but dormant** class: it is not registered by this bootstrap while signed/versioned rights-withdrawal tombstone propagation, real index removal and staging remain unverified. See `docs/R51-SOURCE-INTEGRATION-2026-11-13.md`. No main merge or deploy.

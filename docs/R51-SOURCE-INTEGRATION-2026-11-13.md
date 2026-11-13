@@ -10,6 +10,10 @@
 2. Previously stored File06 source link records could also coerce negative/invalid page/ID values on read; reject malformed typed historic identity, including public quote assertion identity, rather than projecting a plausible but wrong page.
 3. The PR47 File26 connector identifies itself as `proposed` with a pending versioned rights/tombstone cutover contract. Port its source for integration analysis but DO NOT invoke `PLDR_File26_Connector::register()` from the runtime bootstrap. Merely including its definition is NOT activation. Existing indexed copies may expose stale metadata if rights withdrawal is not reconciled; runtime read revalidation alone does not prove safe search index invalidation.
 
+## Exact source/package identity
+- Software candidate `1.1.0-rc.30`; R50 software was `1.1.0-rc.29`. Never reuse a version label for different bytes.
+- Source DB version `1.1.0`; integration contract `1.1.0`; no actual migration or package deployment.
+
 ## Evidence this branch can prove
 - R51 native PHP fixture rejects malformed File06 approval identifiers before source/DB reads; rejects corrupted historical link/quote identifiers.
 - File26 native proposed adapter fixture checks a current lawful public catalog candidate, no private text/history/downloading in the DTO, current rights and version rechecks, and dormant bootstrap.
