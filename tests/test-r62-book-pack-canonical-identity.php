@@ -13,19 +13,30 @@ function sanitize_text_field($s):string{return trim(strip_tags((string)$s));}
 function sanitize_textarea_field($s):string{return trim(strip_tags((string)$s));}
 function absint($s):int{return abs((int)$s);}
 function wp_json_encode($v,$flags=0){return json_encode($v,$flags);}
+function is_wp_error($v):bool{return $v instanceof WP_Error;}
 class PLDR_Core {
     public static function authorize($name,$id=0,$uid=0):bool{return $uid===7;}
     public static function table($name):string{return 'wp_pldr_'.$name;}
     public static function founder($id):bool{return false;}
     public static function machine_error($name,$msg,$status=400,$context=array()){return new WP_Error($name,$msg);}
     public static function sanitize_json_list($v):array{return is_array($v)?$v:array();}
+    public static function now():string{return '2026-11-13 06:00:00';}
+    public static function emit($event,$type,$id,$payload){return true;}
+    public static function audit($type,$id,$action,$data=array(),$actor=0):void{}
 }
 $GLOBALS['db_calls']=0;
+$GLOBALS['permit_db']=false;
 $wpdb=new class {
     public string $last_error='';
+    public int $insert_id=0;
     public function __call(string $method,array $args) {
         $GLOBALS['db_calls']++;
-        throw new RuntimeException('R62: invalid manifest attempted a DB operation: '.$method);
+        if(!($GLOBALS['permit_db']??false))throw new RuntimeException('R62: invalid manifest attempted a DB operation: '.$method);
+        if($method==='prepare')return 'prepared-valid-query';
+        if($method==='get_row')return null;
+        if($method==='query')return 1;
+        if($method==='insert'){$this->insert_id=71;return 1;}
+        throw new RuntimeException('R62 unknown mock DB method: '.$method);
     }
 };
 require dirname(__DIR__).'/pdf-library-foundation-12/includes/class-pldr-rights.php';
@@ -63,4 +74,15 @@ $checks++;
 if(!str_contains($source,'private static function persist_authorized')){
     fwrite(STDERR,"R62 FAIL: controlled private Book Pack writer missing\n");exit(1);
 }
-echo "R62 Book Pack canonical identity: $checks negative regression checks PASS.\n";
+// After invalid-input checks, verify the same class still accepts a real valid
+// manager's canonical pack and reaches its transactional/event persistence path.
+$GLOBALS['permit_db']=true;
+$positive=PLDR_Book_Packs::register($valid,7);
+$checks++;
+if(!is_array($positive)||($positive['id']??0)!==71
+    ||($positive['pack_key']??'')!=='classical-books'
+    ||($positive['immutable_version']??false)!==true
+    ||$GLOBALS['db_calls']<4){
+    fwrite(STDERR,"R62 FAIL: valid canonical pack did not register transactionally\n");exit(1);
+}
+echo "R62 Book Pack canonical identity: $checks negative and positive regression checks PASS.\n";
