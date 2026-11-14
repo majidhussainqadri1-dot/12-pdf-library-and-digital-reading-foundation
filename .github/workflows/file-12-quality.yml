@@ -168,6 +168,8 @@ jobs:
         run: php tests/test-r64-release-evidence-context.php
       - name: R65 release gate rejects untested defect corrections
         run: php tests/test-r65-staging-defect-retest-proof.php
+      - name: V12.3 77-entry source-to-acceptance matrix (not live validation)
+        run: php tests/test-v123-evidence-matrix.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
