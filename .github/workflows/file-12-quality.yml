@@ -176,6 +176,8 @@ jobs:
         run: php tests/test-r66-v123-release-missing-proof.php
       - name: R67 V12.3 live proof cannot reuse staging-only records
         run: php tests/test-r67-live-stage-disjoint-evidence.php
+      - name: R67 positive synthetic source-ledger paths remain reachable
+        run: php tests/test-r67-positive-ledger-fixture.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
