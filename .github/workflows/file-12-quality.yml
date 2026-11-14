@@ -200,6 +200,8 @@ jobs:
           node-version: '22'
       - name: JavaScript syntax — core and Future-24
         run: find pdf-library-foundation-12/assets -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: R69 anonymous reader must not call private REST routes
+        run: node tests/test-r69-reader-guest-private-requests.cjs
       - name: Exact candidate version markers
         run: |
           grep -F "Version: 1.1.0-rc.43" pdf-library-foundation-12/pdf-library-digital-reading.php
