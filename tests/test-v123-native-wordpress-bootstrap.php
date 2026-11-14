@@ -5,7 +5,7 @@
  * NO patient records, PDF binaries, encryption keys or genuine credentials.
  * Cannot prove Hostinger Staging/Live readiness.
  */
-declare(strict_types=1);
+// WP-CLI eval-file injects this fixture after its own bootstrap; no strict_types declaration.
 if(!defined('ABSPATH') || getenv('FILE12_CI_EPHEMERAL_DB')!=='yes'
    || getenv('CI')!=='true'
    || home_url('/')!=='http://file12-ci.invalid/'){
