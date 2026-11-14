@@ -168,6 +168,18 @@ jobs:
         run: php tests/test-r64-release-evidence-context.php
       - name: R65 release gate rejects untested defect corrections
         run: php tests/test-r65-staging-defect-retest-proof.php
+      - name: V12.3 77-entry source-to-acceptance matrix (not live validation)
+        run: php tests/test-v123-evidence-matrix.php
+      - name: V12.3 immutable 58-plugin-file source inventory (not deployed parity)
+        run: php tests/test-v123-source-inventory.php
+      - name: R66 V12.3 release candidate must require new evidence gates
+        run: php tests/test-r66-v123-release-missing-proof.php
+      - name: R67 V12.3 live proof cannot reuse staging-only records
+        run: php tests/test-r67-live-stage-disjoint-evidence.php
+      - name: R67 positive synthetic source-ledger paths remain reachable
+        run: php tests/test-r67-positive-ledger-fixture.php
+      - name: V12.3 PHP code-shape audit coverage on frozen 50 source files
+        run: php tests/test-v123-php-source-scan-coverage.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
