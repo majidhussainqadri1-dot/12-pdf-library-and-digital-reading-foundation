@@ -180,6 +180,10 @@ jobs:
         run: php tests/test-r67-positive-ledger-fixture.php
       - name: V12.3 PHP code-shape audit coverage on frozen 50 source files
         run: php tests/test-v123-php-source-scan-coverage.php
+      - name: R68 immutable evidence ID cardinality negative tests
+        run: php tests/test-r68-release-ledger-identity.php
+      - name: V12.3 QA15-24 60-case real-world acceptance protocol integrity
+        run: php tests/test-v123-qa15-24-runtime-casebook.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
@@ -268,4 +272,78 @@ jobs:
           php wp-cli.phar plugin activate pdf-library-foundation-12 --path="$wp_root"
           php wp-cli.phar eval-file tests/test-v123-native-wordpress-bootstrap.php --path="$wp_root"
           php wp-cli.phar eval-file tests/test-v123-native-rights-bookpack-rest.php --path="$wp_root"
+          php wp-cli.phar eval-file tests/test-v123-native-reading-acl-cas.php --path="$wp_root"
+          php wp-cli.phar eval-file tests/test-v123-native-crypto-range.php --path="$wp_root"
           echo "DISPOSABLE WordPress/MySQL only. No Hostinger runtime or production state touched."
+
+  # V12.3 QA-15 real Chromium UI smoke on a throwaway WordPress/MySQL.
+  # Explicitly NOT real Hostinger staging, a11y certification or Live evidence.
+  native-browser-disposable:
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: browser_root_ci_only
+          MYSQL_DATABASE: file12_browser_ci
+          MYSQL_USER: file12_browser_ci
+          MYSQL_PASSWORD: browser_mysql_ci_only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=root --password=browser_root_ci_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: mysqli, mbstring, intl, gd, zip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Isolated synthetic WordPress 7.1.4 for Chromium test
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          wp_root="$RUNNER_TEMP/file12-browser-wp"
+          mkdir -p "$wp_root"
+          php wp-cli.phar core download --version=7.1.4 --locale=en_US --path="$wp_root"
+          php wp-cli.phar config create --path="$wp_root" --dbname=file12_browser_ci --dbuser=file12_browser_ci --dbpass=browser_mysql_ci_only --dbhost=127.0.0.1:3306 --skip-check
+          php wp-cli.phar core install --path="$wp_root" --url=http://127.0.0.1:8080 --title="File12 Browser Synthetic CI" --admin_user=file12_browser_admin --admin_password=browser_admin_ci_only --admin_email=browser-ci@example.invalid --skip-email
+          cp -a pdf-library-foundation-12 "$wp_root/wp-content/plugins/"
+          php wp-cli.phar plugin activate pdf-library-foundation-12 --path="$wp_root"
+          php wp-cli.phar rewrite structure '/%postname%/' --path="$wp_root"
+          cat > "$wp_root/ci-router.php" <<'PHP'
+          <?php
+          $uri=parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH);
+          $full=__DIR__.$uri;
+          if($uri!=='/' && is_file($full))return false;
+          require __DIR__.'/index.php';
+          PHP
+          nohup php -S 127.0.0.1:8080 -t "$wp_root" "$wp_root/ci-router.php" > "$RUNNER_TEMP/file12-browser.log" 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8080/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -sSI --max-time 5 http://127.0.0.1:8080/library/ | head -n 12
+      - name: Install real Chromium test browser in isolated runner
+        run: |
+          npm install --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: V12.3 QA15 five responsive and synthetic RTL layouts
+        env:
+          FILE12_BROWSER_BASE: http://127.0.0.1:8080
+          FILE12_CI_EPHEMERAL_DB: 'yes'
+        run: node tests/v123-browser-public-catalog-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: file12-disposable-qa15-chromium-screenshots
+          path: browser-evidence/
+          if-no-files-found: warn
