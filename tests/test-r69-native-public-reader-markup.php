@@ -65,6 +65,9 @@ $policy=[
 f12_r69_assert($wpdb->insert(PLDR_Core::table('access_policies'),$policy)!==false,
  'synthetic read-only PDF policy stored');
 wp_set_current_user(0);
+// WP-CLI does not fire the actual front-end asset enqueue hook. Register the
+// canonical File12 script before asserting wp_add_inline_script metadata.
+PLDR_Plugin::instance()->register_assets();
 $guest=PLDR_Reader::reader_html($public_id);
 f12_r69_assert(str_contains($guest,'data-pldr-reader')&&
  str_contains($guest,'Copy citation')&&
