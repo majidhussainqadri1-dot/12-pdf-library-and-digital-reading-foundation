@@ -27,7 +27,8 @@ function csv_v123(string $path): array {
 [$columns,$rows]=csv_v123($matrix);
 foreach (['id','group','work_package','v123_requirement','primary_owner','linked_acceptance',
   'code_anchor_claim','source_review_status','staging_status','live_status',
-  'environment','observed','evidence_id','reviewer','defect_id','retest_status','decision'] as $field) {
+  'environment','observed','evidence_id','reviewer','defect_id','retest_status','decision',
+  'live_environment','live_observed','live_evidence_id','live_reviewer'] as $field) {
     if (!in_array($field,$columns,true)) fail_v123("Missing column ".$field);
 }
 $counts=['FR'=>0,'NFR'=>0,'FUT'=>0,'CEN'=>0,'MODERN'=>0,'QA'=>0,'JOURNEY'=>0];
@@ -47,11 +48,21 @@ foreach ($rows as $row) {
         $status=(string)$row[$state];
         if (!in_array($status,['UNVERIFIED','PASS','FAIL','BLOCKED'],true)) fail_v123($id." invalid ".$state);
         if ($status==='PASS') {
-            if (trim((string)$row['evidence_id'])==='' || trim((string)$row['reviewer'])==='' ||
-                trim((string)$row['environment'])==='' ||
-                in_array(strtoupper(trim((string)$row['environment'])),['UNVERIFIED','HOSTINGER_STAGING_REQUIRED','NOT_OBSERVED','PENDING'],true) ||
-                in_array(strtoupper(trim((string)$row['observed'])),['NOT_OBSERVED','UNVERIFIED','PENDING','NOT_RUN',''],true))
-                fail_v123($id." fabricated or context-free PASS in ".$state);
+            $isLive=($state==='live_status');
+            $proofKey=$isLive?'live_evidence_id':'evidence_id';
+            $reviewerKey=$isLive?'live_reviewer':'reviewer';
+            $environmentKey=$isLive?'live_environment':'environment';
+            $observedKey=$isLive?'live_observed':'observed';
+            $environment=strtoupper(trim((string)$row[$environmentKey]));
+            $observed=strtoupper(trim((string)$row[$observedKey]));
+            if (trim((string)$row[$proofKey])==='' || trim((string)$row[$reviewerKey])==='' ||
+                in_array($environment,['','UNVERIFIED','HOSTINGER_STAGING_REQUIRED','NOT_OBSERVED','PENDING'],true) ||
+                in_array($observed,['','NOT_OBSERVED','UNVERIFIED','PENDING','NOT_RUN'],true))
+                fail_v123($id." fabricated/context-free ".$state." PASS");
+            if ($isLive && ($row['staging_status']!=='PASS' ||
+                !preg_match('/(?:LIVE|PROD)/',$environment) ||
+                (string)$row['live_evidence_id']===(string)$row['evidence_id']))
+                fail_v123($id." LIVE proof must be separate from accepted STAGING");
             if (trim((string)$row['defect_id'])!=='' && (string)$row['retest_status']!=='PASS')
                 fail_v123($id." defect has no passing retest");
         }
