@@ -170,6 +170,8 @@ jobs:
         run: php tests/test-r65-staging-defect-retest-proof.php
       - name: V12.3 77-entry source-to-acceptance matrix (not live validation)
         run: php tests/test-v123-evidence-matrix.php
+      - name: V12.3 immutable 58-plugin-file source inventory (not deployed parity)
+        run: php tests/test-v123-source-inventory.php
       - name: R66 V12.3 release candidate must require new evidence gates
         run: php tests/test-r66-v123-release-missing-proof.php
       - name: Secret scan
