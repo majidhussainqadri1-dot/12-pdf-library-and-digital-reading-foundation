@@ -178,6 +178,8 @@ jobs:
         run: php tests/test-r67-live-stage-disjoint-evidence.php
       - name: R67 positive synthetic source-ledger paths remain reachable
         run: php tests/test-r67-positive-ledger-fixture.php
+      - name: R68 release ledger identity tampering must fail closed
+        run: php tests/test-r68-release-ledger-identity.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
