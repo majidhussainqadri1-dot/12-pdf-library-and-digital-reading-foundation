@@ -281,7 +281,7 @@ jobs:
   # V12.3 QA-15 real Chromium UI smoke on a throwaway WordPress/MySQL.
   # Explicitly NOT real Hostinger staging, a11y certification or Live evidence.
   native-browser-disposable:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       mysql:
         image: mysql:8.0
