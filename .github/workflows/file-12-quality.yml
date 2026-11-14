@@ -180,6 +180,8 @@ jobs:
         run: php tests/test-r67-positive-ledger-fixture.php
       - name: V12.3 PHP code-shape audit coverage on frozen 50 source files
         run: php tests/test-v123-php-source-scan-coverage.php
+      - name: V12.3 QA15-24 runtime casebook 60-row identity and proof preflight
+        run: php tests/test-v123-qa15-24-runtime-casebook.php
       - name: Secret scan
         run: php tests/test-no-secrets.php
       - name: Independent review regressions
