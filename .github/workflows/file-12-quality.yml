@@ -276,6 +276,7 @@ jobs:
           php wp-cli.phar eval-file tests/test-v123-native-rights-bookpack-rest.php --path="$wp_root"
           php wp-cli.phar eval-file tests/test-v123-native-reading-acl-cas.php --path="$wp_root"
           php wp-cli.phar eval-file tests/test-v123-native-crypto-range.php --path="$wp_root"
+          php wp-cli.phar eval-file tests/test-r69-native-public-reader-markup.php --path="$wp_root"
           echo "DISPOSABLE WordPress/MySQL only. No Hostinger runtime or production state touched."
 
   # V12.3 QA-15 real Chromium UI smoke on a throwaway WordPress/MySQL.
