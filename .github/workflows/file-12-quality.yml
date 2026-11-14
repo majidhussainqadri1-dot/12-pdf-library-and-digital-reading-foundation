@@ -272,4 +272,5 @@ jobs:
           php wp-cli.phar plugin activate pdf-library-foundation-12 --path="$wp_root"
           php wp-cli.phar eval-file tests/test-v123-native-wordpress-bootstrap.php --path="$wp_root"
           php wp-cli.phar eval-file tests/test-v123-native-rights-bookpack-rest.php --path="$wp_root"
+          php wp-cli.phar eval-file tests/test-v123-native-reading-acl-cas.php --path="$wp_root"
           echo "DISPOSABLE WordPress/MySQL only. No Hostinger runtime or production state touched."
