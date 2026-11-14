@@ -62,4 +62,27 @@ f12_native_assert(PLDR_Access::can_access_edition(999999,'read',-1)===false,
   'nonexistent PDF edition never granted public read');
 f12_native_assert((int)$wpdb->get_var('SELECT COUNT(*) FROM '.PLDR_Core::table('book_packs'))===0,
   'denied Book Pack authorization writes no DB row');
+
+f12_native_assert(PLDR_Schema::upgrade()===true,
+  'actual second migration in disposable MySQL completes idempotently');
+f12_native_assert(PLDR_R21_Readiness::core_ready(false),
+  'physical core schema remains ready after idempotent rerun');
+$routes=rest_get_server()->get_routes();
+foreach(['/pldr/v1/library','/pldr/v1/ingest','/pldr/v1/book-packs',
+  '/pldr/v1/health','/pldr/v1/reading/items'] as $route){
+   f12_native_assert(isset($routes[$route]),'native REST route registered '.$route);
+}
+foreach([
+  ['POST','/pldr/v1/ingest'],
+  ['POST','/pldr/v1/book-packs'],
+  ['GET','/pldr/v1/health'],
+  ['GET','/pldr/v1/reading/items']
+] as $pair){
+    $req=new WP_REST_Request($pair[0],$pair[1]);
+    $response=rest_do_request($req);
+    f12_native_assert($response instanceof WP_REST_Response &&
+      in_array($response->get_status(),[401,403],true),
+      'anonymous REST management/private route denied '.$pair[0].' '.$pair[1]);
+}
+
 echo "FILE12 NATIVE WORDPRESS/MYSQL DISPOSABLE SMOKE PASS; Hostinger and CF04/File26 integration remain unverified.\n";
