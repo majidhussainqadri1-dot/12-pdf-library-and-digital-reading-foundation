@@ -19,7 +19,7 @@ function f12_native_assert(bool $condition,string $label):void{
 require_once ABSPATH.'wp-admin/includes/plugin.php';
 f12_native_assert(is_plugin_active('pdf-library-foundation-12/pdf-library-digital-reading.php'),
   'candidate plugin is active in disposable WordPress');
-f12_native_assert(defined('PLDR_VERSION') && PLDR_VERSION==='1.1.0-rc.43',
+f12_native_assert(defined('PLDR_VERSION') && PLDR_VERSION==='1.1.0-rc.44',
   'exact candidate code version loaded');
 f12_native_assert(defined('PLDR_DB_VERSION') && PLDR_DB_VERSION==='1.1.0',
   'source schema version declaration loaded');
