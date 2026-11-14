@@ -34,13 +34,14 @@
     if (pageInput) pageInput.value = String(page);
     root.querySelectorAll('[data-thumb-page]').forEach((button) => button.setAttribute('aria-current', Number(button.dataset.thumbPage) === page ? 'page' : 'false'));
     window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(saveProgress, 700);
+    if (cfg.canSavePrivate === true) saveTimer = window.setTimeout(saveProgress, 700);
   };
   const refreshToken = async (operation = 'read') => {
     const grant = await api('reader-access', {method: 'POST', body: {edition_id: cfg.editionId, operation, ttl: 900}, headers: {'Idempotency-Key': crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`}});
     return grant;
   };
   const saveProgress = async () => {
+    if (cfg.canSavePrivate !== true) return;
     try {
       const saved = await api('reading/progress', {method: 'POST', body: {edition_id: cfg.editionId, page, expected_updated_at: progressRevision}, headers: {'Idempotency-Key': crypto.randomUUID?.() || `progress-${cfg.editionId}-${page}-${Date.now()}-${Math.random()}`}});
       progressRevision = String(saved.updated_at || progressRevision);
@@ -61,6 +62,7 @@
     if (action === 'zoom-out') { const n = Number(zoom) || 100; zoom = String(Math.max(50, n - 25)); updateFrame(); }
     if (action === 'fit') { zoom = 'page-width'; updateFrame(); }
     if (action === 'fullscreen') { try { await root.requestFullscreen(); } catch (e) { say(e.message); } }
+    if (cfg.canSavePrivate !== true && ['bookmark', 'note', 'highlight'].includes(action)) return;
     if (action === 'bookmark') {
       try { await api('reading/items', {method:'POST',body:{edition_id:cfg.editionId,type:'bookmark',page},headers:{'Idempotency-Key':crypto.randomUUID?.()||`bookmark-${cfg.editionId}-${page}-${Date.now()}-${Math.random()}`}}); say('Bookmark saved privately.'); loadPrivateItems(); } catch(e){ say(e.message); }
     }
@@ -160,7 +162,7 @@
 
   say(cfg.strings?.loading || 'Loading…');
   updateFrame();
-  loadPrivateItems();
+  if (cfg.canSavePrivate === true) loadPrivateItems();
   if (window.location.hash === '#download' && cfg.canDownload) openDownloadManager();
   window.setTimeout(()=>say(''),1200);
 })();
