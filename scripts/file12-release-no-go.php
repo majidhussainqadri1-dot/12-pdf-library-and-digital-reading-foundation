@@ -7,7 +7,10 @@ $root=dirname(__DIR__);
 $tables=array(
  array('file'=>'docs/R57-FILE12-V121-39-STAGING-GATES.csv','stage'=>'status','live'=>null),
  array('file'=>'docs/R58-FILE12-V121-54-REQUIREMENTS.csv','stage'=>'staging_status','live'=>'live_status'),
- array('file'=>'docs/R59-V121-CF04-STO10-SHARED-SECURITY-GATES.csv','stage'=>'staging_status','live'=>'live_status')
+ array('file'=>'docs/R59-V121-CF04-STO10-SHARED-SECURITY-GATES.csv','stage'=>'staging_status','live'=>'live_status'),
+ // V12.3 adds 12 modern criteria, QA-15..24 and AJ-14 alongside the original 54.
+ // These 77 rows are extra evidence obligations, not 77 invented features or live PASSes.
+ array('file'=>'docs/V123-FILE12-77-REQUIREMENT-AND-ACCEPTANCE-GATES.csv','stage'=>'staging_status','live'=>'live_status')
 );
 $blocked=array();$total=0;$ready=0;
 foreach($tables as $def){
@@ -25,7 +28,7 @@ foreach($tables as $def){
   // The original 39-test ledger carries an explicit staging environment and
   // observed result. A fabricated PASS must never override untouched
   // HOSTINGER_STAGING_REQUIRED / NOT_OBSERVED evidence placeholders.
-  if($def['file']==='docs/R57-FILE12-V121-39-STAGING-GATES.csv'){
+  if(in_array($def['file'],array('docs/R57-FILE12-V121-39-STAGING-GATES.csv','docs/V123-FILE12-77-REQUIREMENT-AND-ACCEPTANCE-GATES.csv'),true)){
    $environment=strtoupper(trim((string)($r['environment']??'')));
    $observed=strtoupper(trim((string)($r['observed']??'')));
    if($environment===''||in_array($environment,array('HOSTINGER_STAGING_REQUIRED','UNVERIFIED','PENDING','NOT_OBSERVED'),true)
@@ -33,7 +36,7 @@ foreach($tables as $def){
   }
   // A recorded defect cannot become a release PASS until its exact repaired
   // scenario has a reviewed and successful re-test in this same ledger.
-  if($def['file']==='docs/R57-FILE12-V121-39-STAGING-GATES.csv'
+  if(in_array($def['file'],array('docs/R57-FILE12-V121-39-STAGING-GATES.csv','docs/V123-FILE12-77-REQUIREMENT-AND-ACCEPTANCE-GATES.csv'),true)
       &&''!==trim((string)($r['defect_id']??''))
       &&'PASS'!==strtoupper(trim((string)($r['retest_status']??''))))continue;
   $ok++;$ready++;
