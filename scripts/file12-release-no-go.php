@@ -24,15 +24,34 @@ foreach($tables as $def){
   if(count($values)!==count($header))continue;
   $r=array_combine($header,$values);
   $key=$mode==='postdeploy'&&$def['live']?$def['live']:$def['stage'];
-  if(($r[$key]??'')!=='PASS'||empty($r['evidence_id'])||empty($r['reviewer']))continue;
-  // The original 39-test ledger carries an explicit staging environment and
-  // observed result. A fabricated PASS must never override untouched
-  // HOSTINGER_STAGING_REQUIRED / NOT_OBSERVED evidence placeholders.
+  $isV123=($def['file']==='docs/V123-FILE12-77-REQUIREMENT-AND-ACCEPTANCE-GATES.csv');
+  // V12.3 keeps STAGING and LIVE as two independent observed realities.
+  // A postdeploy PASS cannot reuse an earlier staging receipt, environment,
+  // reviewer/evidence fields or a source-only GitHub Actions success.
+  $liveEvidence=($isV123&&$mode==='postdeploy');
+  $proofKey=$liveEvidence?'live_evidence_id':'evidence_id';
+  $reviewerKey=$liveEvidence?'live_reviewer':'reviewer';
+  $environmentKey=$liveEvidence?'live_environment':'environment';
+  $observedKey=$liveEvidence?'live_observed':'observed';
+  if(($r[$key]??'')!=='PASS'||empty($r[$proofKey])||empty($r[$reviewerKey]))continue;
+  if($liveEvidence){
+    if(($r['staging_status']??'')!=='PASS'
+       ||empty($r['evidence_id'])||empty($r['reviewer'])
+       ||(string)$r['evidence_id']===(string)$r['live_evidence_id'])continue;
+  }
   if(in_array($def['file'],array('docs/R57-FILE12-V121-39-STAGING-GATES.csv','docs/V123-FILE12-77-REQUIREMENT-AND-ACCEPTANCE-GATES.csv'),true)){
-   $environment=strtoupper(trim((string)($r['environment']??'')));
-   $observed=strtoupper(trim((string)($r['observed']??'')));
+   $environment=strtoupper(trim((string)($r[$environmentKey]??'')));
+   $observed=strtoupper(trim((string)($r[$observedKey]??'')));
    if($environment===''||in_array($environment,array('HOSTINGER_STAGING_REQUIRED','UNVERIFIED','PENDING','NOT_OBSERVED'),true)
        ||$observed===''||in_array($observed,array('NOT_OBSERVED','UNVERIFIED','PENDING','NOT_RUN'),true))continue;
+   if($liveEvidence){
+      $stageEnv=strtoupper(trim((string)($r['environment']??'')));
+      $stageObs=strtoupper(trim((string)($r['observed']??'')));
+      if(in_array($stageEnv,array('','HOSTINGER_STAGING_REQUIRED','UNVERIFIED','PENDING'),true)
+         ||in_array($stageObs,array('','NOT_OBSERVED','UNVERIFIED','PENDING','NOT_RUN'),true))continue;
+      // Production observation must identify LIVE/PRODUCTION, not a staging target.
+      if(!preg_match('/(?:LIVE|PROD)/',$environment)||str_contains($environment,'STAGING'))continue;
+   }
   }
   // A recorded defect cannot become a release PASS until its exact repaired
   // scenario has a reviewed and successful re-test in this same ledger.
