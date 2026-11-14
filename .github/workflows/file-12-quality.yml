@@ -217,3 +217,54 @@ jobs:
           name: file-12-pdf-library-1.1.0-rc.43
           path: dist/
           if-no-files-found: error
+
+  # Exact source plugin on an isolated throwaway WordPress and MySQL service.
+  # This is neither real Hostinger staging nor live proof.
+  native-wordpress-disposable:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wp-version: ['7.0.1', '7.1.4']
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: disposable_root_only
+          MYSQL_DATABASE: file12_ci
+          MYSQL_USER: file12_ci
+          MYSQL_PASSWORD: disposable_ci_only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=root --password=disposable_root_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: mysqli, mbstring, intl, gd, zip
+      - name: WP-CLI from official PHP PHAR (disposable CI only)
+        run: |
+          curl -fsSL --retry 3 -o wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          php wp-cli.phar --info
+      - name: Synthetic WordPress fresh install and File12 denied-access smoke
+        env:
+          FILE12_CI_EPHEMERAL_DB: 'yes'
+        run: |
+          set -euo pipefail
+          wp_root="$RUNNER_TEMP/file12-wp"
+          mkdir -p "$wp_root"
+          php wp-cli.phar core download --version="${{ matrix.wp-version }}" --locale=en_US --path="$wp_root"
+          php wp-cli.phar config create --path="$wp_root" --dbname=file12_ci --dbuser=file12_ci --dbpass=disposable_ci_only --dbhost=127.0.0.1:3306 --skip-check
+          php wp-cli.phar core install --path="$wp_root" --url=http://file12-ci.invalid --title="File12 Synthetic CI" --admin_user=file12_ci_admin --admin_password=disposable_admin_only --admin_email=file12-ci@example.invalid --skip-email
+          cp -a pdf-library-foundation-12 "$wp_root/wp-content/plugins/"
+          php wp-cli.phar plugin activate pdf-library-foundation-12 --path="$wp_root"
+          php wp-cli.phar eval-file tests/test-v123-native-wordpress-bootstrap.php --path="$wp_root"
+          echo "DISPOSABLE WordPress/MySQL only. No Hostinger runtime or production state touched."
