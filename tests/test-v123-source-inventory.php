@@ -318,6 +318,31 @@ while(($dv=fgetcsv($fh53,0,',','"','\\'))!==false){
 fclose($fh53);
 if(count($rc53)!==2){fwrite(STDERR,"rc.53 must contain exactly two source deltas\n");exit(1);}
 
+// R80 immutable rc.54 signed PDF source delta, preserve prior 58-file chain.
+$rc54File=$root.'/docs/V123-FILE12-RC54-SOURCE-DELTA-OVERLAY.csv';
+$rc54=[];$fields54=['path','baseline_blob_sha','candidate_blob_sha','candidate_bytes','introduced_at_sha','audit_status','runtime_status','reason'];
+$fh54=@fopen($rc54File,'rb');
+if(!$fh54){fwrite(STDERR,"Missing rc.54 source overlay\n");exit(1);}
+if(fgetcsv($fh54,0,',','"','\\')!==$fields54){fwrite(STDERR,"rc.54 schema invalid\n");exit(1);}
+$allowed54=['pdf-library-foundation-12/assets/reader.js','pdf-library-foundation-12/pdf-library-digital-reading.php'];
+while(($row54=fgetcsv($fh54,0,',','"','\\'))!==false){
+ if($row54===[null])continue;
+ if(count($row54)!==count($fields54)){fwrite(STDERR,"Malformed rc.54 source row\n");exit(1);}
+ $item54=array_combine($fields54,$row54);$path54=(string)$item54['path'];
+ if(isset($rc54[$path54])||!in_array($path54,$allowed54,true)){fwrite(STDERR,"Unexpected/duplicate rc.54 path\n");exit(1);}
+ foreach(['baseline_blob_sha','candidate_blob_sha','introduced_at_sha'] as $field)
+  if(!preg_match('/^[0-9a-f]{40}$/D',(string)$item54[$field])){fwrite(STDERR,"Invalid rc.54 Git SHA\n");exit(1);}
+ if((string)$item54['audit_status']!=='SOURCE_DELTA_AWAITING_INDEPENDENT_REVIEW'
+   ||(string)$item54['runtime_status']!=='UNVERIFIED'
+   ||!ctype_digit((string)$item54['candidate_bytes'])
+   ||trim((string)$item54['reason'])===''){
+  fwrite(STDERR,"Invalid rc.54 review or byte status\n");exit(1);
+ }
+ $rc54[$path54]=$item54;
+}
+fclose($fh54);
+if(count($rc54)!==2){fwrite(STDERR,"rc.54 exact two-file delta is required\n");exit(1);}
+
 while(($v=fgetcsv($in,0,',','"','\\'))!==false){
  if($v===[null])continue;
  if(count($v)!==count($h)){$failures[]="bad row";continue;}
@@ -357,7 +382,16 @@ while(($v=fgetcsv($in,0,',','"','\\'))!==false){
  if(isset($rc51[$p])&&strtolower((string)$rc51[$p]['baseline_blob_sha'])!==strtolower($rc51Parent))
    $failures[]='Invalid rc.51 source parent: '.$p;
  $rc52Parent=isset($rc51[$p])?(string)$rc51[$p]['candidate_blob_sha']:$rc51Parent;
- if(isset($rc53[$p])){
+ if(isset($rc54[$p])){
+   $new=$rc54[$p];
+   $expectedParent54=isset($rc53[$p])?(string)$rc53[$p]['candidate_blob_sha']:
+    (isset($rc52[$p])?(string)$rc52[$p]['candidate_blob_sha']:$rc52Parent);
+   if(strtolower((string)$new['baseline_blob_sha'])!==strtolower($expectedParent54)
+      ||strtolower((string)$new['candidate_blob_sha'])!==$blob
+      ||(string)$new['candidate_bytes']!==(string)$bytes
+      ||strtolower((string)$new['baseline_blob_sha'])===$blob)
+    $failures[]='Invalid or unrecorded rc.54 source delta: '.$p;
+ }else if(isset($rc53[$p])){
    $new=$rc53[$p];
    if(strtolower((string)$new['baseline_blob_sha'])!==strtolower($rc52Parent)
      && !isset($rc52[$p]))$failures[]="Invalid rc.53 source parent: ".$p;
@@ -471,5 +505,5 @@ foreach($iter as $candidate){
 foreach($actual as $p=>$_)if(!isset($seen[$p]))$failures[]="unregistered plugin file: ".$p;
 if($count!==58||count($actual)!==58)$failures[]="Source file-count mismatch: inventoried ".$count."; plugin files ".count($actual);
 if($failures){fwrite(STDERR,implode("\n",$failures)."\n");exit(1);}
-echo "V12.3 File12 SOURCE inventory PASS: 58 original rc.43 blobs verified, plus ".count($overlay)." rc.44 and ".count($rc45)." rc.45 and ".count($rc46)." rc.46 and ".count($rc47)." rc.47 and ".count($rc48)." rc.48 and ".count($rc49)." rc.49 and ".count($rc50)." rc.50 and ".count($rc51)." rc.51 and ".count($rc52)." rc.52 and ".count($rc53)." rc.53 exact candidate deltas (no overwritten baseline). ";
+echo "V12.3 File12 SOURCE inventory PASS: 58 original rc.43 blobs verified, plus ".count($overlay)." rc.44 and ".count($rc45)." rc.45 and ".count($rc46)." rc.46 and ".count($rc47)." rc.47 and ".count($rc48)." rc.48 and ".count($rc49)." rc.49 and ".count($rc50)." rc.50 and ".count($rc51)." rc.51 and ".count($rc52)." rc.52 and ".count($rc53)." rc.53 and ".count($rc54)." rc.54 exact candidate deltas (no overwritten baseline). ";
 echo "All delta reviews and Hostinger deployed package, DB, and runtime remain UNVERIFIED.\n";
