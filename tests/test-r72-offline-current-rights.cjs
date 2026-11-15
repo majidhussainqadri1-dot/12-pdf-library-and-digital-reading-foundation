@@ -63,7 +63,7 @@ async function simulate({online,authorized,retryOffline=false}){
     api:async endpoint=>{
       assert.equal(endpoint,'offline-authorization/'+editionId);
       authCalls++;
-      return {authorized};
+      return {authorized,edition_id:editionId,rights_valid_until:null,checked_at:'2026-11-15T08:00:00Z'};
     },
     say:s=>messages.push(String(s)),
     openPanel(){},
