@@ -26,6 +26,8 @@ jobs:
         run: find pdf-library-foundation-12 tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: R75 private storage and CF04 shared root fail-closed
         run: php tests/test-r75-storage-private-root.php
+      - name: R75 public webroot symlink alias deny regression
+        run: php tests/test-r75-public-symlink-alias.php
       - name: Authenticated crypto/range/tamper test
         run: php -d zend.assertions=1 -d assert.exception=1 tests/test-crypto.php
       - name: Core governing-plan contract scan
