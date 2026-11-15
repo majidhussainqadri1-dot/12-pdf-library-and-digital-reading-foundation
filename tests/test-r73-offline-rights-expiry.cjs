@@ -40,7 +40,7 @@ function makeDb(preloaded){
       return tx;
     }
   };
-  return {open(){
+  return {stores,open(){
     const req={result:db,onupgradeneeded:null,onsuccess:null,onerror:null};
     queueMicrotask(()=>req.onsuccess?.());return req;
   }};
@@ -88,9 +88,9 @@ async function simulate({online,authorized,validUntil=null,retryOffline=false,wr
   vm.runInNewContext(source,sandbox,{timeout:2000,filename:'future-reader-vault.js'});
   handlers['root:click']({target:{closest(){return {dataset:{f24Action:'offline'}};}}});
   await handlers['[data-vault-open]']();
-  const expiryAfterOnline=stores.get('meta').get('700')?.offlineValidUntil;
+  const expiryAfterOnline=idb.stores.get('meta').get('700')?.offlineValidUntil;
   if(retryOffline){navigator.onLine=false;if(moveTime)observedTime=Date.parse('2026-11-18T08:00:00Z');await handlers['[data-vault-open]']();}
-  return {authCalls,opens,messages,expiryAfterOnline,stillCached:stores.get('meta').has('700')};
+  return {authCalls,opens,messages,expiryAfterOnline,stillCached:idb.stores.get('meta').has('700')};
 }
 (async()=>{
   const shorter=await simulate({online:true,authorized:true,validUntil:'2026-11-17T00:00:00Z',retryOffline:true,moveTime:true});
