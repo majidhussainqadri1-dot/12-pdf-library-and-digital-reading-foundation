@@ -178,7 +178,7 @@ $rc49File=$root.'/docs/V123-FILE12-RC49-SOURCE-DELTA-OVERLAY.csv';
 $rc49=[];
 $rc49Fields=['path','baseline_blob_sha','candidate_blob_sha','candidate_bytes','introduced_at_sha','audit_status','runtime_status','reason'];
 $rc49Handle=@fopen($rc49File,'rb');
-if(!$rc49Handle){fwrite(STDERR,"Missing rc.49 exact R72 source delta overlay\n");exit(1);}
+if(!$rc49Handle){fwrite(STDERR,"Missing rc.49 exact R74 source delta overlay\n");exit(1);}
 $rc49Header=fgetcsv($rc49Handle,0,',','"','\\');
 if($rc49Header!==$rc49Fields){fwrite(STDERR,"rc.49 source delta schema mismatch\n");exit(1);}
 while(($values=fgetcsv($rc49Handle,0,',','"','\\'))!==false){
@@ -188,6 +188,7 @@ while(($values=fgetcsv($rc49Handle,0,',','"','\\'))!==false){
  $path49=(string)$record['path'];
  if(isset($rc49[$path49])||!in_array($path49,[
   'pdf-library-foundation-12/assets/future-reader-scholar.js',
+  'pdf-library-foundation-12/assets/future-reader-personal.js',
   'pdf-library-foundation-12/pdf-library-digital-reading.php'
  ],true)){fwrite(STDERR,"Unexpected or duplicate rc.49 source delta ".$path49."\n");exit(1);}
  foreach(['baseline_blob_sha','candidate_blob_sha','introduced_at_sha'] as $field){
@@ -203,7 +204,7 @@ while(($values=fgetcsv($rc49Handle,0,',','"','\\'))!==false){
  $rc49[$path49]=$record;
 }
 fclose($rc49Handle);
-if(count($rc49)!==2){fwrite(STDERR,"rc.49 overlay must contain exactly two source deltas\n");exit(1);}
+if(count($rc49)!==3){fwrite(STDERR,"rc.49 overlay must contain exactly three source deltas\n");exit(1);}
 
 while(($v=fgetcsv($in,0,',','"','\\'))!==false){
  if($v===[null])continue;
