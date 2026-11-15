@@ -1,3 +1,20 @@
+# Latest File12 V12.3 checkpoint — R78 / 1.1.0-rc.52 / Draft PR #76 (2026-11-15)
+
+**Release: NO_GO. This top section supersedes the historical dated source checkpoints below.** Source-only, NOT deployed.
+
+- GitHub `main` remains README-only HEAD `2b369ef2d609247896e1ab32118f1dc498407f51`; newest source candidate is the **unmerged stacked Draft PR #76** based on PR #74 (R77 source freeze), PR #73 (R76 actor boundary), PR #71 etc.
+- Documented R64–R76: **13** demonstrated source defects corrected in separate Drafts; plus **R78** strict PDF-only offline Blob/bytes: **14 independently enumerated source defects / 14 Draft-source corrections / 0 Live-verified corrections**. R77 is an additional read-only deployment/schema evidence-collector improvement, not counted as a separate plugin bug.
+- **R78 RED** GitHub Actions `43710048142` (HTML MIME cached Blob opened). **R78 first full GREEN** exact source `033affe770c7d5297fc7f298d6538e598825c2fa`, Actions `43710692985`, **7/7** success across PHP8.1/8.3/8.4, disposable WP7.0.1/7.1.4, frontend and Chromium. Subsequent documentation-only updates require their own exact-HEAD CI proof.
+- Actual code changes: offline capture/open PDF MIME + `%PDF-` header checks and fixed `application/pdf` Blob; two new R78 executable WebCrypto/IndexedDB fixtures and historical SHA-negative-case preservation. **This is not full structural PDF/malware validation**; CF04 must still prove that separately. 128MiB offline max remains.
+- Source manifest: 58 original plugin-source files, immutable rc.44–rc.51 overlays, new rc.52 exact **2-plugin-file** SHA/byte overlay. Declared DB schema and integration contract are `1.1.0`, not evidence of the physical Hostinger DB.
+- Existing **10 release blocker categories** remain (5 CRITICAL, 5 HIGH): exact installed package/version/hash, DB/options/migration, plugin-folder compatibility, File26 PDF+Book Pack contract and rights-withdrawal ACK/index purge, CF04 scanner/private encryption/key/restore, licensed original source/OCR, actual Staging browser/RTL/WCAG/functional gates, independent reviewers, approved GO/backup/rollback, Live deploy/retest.
+- Real acceptance remains **UNVERIFIED**: 39 historical Stage, 54 requirement runtime, 10 CF04, 77 V12.3 Stage and 77 independent Live, 60 QA journeys. They overlap, so do not call them independent bugs. Current source reader acceptance does not equal actual deployed readiness.
+- **Five separate truths:** Repository HEAD (`main`) `2b369ef2d609247896e1ab32118f1dc498407f51`; Deployed Version **UNVERIFIED**; physical DB Version **UNVERIFIED**; Migration State **UNVERIFIED**; Live Verification Status **NOT PERFORMED**.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # File 12 — V12.3 source completion checkpoint rc.50 (2026-11-15, DRAFT, NO_GO)
 
 - **This is source-repository status only.** GitHub `main` HEAD `2b369ef2d609247896e1ab32118f1dc498407f51` contains only README; the full code lives in stacked Draft PRs. All installed Hostinger File12 package, physical DB, migration state and Live behavior remain **UNVERIFIED**.
