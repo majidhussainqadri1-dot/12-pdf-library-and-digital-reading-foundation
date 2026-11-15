@@ -206,6 +206,8 @@ jobs:
         run: node tests/test-r70-reader-range-integrity.cjs
       - name: R71 RED-first encrypted offline vault range and SHA-256
         run: node tests/test-r71-offline-vault-integrity.cjs
+      - name: R72 offline vault must recheck current rights on online open
+        run: node tests/test-r72-offline-current-rights.cjs
       - name: Exact candidate version markers
         run: |
           grep -F "Version: 1.1.0-rc.46" pdf-library-foundation-12/pdf-library-digital-reading.php
