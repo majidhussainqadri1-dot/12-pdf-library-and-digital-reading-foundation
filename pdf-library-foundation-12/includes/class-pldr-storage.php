@@ -6,6 +6,12 @@ final class PLDR_Storage {
     private static array $temporary_paths=array();
     private static bool $shutdown_registered=false;
     public static function root(string $scope = 'pldr') {
+        // The shared SPL/CF04 owner is not automatically a private filesystem
+        // path. Unknown scopes must never inherit the default directory while
+        // bypassing the stricter File12 owner privacy checks.
+        if (!in_array($scope, array('pldr', 'spl'), true)) {
+            return new WP_Error('pldr_storage_scope', 'Unknown private storage owner scope.');
+        }
         if ('spl' === $scope) {
             $configured = defined('SPL_PDF_STORAGE_DIR') ? (string) SPL_PDF_STORAGE_DIR : '';
             $root = $configured ?: trailingslashit(dirname(untrailingslashit(ABSPATH))) . 'sabri-private/pdf-library';
@@ -26,13 +32,46 @@ final class PLDR_Storage {
         if ('pldr' === $scope && !is_writable($root)) {
             return new WP_Error('pldr_storage_write', 'The private File 12 storage directory is not writable.');
         }
+
+        // Use canonical real paths (including symlink targets) for BOTH owner
+        // scopes. DOCUMENT_ROOT is often absent under WP-CLI or cron, therefore
+        // WordPress ABSPATH also acts as a conservative public-root boundary.
+        // Neither a manager setting nor a shared owner config can waive it.
+        $real = realpath($root);
+        if (!$real) {
+            return new WP_Error('pldr_storage_realpath', 'Private storage directory could not be resolved.');
+        }
+        $public_roots = array();
+        foreach (array(
+            (string) ($_SERVER['DOCUMENT_ROOT'] ?? ''),
+            defined('ABSPATH') ? (string) ABSPATH : '',
+        ) as $candidate) {
+            if ('' === trim($candidate)) continue;
+            // Preserve the literal served filesystem path in addition to the
+            // resolved path. A symlink *inside* the public tree pointing out
+            // to a private directory must still be denied: its alias may be
+            // directly addressable through the web server.
+            $literal = rtrim($candidate, DIRECTORY_SEPARATOR);
+            $canonical = realpath($candidate);
+            foreach (array($literal, $canonical) as $public_root) {
+                if (false !== $public_root && '' !== $public_root &&
+                    !in_array($public_root, $public_roots, true)) {
+                    $public_roots[] = $public_root;
+                }
+            }
+        }
+        foreach ($public_roots as $public_root) {
+            $boundary = rtrim($public_root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+            if ($real === $public_root ||
+                str_starts_with($real, $boundary) ||
+                $root === $public_root ||
+                str_starts_with($root, $boundary)) {
+                return new WP_Error('pldr_storage_public',
+                    'Shared and File 12 object storage must reside outside the public document and WordPress roots.');
+            }
+        }
         if ('pldr' === $scope) {
             self::protect($root);
-            $docroot = !empty($_SERVER['DOCUMENT_ROOT']) ? realpath((string) $_SERVER['DOCUMENT_ROOT']) : false;
-            $real = realpath($root);
-            if ($docroot && $real && (0 === strpos($real, rtrim($docroot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR) || $real === $docroot)) {
-                return new WP_Error('pldr_storage_public', 'File 12 storage must be outside the public document root.');
-            }
         }
         return $root;
     }
