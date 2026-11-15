@@ -68,7 +68,7 @@ async function simulate({online,authorized}){
     say:s=>messages.push(String(s)),
     openPanel(){},
     setWorkspace(){
-      this.workspace={querySelector(sel){return {addEventListener(_event,cb){handlers[sel]=cb;}};};
+      this.workspace={querySelector(sel){return {addEventListener(_event,cb){handlers[sel]=cb;}};}};
     },
     root:{addEventListener(name,cb){handlers['root:'+name]=cb;}}
   };
