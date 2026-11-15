@@ -96,7 +96,7 @@ async function simulate({online,authorized,retryOffline=false,actorId=17,cachedA
     'cross-user cached copy must explain the access refusal');
   const unknown=await simulate({online:false,authorized:false,actorId:0,cachedActorId:17});
   assert.equal(unknown.opens,0,'unknown WordPress actor must never read a cached offline PDF');
-  const legacy=await simulate({online:false,authorized:false,actorId:17,cachedActorId:undefined});
+  const legacy=await simulate({online:false,authorized:false,actorId:17,cachedActorId:null});
   assert.equal(legacy.opens,0,'legacy unbound local cache must require a fresh online grant');
   console.log('R73 current WordPress actor binding for encrypted offline PDF: PASS.');
 })().catch(error=>{console.error(error.stack||error);process.exit(1);});
