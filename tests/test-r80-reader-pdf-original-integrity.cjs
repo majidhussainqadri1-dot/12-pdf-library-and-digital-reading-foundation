@@ -14,9 +14,9 @@ const validPdf=Buffer.from('%PDF-1.7\nabcX','ascii');
 const fakeHtml=Buffer.from('<html>oops!!','ascii');
 const sha=createHash('sha256').update(validPdf).digest('hex');
 const other='a'.repeat(64)===sha?'b'.repeat(64):'a'.repeat(64);
-function grant(kind){
-  const body=kind==='fake-pdf' ? fakeHtml : validPdf;
-  const hash=createHash('sha256').update(body).digest('hex');
+function grant(kind,issued=1){
+  const body=kind==='fake-pdf'||(kind==='state-reset'&&issued>1) ? fakeHtml : validPdf;
+  const hash=kind==='state-reset'&&issued===1 ? '0'.repeat(64) : createHash('sha256').update(body).digest('hex');
   return {job_id:'synthetic-job',delivery:{url:'/synthetic-signed-range',
     size:body.length,sha256:hash,filename:kind==='unsafe-extension'?'payload.html':'licensed-synthetic.pdf',
     mime_type:kind==='wrong-mime'?'text/html':'application/pdf'},range_bytes:4,checksum:'sha256:'+hash};
@@ -24,7 +24,7 @@ function grant(kind){
 async function scenario(kind){
   let sessionCount=0;
   const rangeRequests=[];
-  const content=kind==='fake-pdf'?fakeHtml:validPdf;
+  let content=kind==='fake-pdf'?fakeHtml:validPdf;
   let attachmentClicks=0;
   const handlers={};
   const dm={hidden:true,scrollIntoView(){}};
@@ -51,7 +51,8 @@ async function scenario(kind){
   const fetch=async(url,options={})=>{
     if(String(url).includes('/downloads/session')){
       sessionCount++;
-      return {ok:true,status:200,json:async()=>grant(kind==='renewal-wrong-mime'&&sessionCount>1?'wrong-mime':kind)};
+      if(kind==='state-reset'&&sessionCount>1)content=fakeHtml;
+      return {ok:true,status:200,json:async()=>grant(kind==='renewal-wrong-mime'&&sessionCount>1?'wrong-mime':kind,sessionCount)};
     }
     if(String(url)!=='/synthetic-signed-range')throw new Error('Unrecognized synthetic URL '+url);
     const range=(options.headers||{}).Range;
@@ -91,6 +92,13 @@ async function scenario(kind){
   assert.equal(typeof handlers['start:click'],'function');
   await handlers['start:click']();
   for(let n=0;n<10;n++)await Promise.resolve();
+  if(kind==='state-reset'){
+    // Start a new signed session after a failed first file digest.
+    await click({target:{closest(){return {dataset:{action:'download'}};}}});
+    for(let n=0;n<10;n++)await Promise.resolve();
+    await handlers['start:click']();
+    for(let n=0;n<10;n++)await Promise.resolve();
+  }
   return {rangeRequests,dmStatus:dmStatus.textContent,attachmentClicks,sessionCount};
 }
 (async()=>{
@@ -110,5 +118,9 @@ async function scenario(kind){
   assert.equal(renewed.sessionCount,2,'expired grant must be replaced once');
   assert.equal(renewed.attachmentClicks,0,'refreshed token with mismatched PDF MIME must fail closed');
   assert.match(renewed.dmStatus,/MIME|PDF|type/i,'renewal mismatch must be explainable');
-  console.log('R80 signed PDF download filename/MIME/header content gates: PASS');
+  const reset=await scenario('state-reset');
+  assert.equal(reset.sessionCount,2,'bad initial digest must permit a fresh signed session');
+  assert.equal(reset.attachmentClicks,0,'a successful old PDF header MUST NOT authorize new HTML bytes after a reset');
+  assert.match(reset.dmStatus,/PDF|signature|header/i,'untrusted new object must fail its own PDF header check');
+  console.log('R80 signed PDF download filename/MIME/header and reset-state gates: PASS');
 })().catch(error=>{console.error(error.stack||error);process.exit(1);});
