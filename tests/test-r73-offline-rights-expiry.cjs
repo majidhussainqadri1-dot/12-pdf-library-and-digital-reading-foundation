@@ -47,7 +47,7 @@ function makeDb(preloaded){
 }
 async function simulate({online,authorized,validUntil=null,retryOffline=false,wrongEdition=false,moveTime=false}){
   const editionId=700;
-  const bytes=Buffer.from('signed-synthetic-PDF-offline');
+  const bytes=Buffer.from('%PDF-1.7\\nsigned-synthetic-PDF-offline');
   const sha=createHash('sha256').update(bytes).digest('hex');
   const k=await webcrypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);
   const iv=webcrypto.getRandomValues(new Uint8Array(12));

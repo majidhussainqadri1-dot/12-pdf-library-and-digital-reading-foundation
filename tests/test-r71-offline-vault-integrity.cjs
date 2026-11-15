@@ -10,7 +10,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const {createHash,webcrypto}=require('node:crypto');
 const vault=fs.readFileSync(path.join(__dirname,'..','pdf-library-foundation-12','assets','future-reader-vault.js'),'utf8');
-const original=Buffer.from('test-pdf-byte-content-2026','ascii');
+const original=Buffer.from('%PDF-1.7\\nsynthetic-test-pdf-byte-content-2026','ascii');
 const expectedHash=createHash('sha256').update(original).digest('hex');
 
 function fakeIndexedDb(){
@@ -98,7 +98,7 @@ async function simulate(kind){
     const start=Number(match[1]),end=Number(match[2]);
     ranges++;
     let body=original.subarray(start,end+1);
-    if(kind==='wrong-digest')body=Buffer.from('X'.repeat(body.length));
+    if(kind==='wrong-digest'){body=Buffer.from(body);body[body.length-1]^=1;} // keep the PDF header intact to isolate SHA failure
     if(kind==='truncated')body=original.subarray(start,end);
     const responseStart=kind==='wrong-content-range'?start+1:start;
     return {
