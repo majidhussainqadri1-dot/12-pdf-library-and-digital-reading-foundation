@@ -2,6 +2,8 @@
   'use strict';
   const F=window.PLDRF24;if(!F)return;
   const DB='pldr-offline-v1';
+  const currentActor=Number(F.future?.userId||0);
+  const validActor=()=>Number.isSafeInteger(currentActor)&&currentActor>0;
   const openDb=()=>new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('keys'))db.createObjectStore('keys');if(!db.objectStoreNames.contains('chunks'))db.createObjectStore('chunks');if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta');};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('Unable to open the encrypted offline vault.'));r.onblocked=()=>reject(new Error('The encrypted offline vault is blocked by another open browser context.'));});
   const req=async(store,mode,key,value)=>{const db=await openDb();try{return await new Promise((resolve,reject)=>{const tx=db.transaction(store,mode),os=tx.objectStore(store),r=value===undefined?os.get(key):os.put(value,key);let result,requestDone=false,settled=false;const fail=(e)=>{if(settled)return;settled=true;reject(e||new Error('Offline vault transaction failed.'));};r.onsuccess=()=>{result=r.result;requestDone=true;if(mode==='readonly'&&!settled){settled=true;resolve(result);}};r.onerror=()=>fail(r.error||new Error('Offline vault request failed.'));tx.onerror=()=>fail(tx.error||new Error('Offline vault transaction failed.'));tx.onabort=()=>fail(tx.error||new Error('Offline vault transaction was aborted.'));tx.oncomplete=()=>{if(mode!=='readonly'&&!settled){if(!requestDone)return fail(new Error('Offline vault write completed without a request result.'));settled=true;resolve(result);}};});}finally{try{db.close();}catch(_){}}};
   const key=async()=>{let k=await req('keys','readonly','device-key');if(k)return k;k=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);await req('keys','readwrite','device-key',k);return k;};
@@ -24,7 +26,8 @@
 
   const reauthorizeAfterReconnect=async()=>{if(!F.future.loggedIn||!navigator.onLine)return false;try{
     const d=await F.api('offline-authorization/'+F.editionId);
-    if(d?.authorized!==true)throw new Error('Offline authorization is no longer valid.');
+    if(d?.authorized!==true||Number(d?.actor_id)!==currentActor||!validActor())
+      throw new Error('Offline authorization or current account identity is no longer valid.');
     if(!clearOfflineReauthDenied())throw new Error('Offline authorization could not be recorded locally.');
     clearReconnectPending();
     return true;
@@ -63,12 +66,15 @@
     if(!window.crypto?.subtle||!window.indexedDB){
       F.say('Encrypted offline vault is unavailable in this browser.');return;
     }
-    if(!F.future.loggedIn){F.say('Log in before using encrypted offline reading.');return;}
+    if(!F.future.loggedIn||!validActor()){F.say('Verified WordPress account identity is required for private offline reading.');return;}
     F.say('Requesting rights-aware offline grant…');
     const plaintext=[];
     try{
       const grant=await F.api('offline-grant',{method:'POST',body:{edition_id:F.editionId},
         headers:{'Idempotency-Key':F.idempotency('offline')}});
+      if(Number(grant?.actor_id)!==currentActor){
+        throw new Error('Offline grant account identity does not match the current WordPress user.');
+      }
       const size=Number(grant?.size);
       const expectedHash=String(grant?.sha256||'').toLowerCase();
       const expiry=Date.parse(grant?.offline_valid_until||'');
@@ -103,7 +109,7 @@
         throw new Error('Offline SHA-256 checksum mismatch: captured bytes differ from the authorized PDF.');
       }
       await req('meta','readwrite',String(F.editionId),{
-        editionId:F.editionId,size,sha256:expectedHash,filename:grant.filename,
+        editionId:F.editionId,actorId:currentActor,size,sha256:expectedHash,filename:grant.filename,
         mime:grant.mime_type,chunks:index,offlineValidUntil:grant.offline_valid_until,
         storedAt:Date.now(),aadVersion:1,
         policy:'128 MiB max; exact ranges and full SHA-256 verified; encrypted non-extractable WebCrypto key; expiry and reconnect authorization'
@@ -119,6 +125,10 @@
     try{
       const meta=await req('meta','readonly',String(F.editionId));
       if(!meta){F.say('No encrypted offline copy exists for this edition.');return;}
+      if(!F.future?.loggedIn||!validActor()||Number(meta.actorId)!==currentActor){
+        F.say('Cached offline PDF is bound to another or unverified WordPress account; switch to the original account and obtain current rights.');
+        return;
+      }
       const expiry=Date.parse(meta.offlineValidUntil||'');
       if(!expiry||Date.now()>=expiry){
         await clearEdition(false);
