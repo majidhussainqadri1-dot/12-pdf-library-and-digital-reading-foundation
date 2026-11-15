@@ -382,6 +382,9 @@ while(($v=fgetcsv($in,0,',','"','\\'))!==false){
  if(isset($rc51[$p])&&strtolower((string)$rc51[$p]['baseline_blob_sha'])!==strtolower($rc51Parent))
    $failures[]='Invalid rc.51 source parent: '.$p;
  $rc52Parent=isset($rc51[$p])?(string)$rc51[$p]['candidate_blob_sha']:$rc51Parent;
+ $rc53Parent=isset($rc52[$p])?(string)$rc52[$p]['candidate_blob_sha']:$rc52Parent;
+ if(isset($rc53[$p])&&strtolower((string)$rc53[$p]['baseline_blob_sha'])!==strtolower($rc53Parent))
+   $failures[]='Invalid rc.53 parent even when superseded by rc.54: '.$p;
  if(isset($rc54[$p])){
    $new=$rc54[$p];
    $expectedParent54=isset($rc53[$p])?(string)$rc53[$p]['candidate_blob_sha']:
