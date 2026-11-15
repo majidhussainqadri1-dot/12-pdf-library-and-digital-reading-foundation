@@ -64,7 +64,7 @@ async function fire(action){
 }
 (async()=>{
   for(const action of ['context','insights','a11y'])await fire(action);
-  assert.ok(hrefWrites.some(x=>x.startsWith('https://sabrihomeopathy.com/')),
+  assert.ok(hrefWrites.some(x=>x.startsWith('/library/document/')||x.startsWith('https://sabrihomeopathy.com/')),
     'safe relative canonical context URL should still render as a link');
   assert.ok(hrefWrites.every(x=>x.startsWith('https://sabrihomeopathy.com/')),
     'untrusted provider URL leaked an unsafe/external protocol: '+JSON.stringify(hrefWrites));
