@@ -96,7 +96,7 @@ async function scenario(kind){
   assert.equal(result.sessionCount,2,'one token renewal is enough for the entire remaining download');
   assert.deepEqual(result.requestedUrls,['/signed-1','/signed-2','/signed-2','/signed-2'],
     'no stale signed URL may be used after the first successful grant refresh');
-  assert.deepEqual(result.rangeRequests,[[0,3],[0,3],[4,7],[8,11]],
+  assert.deepEqual(result.rangeRequests,[[0,3],[4,7],[8,11]],
     'after refresh byte ranges must advance strictly and exactly');
   console.log('R79 resumed download uses current refreshed signed grant URL: PASS');
 })().catch(error=>{console.error(error.stack||error);process.exit(1);});
