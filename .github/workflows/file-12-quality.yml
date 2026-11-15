@@ -214,6 +214,10 @@ jobs:
         run: node tests/test-r72-offline-current-rights.cjs
       - name: R76 offline PDF actor-isolation red-first regression
         run: node tests/test-r76-offline-user-identity.cjs
+      - name: R77 offline PDF safe-blob-open RED-first regression
+        run: node tests/test-r77-offline-pdf-safe-open.cjs
+      - name: R77 signed PDF MIME and byte-header RED-first regression
+        run: node tests/test-r77-offline-pdf-safe-store.cjs
       - name: R73 lawful reduced offline rights expiry RED-first
         run: node tests/test-r73-offline-rights-expiry.cjs
       - name: R74 scholarly reader provider-data safe DOM test
