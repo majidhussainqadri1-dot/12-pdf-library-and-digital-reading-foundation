@@ -300,6 +300,7 @@ final class PLDR_Future_REST {
             $grant=PLDR_Access::issue_token((int)$edition['id'],(int)$edition['object_id'],'offline',$uid,$grant_ttl);
             if(is_wp_error($grant))return $grant;
             $grant['offline_valid_until']=gmdate('c',$valid);
+            $grant['actor_id']=$uid;
             $grant['requires_logout_purge']=true;
             $grant['policy_checked_before_grant']=true;
             $grant['device_vault_policy']='non-extractable WebCrypto key; local expiry enforced; future refresh requires server reauthorization';
@@ -313,7 +314,7 @@ final class PLDR_Future_REST {
         $rights=self::offline_rights_expiry($edition);
         if(is_wp_error($rights))return $rights;
         $valid_until=null!==$rights?gmdate('c',$rights):null;
-        return rest_ensure_response(array('authorized'=>true,'edition_id'=>$edition_id,'checked_at'=>gmdate('c'),'rights_valid_until'=>$valid_until,'reconnect_reauthorized'=>true));
+        return rest_ensure_response(array('authorized'=>true,'actor_id'=>get_current_user_id(),'edition_id'=>$edition_id,'checked_at'=>gmdate('c'),'rights_valid_until'=>$valid_until,'reconnect_reauthorized'=>true));
     }
     public static function preferences_get(WP_REST_Request $r) { $shape=self::validate_query_shape($r,array('key'),array());if(is_wp_error($shape))return $shape; return self::response(PLDR_Future_Preferences::get((string)($r['key']?:'reader'))); }
     public static function preferences_save(WP_REST_Request $r) { $shape=self::validate_mutation_shape($r,array('key'),array('expected_version'),array('value'),array());if(is_wp_error($shape))return $shape; $b=self::body($r);return self::idempotent($r,'preferences-save',static fn()=>PLDR_Future_Preferences::save((string)($b['key']??'reader'),(array)($b['value']??array()),absint($b['expected_version']??0))); }

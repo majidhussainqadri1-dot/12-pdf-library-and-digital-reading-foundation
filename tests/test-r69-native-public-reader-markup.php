@@ -13,8 +13,8 @@ function f12_r69_assert(bool $ok,string $description):void{
  if(!$ok){fwrite(STDERR,"R69 NATIVE FAIL: ".$description."\n");exit(1);}
  echo "PASS: ".$description."\n";
 }
-f12_r69_assert(defined('PLDR_VERSION')&&PLDR_VERSION==='1.1.0-rc.50',
- 'R69 native test running exact 1.1.0-rc.50 candidate');
+f12_r69_assert(defined('PLDR_VERSION')&&PLDR_VERSION==='1.1.0-rc.51',
+ 'R69 native test running exact 1.1.0-rc.51 candidate');
 global $wpdb;
 $now=PLDR_Core::now();
 $admin=get_users(['role'=>'administrator','number'=>1,'fields'=>'ID']);

@@ -201,6 +201,7 @@ final class PLDR_Future {
             'nonce' => wp_create_nonce('wp_rest'),
             'features' => self::FEATURES,
             'loggedIn' => is_user_logged_in(),
+            'userId' => get_current_user_id(),
         )) . ';', 'before');
     }
 
