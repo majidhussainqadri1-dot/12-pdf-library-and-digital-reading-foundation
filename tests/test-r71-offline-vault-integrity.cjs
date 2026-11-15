@@ -10,7 +10,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const {createHash,webcrypto}=require('node:crypto');
 const vault=fs.readFileSync(path.join(__dirname,'..','pdf-library-foundation-12','assets','future-reader-vault.js'),'utf8');
-const original=Buffer.from('test-pdf-byte-content-2026','ascii');
+const original=Buffer.from('%PDF-1.7\\nsynthetic-test-pdf-byte-content-2026','ascii');
 const expectedHash=createHash('sha256').update(original).digest('hex');
 
 function fakeIndexedDb(){
