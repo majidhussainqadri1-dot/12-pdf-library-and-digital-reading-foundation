@@ -38,10 +38,11 @@ php -r '
     if(is_string($path)&&preg_match("/^[A-Za-z0-9._\/-]+$/D",$path)){echo $path,"\n";}
   }
 '
-printf '\n[File12 physical database-version wp_option]\n'
-wp --path="$root" --skip-plugins --skip-themes db query "SELECT option_value AS db_version_option FROM $opts WHERE option_name='pldr_db_version' LIMIT 1"
-printf '\n[Migration/upgrade markers: option names only, never lock tokens]\n'
-wp --path="$root" --skip-plugins --skip-themes db query "SELECT option_name,'PRESENT' AS state FROM $opts WHERE option_name IN ('pldr_migration_lock','pldr_migration_state','pldr_deferred_upgrade') ORDER BY option_name"
+printf '\n[Allowlisted exact core/Future/correction schema versions; invalid values redacted]\n'
+wp --path="$root" --skip-plugins --skip-themes db query "SELECT option_name,CASE WHEN option_value REGEXP '^[0-9A-Za-z._-]{1,64}$' THEN option_value ELSE '[REDACTED_OR_INVALID]' END AS version_or_revision FROM $opts WHERE option_name IN ('pldr_db_version','pldr_contract_version','pldr_future_db_version','pldr_future_schema_revision','pldr_schema_corrections_revision') ORDER BY option_name"
+printf '\n[Migration/upgrade/repair/error markers: names only, never option values or lock tokens]\n'
+wp --path="$root" --skip-plugins --skip-themes db query "SELECT option_name,'PRESENT' AS state FROM $opts WHERE option_name IN ('pldr_migration_lock','pldr_future_migration_lock','pldr_migration_state','pldr_deferred_upgrade','pldr_legacy_migration_state','pldr_schema_error','pldr_future_schema_error','pldr_future_loader_error','pldr_rewrite_flush_needed') ORDER BY option_name"
+printf 'An absent version or marker is UNVERIFIED, not proof of successful migration.\n'
 printf '\n[Physical File12 tables; approximate row counts, no row content]\n'
 wp --path="$root" --skip-plugins --skip-themes db query "SELECT TABLE_NAME,ENGINE,TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME REGEXP '$pattern' ORDER BY TABLE_NAME"
 printf '\n[Physical File12 columns and types]\n'
@@ -56,7 +57,11 @@ for plugin_name in pdf-library-foundation-12 12-pdf-library-foundation; do
   found=1
   printf 'PLUGIN_ROOT=%s\n' "$plugin_name"
   entry="$plugin/pdf-library-digital-reading.php"
-  if [ -f "$entry" ]; then sha256sum "$entry"; else printf 'ENTRYPOINT_MISSING\n'; fi
+  if [ -f "$entry" ]; then
+    sha256sum "$entry"
+    # Read the file header as data only; do not execute the installed PHP plugin.
+    php -r '$raw=@file_get_contents($argv[1]);$m=[];if(is_string($raw))preg_match("/^[ \t*\/]*Version:[ \t]*([0-9A-Za-z._-]+)/m",$raw,$m);echo "PLUGIN_HEADER_VERSION=".($m[1]??"UNVERIFIED").PHP_EOL;' "$entry"
+  else printf 'ENTRYPOINT_MISSING\n'; fi
   ( cd "$plugin" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum | sha256sum )
 done
 if [ "$found" -eq 0 ]; then
