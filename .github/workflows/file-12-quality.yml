@@ -208,6 +208,8 @@ jobs:
         run: node tests/test-r71-offline-vault-integrity.cjs
       - name: R72 offline vault must recheck current rights on online open
         run: node tests/test-r72-offline-current-rights.cjs
+      - name: R73 cross-account encrypted offline isolation RED-first
+        run: node tests/test-r73-offline-user-identity.cjs
       - name: Exact candidate version markers
         run: |
           grep -F "Version: 1.1.0-rc.47" pdf-library-foundation-12/pdf-library-digital-reading.php
