@@ -1,0 +1,3 @@
+"path","baseline_blob_sha","candidate_blob_sha","candidate_bytes","introduced_at_sha","audit_status","runtime_status","reason"
+"pdf-library-foundation-12/assets/reader.js","7b05e1de495ecda8131b79922040e5ec781d2ab1","c9c8fa48c37cbd1fe346f84b511175ce1eee06a4","16973","8bbcc72b464f8b2ad26ed91681e9811d38caae5b","SOURCE_DELTA_AWAITING_INDEPENDENT_REVIEW","UNVERIFIED","R79 continue signed byte-range requests with refreshed delivery URL"
+"pdf-library-foundation-12/pdf-library-digital-reading.php","bb06a955b016deec69afefd3c557135a89111b7b","0828f23bb3d3b8cb3705fd95a1953e951933f806","3031","d7423c8cdd4fadf829bfdadce85741eb099319e0","SOURCE_DELTA_AWAITING_INDEPENDENT_REVIEW","UNVERIFIED","R79 rc53 source candidate only; DB version remains 1.1.0"
