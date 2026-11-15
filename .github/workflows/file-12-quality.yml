@@ -213,6 +213,8 @@ jobs:
         run: node tests/test-r69-reader-guest-private-requests.cjs
       - name: R70 signed download byte-range RED-first regression
         run: node tests/test-r70-reader-range-integrity.cjs
+      - name: R79 RED-first signed URL continuation after token refresh
+        run: node tests/test-r79-renewal-url-continuation.cjs
       - name: R71 RED-first encrypted offline vault range and SHA-256
         run: node tests/test-r71-offline-vault-integrity.cjs
       - name: R72 offline vault must recheck current rights on online open
@@ -231,7 +233,7 @@ jobs:
         run: node tests/test-r74-personal-context-dom-url.cjs
       - name: Exact candidate version markers
         run: |
-          grep -F "Version: 1.1.0-rc.52" pdf-library-foundation-12/pdf-library-digital-reading.php
+          grep -F "Version: 1.1.0-rc.53" pdf-library-foundation-12/pdf-library-digital-reading.php
           grep -F "define('PLDR_DB_VERSION', '1.1.0')" pdf-library-foundation-12/pdf-library-digital-reading.php
           grep -F "F12-FUT-024" pdf-library-foundation-12/includes/class-pldr-future.php
           grep -F "Final defect rounds: **4, 6, 7, 9, 12, 14, 17, 20**." docs/TWENTY-ROUND-REVIEW-2026-08-29-R25.md
@@ -242,12 +244,12 @@ jobs:
           LC_ALL=C find pdf-library-foundation-12 -type f -print0 | sort -z | xargs -0 -n1 sha256sum > dist/SOURCE-SHA256SUMS
           cp -a pdf-library-foundation-12 build/
           find build/pdf-library-foundation-12 -exec touch -t 202601010000 {} +
-          (cd build && find pdf-library-foundation-12 -type f -print | LC_ALL=C sort | zip -X -q ../dist/12-pdf-library-and-digital-reading-1.1.0-rc.52.zip -@)
-          sha256sum dist/12-pdf-library-and-digital-reading-1.1.0-rc.52.zip | tee dist/SHA256SUMS
-          unzip -t dist/12-pdf-library-and-digital-reading-1.1.0-rc.52.zip
+          (cd build && find pdf-library-foundation-12 -type f -print | LC_ALL=C sort | zip -X -q ../dist/12-pdf-library-and-digital-reading-1.1.0-rc.53.zip -@)
+          sha256sum dist/12-pdf-library-and-digital-reading-1.1.0-rc.53.zip | tee dist/SHA256SUMS
+          unzip -t dist/12-pdf-library-and-digital-reading-1.1.0-rc.53.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: file-12-pdf-library-1.1.0-rc.52
+          name: file-12-pdf-library-1.1.0-rc.53
           path: dist/
           if-no-files-found: error
 
