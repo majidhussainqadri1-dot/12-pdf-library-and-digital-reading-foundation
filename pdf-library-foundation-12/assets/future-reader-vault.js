@@ -9,11 +9,36 @@
   const clearEdition=async(announce=true)=>{try{const db=await openDb(),tx=db.transaction(['chunks','meta'],'readwrite'),store=tx.objectStore('chunks'),r=store.openCursor();r.onsuccess=()=>{const c=r.result;if(c){if(String(c.key).startsWith(`${F.editionId}:`))c.delete();c.continue();}};tx.objectStore('meta').delete(String(F.editionId));await new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error||new Error('Offline vault clear failed.'));tx.onabort=()=>rej(tx.error||new Error('Offline vault clear was aborted.'));});db.close();if(announce)F.say('Offline vault cleared for this edition.');return true;}catch(e){if(announce)F.say(e.message);return false;}};
   const clearAllOnce=async()=>new Promise(resolve=>{if(!window.indexedDB)return resolve(true);const r=indexedDB.deleteDatabase(DB);r.onsuccess=()=>resolve(true);r.onerror=r.onblocked=()=>resolve(false);});
   const clearAll=async()=>{for(let attempt=0;attempt<3;attempt++){if(await clearAllOnce())return true;await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));}return false;};
-  const purgeLoggedOut=async()=>{const ok=await clearAll();try{if(ok){localStorage.removeItem('pldrOfflinePurgePending');localStorage.removeItem('pldrOfflineReconnectReauth');}else localStorage.setItem('pldrOfflinePurgePending','1');}catch(_){}if(!ok)console.warn('[PLDR] Encrypted offline vault purge remains pending and will retry on a later logged-out page load.');};
+  const purgeLoggedOut=async()=>{const ok=await clearAll();try{if(ok){localStorage.removeItem('pldrOfflinePurgePending');localStorage.removeItem('pldrOfflineReconnectReauth');localStorage.removeItem('pldrOfflineReauthDenied:'+F.editionId);}else localStorage.setItem('pldrOfflinePurgePending','1');}catch(_){}if(!ok)console.warn('[PLDR] Encrypted offline vault purge remains pending and will retry on a later logged-out page load.');};
   const reconnectPending=()=>{try{return localStorage.getItem('pldrOfflineReconnectReauth')==='1';}catch(_){return false;}};
   const markReconnectPending=()=>{try{localStorage.setItem('pldrOfflineReconnectReauth','1');}catch(_){}};
   const clearReconnectPending=()=>{try{localStorage.removeItem('pldrOfflineReconnectReauth');}catch(_){}};
-  const reauthorizeAfterReconnect=async()=>{if(!F.future.loggedIn||!navigator.onLine)return false;try{const d=await F.api(`offline-authorization/${F.editionId}`);if(!d?.authorized)throw new Error('Offline authorization is no longer valid.');clearReconnectPending();return true;}catch(e){F.say(`${e.message||'Offline authorization could not be revalidated after reconnect.'} The encrypted local copy was retained but will not be opened until server authorization succeeds or it expires.`);return false;}};
+  // Once this device has actually observed a failed online rights recheck,
+  // later going offline must not reopen a cached book under stale rights.
+  // This is distinct from the ordinary "offline event" flag: users must
+  // retain permitted local reading during an initial genuine offline period.
+  const deniedKey='pldrOfflineReauthDenied:'+F.editionId;
+  const offlineReauthDenied=()=>{try{return localStorage.getItem(deniedKey)==='1';}catch(_){return true;}};
+  const markOfflineReauthDenied=()=>{try{localStorage.setItem(deniedKey,'1');return true;}catch(_){return false;}};
+  const clearOfflineReauthDenied=()=>{try{localStorage.removeItem(deniedKey);return true;}catch(_){return false;}};
+
+  const reauthorizeAfterReconnect=async()=>{if(!F.future.loggedIn||!navigator.onLine)return false;try{
+    const d=await F.api('offline-authorization/'+F.editionId);
+    if(d?.authorized!==true)throw new Error('Offline authorization is no longer valid.');
+    if(!clearOfflineReauthDenied())throw new Error('Offline authorization could not be recorded locally.');
+    clearReconnectPending();
+    return true;
+  }catch(e){
+    // Keep a durable deny latch so an online revocation cannot be bypassed
+    // by toggling offline or restarting the browser. If storage is disabled,
+    // purge the cached ciphertext instead of making an unverifiable promise.
+    const durable=markOfflineReauthDenied();
+    if(!durable)await clearEdition(false);
+    F.say((e.message||'Offline authorization could not be revalidated after reconnect.')+
+      (durable?' The local copy remains locked until online authorization succeeds.':
+        ' Local authorization could not be persisted, so cached data was purged.'));
+    return false;
+  }};
   // Offline reading is intentionally bounded while the browser's native
   // SHA-256 API requires a complete ArrayBuffer. A larger vault must use a
   // separately audited incremental digest, not silently skip verification.
@@ -83,7 +108,7 @@
         storedAt:Date.now(),aadVersion:1,
         policy:'128 MiB max; exact ranges and full SHA-256 verified; encrypted non-extractable WebCrypto key; expiry and reconnect authorization'
       });
-      clearReconnectPending();
+      clearOfflineReauthDenied();clearReconnectPending();
       F.say('Encrypted offline vault stored with a non-extractable WebCrypto key; original file SHA-256 verified.');
     }catch(error){await clearEdition(false);F.say(error.message||'Encrypted offline vault failed.');}finally{
       for(const part of plaintext){try{new Uint8Array(part).fill(0);}catch(_){}}
@@ -109,6 +134,7 @@
         throw new Error('Offline-vault manifest has invalid size, SHA-256 or chunk count.');
       }
       // Online openings must always recheck owner rights; the offline event may have been missed by a closed browser.
+      if(!navigator.onLine&&offlineReauthDenied()){F.say('Offline cache was denied after a previous online rights check; reconnect and obtain authorization first.');return;}
       if(navigator.onLine&&!await reauthorizeAfterReconnect())return;
       const k=await key(),chunks=[];
       let nextOffset=0;
