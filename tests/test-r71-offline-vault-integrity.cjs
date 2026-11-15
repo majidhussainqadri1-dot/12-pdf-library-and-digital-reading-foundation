@@ -133,7 +133,7 @@ async function simulate(kind){
   for(const kind of ['http-200','wrong-content-range','truncated','wrong-digest','missing-hash']){
     const result=await simulate(kind);
     assert.equal(result.meta,undefined,kind+' must not persist a false verified offline copy');
-    assert.equal(result.ranges,1,kind+' must stop after its first invalid capture response');
+    assert.equal(result.ranges,kind==='missing-hash'?0:1,kind+' must stop at the first invalid grant/response');
     assert.ok(result.messages.some(x=>/range|checksum|digest|sha-256|invalid|manifest/i.test(x)),
       kind+' must explain why capture was rejected: '+JSON.stringify(result.messages));
   }
