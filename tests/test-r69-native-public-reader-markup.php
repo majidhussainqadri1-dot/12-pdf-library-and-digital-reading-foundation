@@ -1,6 +1,6 @@
 <?php
 /**
- * R69 positive native WordPress rendering: source candidate rc.44.
+ * R69 positive native WordPress rendering: R69 behavior inherited by new R70 rc.45 source candidate.
  * Ephemeral MySQL metadata-only public PDF candidate, WITHOUT real object
  * bytes, copyright book, CF04 storage or any actual delivery.
  */
@@ -13,8 +13,8 @@ function f12_r69_assert(bool $ok,string $description):void{
  if(!$ok){fwrite(STDERR,"R69 NATIVE FAIL: ".$description."\n");exit(1);}
  echo "PASS: ".$description."\n";
 }
-f12_r69_assert(defined('PLDR_VERSION')&&PLDR_VERSION==='1.1.0-rc.44',
- 'R69 native test running exact 1.1.0-rc.44 candidate');
+f12_r69_assert(defined('PLDR_VERSION')&&PLDR_VERSION==='1.1.0-rc.45',
+ 'R69 native test running exact 1.1.0-rc.45 candidate');
 global $wpdb;
 $now=PLDR_Core::now();
 $admin=get_users(['role'=>'administrator','number'=>1,'fields'=>'ID']);
