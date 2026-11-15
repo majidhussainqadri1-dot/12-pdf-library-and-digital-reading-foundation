@@ -42,7 +42,7 @@ function makeDb(preloaded){
     queueMicrotask(()=>req.onsuccess?.());return req;
   }};
 }
-async function simulate({online,authorized}){
+async function simulate({online,authorized,retryOffline=false}){
   const editionId=700;
   const bytes=Buffer.from('signed-synthetic-PDF-offline');
   const sha=createHash('sha256').update(bytes).digest('hex');
@@ -72,21 +72,28 @@ async function simulate({online,authorized}){
     },
     root:{addEventListener(name,cb){handlers['root:'+name]=cb;}}
   };
-  const localStorage={getItem:()=>null,setItem(){},removeItem(){}};
+  const saved=new Map();
+  const localStorage={getItem:k=>saved.get(k)||null,setItem(k,v){saved.set(k,String(v));},removeItem:k=>saved.delete(k)};
   const window={PLDRF24:F,indexedDB:idb,crypto:webcrypto,open(){opens++;},addEventListener(){}};
+  const navigator={onLine:online};
   const sandbox={window,crypto:webcrypto,indexedDB:idb,localStorage,
-    navigator:{onLine:online},Blob,TextEncoder,Date,URL:{
+    navigator,Blob,TextEncoder,Date,URL:{
       createObjectURL:()=>'/synthetic-local-blob',revokeObjectURL(){}
     },setTimeout(){return 1;},clearTimeout(){},console};
   vm.runInNewContext(source,sandbox,{timeout:2000,filename:'future-reader-vault.js'});
   handlers['root:click']({target:{closest(){return {dataset:{f24Action:'offline'}};}}});
   await handlers['[data-vault-open]']();
-  return {authCalls,opens,messages};
+  if(retryOffline){navigator.onLine=false;await handlers['[data-vault-open]']();}
+  return {authCalls,opens,messages,storedReauthDenied:saved.get('pldrOfflineReauthDenied:'+editionId)||null};
 }
 (async()=>{
   const revoked=await simulate({online:true,authorized:false});
   assert.equal(revoked.authCalls,1,'online offline-vault open must consult current rights even without reconnect flag');
   assert.equal(revoked.opens,0,'revoked online PDF must never open from stale encrypted cache');
+  const afterDenial=await simulate({online:true,authorized:false,retryOffline:true});
+  assert.equal(afterDenial.authCalls,1,'offline retry must not fabricate online request');
+  assert.equal(afterDenial.opens,0,'after observed online revocation, stale offline copy must remain blocked');
+  assert.equal(afterDenial.storedReauthDenied,'1','offline-revocation denial should be durable across browser restart');
   const approved=await simulate({online:true,authorized:true});
   assert.equal(approved.authCalls,1,'approved online open still revalidates server authorization');
   assert.equal(approved.opens,1,'approved online opening remains available');
