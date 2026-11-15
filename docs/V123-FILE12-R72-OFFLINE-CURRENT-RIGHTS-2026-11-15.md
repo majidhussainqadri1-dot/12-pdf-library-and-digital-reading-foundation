@@ -20,6 +20,15 @@ Date: 2026-11-15
 - New version marker `rc.47`; immutable source version overlays: rc.43 58 exact baseline blob IDs, rc.44 (3 deltas), rc.45 (2), rc.46 (2), rc.47 (2). No historic source evidence overwritten.
 - **GREEN** GitHub Actions run `43686569205` on exact candidate SHA `68d6081463b71ee82174dd20c691728ee52c5851`: seven of seven jobs including PHP 8.1/8.3/8.4, native isolated WordPress/MySQL 7.0.1 and 7.1.4, Node frontend and Chromium synthetic browser.
 
+## R72 supplementary negative test: online denial followed by offline reopening
+
+- Extended the **same R72 defect acceptance**, not a newly asserted Live incident: after an online owner response `authorized=false`, a subsequent offline opening in the same device must be prohibited even when the offline PDF local expiry has not elapsed.
+- The real-JS synthetic regression `tests/test-r72-offline-current-rights.cjs` now verifies current rights on online opening, persistence of a per-edition denied reauthorization marker `pldrOfflineReauthDenied:<edition>`, and prevention of later offline bypass.
+- The corrected source uses a dedicated per-edition, durable denial latch distinct from the usual `offline` network-event marker, so an initial genuinely offline reading period is still permitted within its original grant.
+- A later successful **online** current-rights check can clear the denial latch; failure to persist its denied state triggers local-copy purge rather than falsely promising lockout.
+- Parent rc.46 inventory, source rc.47 version and declared DB `1.1.0` remain unchanged; the rc.47 two-file delta overlay is updated with final source blob SHA and UTF-8 byte count. The exact GitHub CI record for this supplemental correction is separate from the earlier `43686569205` run.
+- This remains a **source-only** safety measure; authorized real host/device/browser tests and genuine rights-policy obligations remain unverified.
+
 ## Residual scope and mandatory stop-ship
 - A genuinely offline browser cannot query server rights and is allowed only the previously issued, locally unexpired offline grant. Current owner can revoke remote access when online, subject to the documented offline-grant window; strict instant global revocation while disconnected is not cryptographically demonstrable here.
 - Real installed keys, true edition rights, licensed PDF source and 128MiB offline cap on actual phones/tablets must be staged and tested.
