@@ -76,6 +76,39 @@ while(($values=fgetcsv($rc45Handle,0,',','"','\\'))!==false){
 fclose($rc45Handle);
 if(count($rc45)!==2){fwrite(STDERR,"rc.45 overlay must contain exactly two source deltas\n");exit(1);}
 
+// R71 third chained overlay. rc.43 baseline, rc.44 overlay and rc.45 overlay
+// must be retained exactly, even for files revised by rc.46.
+$rc46File=$root.'/docs/V123-FILE12-RC46-SOURCE-DELTA-OVERLAY.csv';
+$rc46=[];
+$rc46Fields=['path','baseline_blob_sha','candidate_blob_sha','candidate_bytes','introduced_at_sha','audit_status','runtime_status','reason'];
+$rc46Handle=@fopen($rc46File,'rb');
+if(!$rc46Handle){fwrite(STDERR,"Missing rc.46 immutable R71 source delta overlay\n");exit(1);}
+$rc46Header=fgetcsv($rc46Handle,0,',','"','\\');
+if($rc46Header!==$rc46Fields){fwrite(STDERR,"rc.46 source delta overlay schema mismatch\n");exit(1);}
+while(($values=fgetcsv($rc46Handle,0,',','"','\\'))!==false){
+ if($values===[null])continue;
+ if(count($values)!==count($rc46Fields)){fwrite(STDERR,"Malformed rc.46 delta row\n");exit(1);}
+ $record=array_combine($rc46Fields,$values);
+ $path46=(string)$record['path'];
+ if(isset($rc46[$path46])||!in_array($path46,[
+   'pdf-library-foundation-12/assets/future-reader-vault.js',
+   'pdf-library-foundation-12/pdf-library-digital-reading.php'
+ ],true)){fwrite(STDERR,"Unexpected or duplicated rc.46 source delta ".$path46."\n");exit(1);}
+ foreach(['baseline_blob_sha','candidate_blob_sha','introduced_at_sha'] as $field){
+   if(!preg_match('/^[0-9a-f]{40}$/D',(string)$record[$field])){
+     fwrite(STDERR,"Invalid rc.46 SHA provenance ".$path46."\n");exit(1);
+   }
+ }
+ if((string)$record['audit_status']!=='SOURCE_DELTA_AWAITING_INDEPENDENT_REVIEW'
+   ||(string)$record['runtime_status']!=='UNVERIFIED'
+   ||trim((string)$record['reason'])===''||!ctype_digit((string)$record['candidate_bytes'])){
+     fwrite(STDERR,"Invalid rc.46 review status ".$path46."\n");exit(1);
+ }
+ $rc46[$path46]=$record;
+}
+fclose($rc46Handle);
+if(count($rc46)!==2){fwrite(STDERR,"rc.46 overlay must contain two source deltas\n");exit(1);}
+
 while(($v=fgetcsv($in,0,',','"','\\'))!==false){
  if($v===[null])continue;
  if(count($v)!==count($h)){$failures[]="bad row";continue;}
@@ -91,18 +124,30 @@ while(($v=fgetcsv($in,0,',','"','\\'))!==false){
  $blob=sha1('blob '.$bytes."\0".$raw);
  $base=(string)$r['git_blob_sha'];
  $currentIsFrozen=((string)$r['bytes']===(string)$bytes && strtolower($base)===$blob);
- if(isset($rc45[$p])){
-   $new=$rc45[$p];
-   // Parent is the immutable rc.44 overlay (or rc.43 for a previously
-   // untouched source file); the full earlier baseline remains mandatory.
-   $parentBlob=isset($overlay[$p])?(string)$overlay[$p]['candidate_blob_sha']:$base;
-   $parentBytes=isset($overlay[$p])?(string)$overlay[$p]['candidate_bytes']:(string)$r['bytes'];
+ // Validate the complete historical lineage even when a later version
+ // changes the same plugin file again.
+ if(isset($overlay[$p])&&strtolower((string)$overlay[$p]['baseline_blob_sha'])!==strtolower($base))
+   $failures[]="Invalid rc.44 parent baseline: ".$p;
+ $rc45Parent=isset($overlay[$p])?(string)$overlay[$p]['candidate_blob_sha']:$base;
+ if(isset($rc45[$p])&&strtolower((string)$rc45[$p]['baseline_blob_sha'])!==strtolower($rc45Parent))
+   $failures[]="Invalid rc.45 parent baseline: ".$p;
+ if(isset($rc46[$p])){
+   $new=$rc46[$p];
+   $parentBlob=isset($rc45[$p])?(string)$rc45[$p]['candidate_blob_sha']:$rc45Parent;
+   $parentBytes=isset($rc45[$p])?(string)$rc45[$p]['candidate_bytes']:(isset($overlay[$p])?(string)$overlay[$p]['candidate_bytes']:(string)$r['bytes']);
    if(strtolower((string)$new['baseline_blob_sha'])!==strtolower($parentBlob)
      ||strtolower((string)$new['candidate_blob_sha'])!==$blob
      ||(string)$new['candidate_bytes']!==(string)$bytes
-     ||($blob===$parentBlob && (string)$bytes===$parentBytes)){
+     ||($blob===$parentBlob&&(string)$bytes===$parentBytes))
+       $failures[]="Invalid or unrecorded rc.46 source delta: ".$p;
+ }elseif(isset($rc45[$p])){
+   $new=$rc45[$p];
+   $parentBytes=isset($overlay[$p])?(string)$overlay[$p]['candidate_bytes']:(string)$r['bytes'];
+   if(strtolower((string)$new['baseline_blob_sha'])!==strtolower($rc45Parent)
+     ||strtolower((string)$new['candidate_blob_sha'])!==$blob
+     ||(string)$new['candidate_bytes']!==(string)$bytes
+     ||($blob===$rc45Parent&&(string)$bytes===$parentBytes))
        $failures[]="Invalid or unrecorded rc.45 source delta: ".$p;
-   }
  }elseif(isset($overlay[$p])){
    $patch=$overlay[$p];
    if(strtolower((string)$patch['baseline_blob_sha'])!==strtolower($base)
@@ -129,5 +174,5 @@ foreach($iter as $candidate){
 foreach($actual as $p=>$_)if(!isset($seen[$p]))$failures[]="unregistered plugin file: ".$p;
 if($count!==58||count($actual)!==58)$failures[]="Source file-count mismatch: inventoried ".$count."; plugin files ".count($actual);
 if($failures){fwrite(STDERR,implode("\n",$failures)."\n");exit(1);}
-echo "V12.3 File12 SOURCE inventory PASS: 58 original rc.43 blobs verified, plus ".count($overlay)." rc.44 and ".count($rc45)." rc.45 exact candidate deltas (no overwritten baseline). ";
+echo "V12.3 File12 SOURCE inventory PASS: 58 original rc.43 blobs verified, plus ".count($overlay)." rc.44 and ".count($rc45)." rc.45 and ".count($rc46)." rc.46 exact candidate deltas (no overwritten baseline). ";
 echo "All delta reviews and Hostinger deployed package, DB, and runtime remain UNVERIFIED.\n";
