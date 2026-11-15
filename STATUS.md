@@ -1,3 +1,16 @@
+# R70/R71/R72 — V12.3 exact-source candidate rc.47 (2026-11-15; DRAFT, NO DEPLOY)
+- New reproduced **source-only** defects: three, recorded as R70 (signed reader HTTP byte-range and grant identity), R71 (offline vault exact ranges and authenticated plaintext SHA-256), R72 (online current-rights recheck and durable denied-recheck lockout). Older R64–R69: six. **Total source defects documented R64–R72: nine; nine Draft source-level corrections; 0 Live-proven corrections.**
+- Branch PR #66 on #65 source: `1.1.0-rc.45`, exact SHA `7b58c4d8a13d8849277a72df0ae76ec6e863fdc9`, Actions run `43685437189` 7/7 success. PR #67 on #66: `1.1.0-rc.46`, SHA `c8cb21794288cef836d711339bb1ae0fc82248b4`, Actions `43686124624` 7/7. PR #68 on #67: `1.1.0-rc.47`, initial SHA `68d6081463b71ee82174dd20c691728ee52c5851`, Actions `43686569205` 7/7. Follow-on R72 durable offline denial-latch hardening and exact newer HEAD QA tracked separately in `docs/V123-FILE12-R72-OFFLINE-CURRENT-RIGHTS-2026-11-15.md`. All revisions remain **Draft/unmerged**, not installed.
+- Exact source inventory now chains original frozen 58-file rc43 baseline through immutable three-file rc44 + two-file rc45 + two-file rc46 + two-file rc47 overlays. New JS tests run actual clients in bounded Node VM with synthetic WebCrypto/IDB; native WordPress/MySQL 7.0.1 and 7.1.4 and Chromium are disposable evidence, not Hostinger proof.
+- Offline capture currently bounded to 128 MiB for whole-file WebCrypto SHA-256; larger offline originals require an independently audited bounded-memory incremental integrity strategy. Reader large-file client digest status must remain truthful.
+- Ten existing stop-ship categories remain. All 39 historic Stage, 54 runtime requirements, 10 CF04, 77 V12.3 Stage/Live and 60 QA15–24 runtime cases unverified. Neither CI nor WordPress.com site listing proves installed code, physical DB, migration or rights revocation.
+- Hostinger Jetpack site scope was disconnected and WPVibe site connection returned HTTP530; these are connector symptoms, not a diagnosed host-origin/security failure. Source repairs never modify a live application.
+- **Five release truths:** main HEAD `2b369ef2d609247896e1ab32118f1dc498407f51`; Deployed Version **UNVERIFIED**; DB Version **UNVERIFIED**; Migration State **UNVERIFIED**; Live Verification **NOT PERFORMED**. **NO_GO**. See `docs/V123-FILE12-R70-R72-COMPLETION-AND-BLOCKER-HANDOFF-2026-11-15.md`.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
 # R64/R65 — staging reality before pass and completed retest — candidate rc.43 (2026-11-13)
 - Source Draft PR #57 stacked on #56; explicit independent RED-first source reproductions for false staging PASS and missing defect retest, corrected in non-deploying CLI.
 - 2 newly demonstrated source release-governance defects fixed. Original real ledgers remain all UNVERIFIED, no proof invented; R60/R64/R65 native PHPUnit-free PHP fixtures pass.
