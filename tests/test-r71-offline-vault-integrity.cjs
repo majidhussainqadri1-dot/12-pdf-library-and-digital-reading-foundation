@@ -76,7 +76,7 @@ async function simulate(kind){
         url:'/synthetic-offline',
         size:original.length,
         sha256:kind==='missing-hash'?'':expectedHash,
-        actor_id:17,
+        actor_id:kind==='foreign-actor'?18:17,
         filename:'licensed-synthetic.pdf',mime_type:'application/pdf',
         offline_valid_until:'2099-01-01T00:00:00Z'
       };
@@ -131,11 +131,11 @@ async function simulate(kind){
   const success=await simulate('valid');
   assert.ok(success.meta,'exact ranges and matching SHA-256 must store encrypted vault metadata');
   assert.ok(success.messages.some(x=>/stored with a non-extractable/i.test(x)));
-  for(const kind of ['http-200','wrong-content-range','truncated','wrong-digest','missing-hash']){
+  for(const kind of ['http-200','wrong-content-range','truncated','wrong-digest','missing-hash','foreign-actor']){
     const result=await simulate(kind);
     assert.equal(result.meta,undefined,kind+' must not persist a false verified offline copy');
-    assert.equal(result.ranges,kind==='missing-hash'?0:1,kind+' must stop at the first invalid grant/response');
-    assert.ok(result.messages.some(x=>/range|checksum|digest|sha-256|invalid|manifest/i.test(x)),
+    assert.equal(result.ranges,['missing-hash','foreign-actor'].includes(kind)?0:1,kind+' must stop at the first invalid grant/response');
+    assert.ok(result.messages.some(x=>/range|checksum|digest|sha-256|invalid|manifest|actor|account|identity/i.test(x)),
       kind+' must explain why capture was rejected: '+JSON.stringify(result.messages));
   }
   console.log('R71 offline-vault exact byte ranges and full SHA-256: PASS.');
