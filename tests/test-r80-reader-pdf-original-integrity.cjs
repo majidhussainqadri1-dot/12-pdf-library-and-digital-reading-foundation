@@ -51,7 +51,7 @@ async function scenario(kind){
   const fetch=async(url,options={})=>{
     if(String(url).includes('/downloads/session')){
       sessionCount++;
-      return {ok:true,status:200,json:async()=>grant(kind)};
+      return {ok:true,status:200,json:async()=>grant(kind==='renewal-wrong-mime'&&sessionCount>1?'wrong-mime':kind)};
     }
     if(String(url)!=='/synthetic-signed-range')throw new Error('Unrecognized synthetic URL '+url);
     const range=(options.headers||{}).Range;
@@ -59,6 +59,9 @@ async function scenario(kind){
     assert.ok(m,'A bounded HTTP Range request is required');
     const start=Number(m[1]),end=Number(m[2]);
     rangeRequests.push([start,end]);
+    if(kind==='renewal-wrong-mime'&&rangeRequests.length===1){
+      return {ok:false,status:403,headers:{get:()=>null}};
+    }
     const code=206;
     let responseStart=start,responseEnd=end;
     if(kind==='wrong-range')responseStart=start+1;
@@ -96,11 +99,16 @@ async function scenario(kind){
   const html=await scenario('fake-pdf');
   assert.equal(html.attachmentClicks,0,'HTML-disguised original must never be saved, even when SHA-256 matches');
   assert.match(html.dmStatus,/PDF|signature|header|file/i,'non-PDF bytes must have a clear rejection');
+  assert.equal(html.rangeRequests.length,2,'malformed first five PDF bytes must stop before the remaining ranges');
   const mime=await scenario('wrong-mime');
   assert.equal(mime.attachmentClicks,0,'non-PDF manifest MIME must be denied');
   assert.match(mime.dmStatus,/mime|PDF|type/i,'bad MIME must be explained');
   const ext=await scenario('unsafe-extension');
   assert.equal(ext.attachmentClicks,0,'unsafe non-PDF attachment filename must be rejected');
   assert.match(ext.dmStatus,/extension|filename|PDF/i,'unsafe extension must be explained');
+  const renewed=await scenario('renewal-wrong-mime');
+  assert.equal(renewed.sessionCount,2,'expired grant must be replaced once');
+  assert.equal(renewed.attachmentClicks,0,'refreshed token with mismatched PDF MIME must fail closed');
+  assert.match(renewed.dmStatus,/MIME|PDF|type/i,'renewal mismatch must be explainable');
   console.log('R80 signed PDF download filename/MIME/header content gates: PASS');
 })().catch(error=>{console.error(error.stack||error);process.exit(1);});
