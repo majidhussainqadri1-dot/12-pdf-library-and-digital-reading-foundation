@@ -24,7 +24,39 @@
 
   const reauthorizeAfterReconnect=async()=>{if(!F.future.loggedIn||!navigator.onLine)return false;try{
     const d=await F.api('offline-authorization/'+F.editionId);
-    if(d?.authorized!==true)throw new Error('Offline authorization is no longer valid.');
+    if(d?.authorized!==true||Number(d?.edition_id)!==Number(F.editionId)){
+      throw new Error('Offline authorization is no longer valid for this book edition.');
+    }
+    // Authorization may still be valid while the owner's license expiry has
+    // moved earlier. Persist the restrictive bound before opening, or fail
+    // closed. In-memory checks alone are bypassed after the browser restarts.
+    const cached=await req('meta','readonly',String(F.editionId));
+    if(cached){
+      const oldExpiry=Date.parse(cached.offlineValidUntil||'');
+      if(!Number.isFinite(oldExpiry)||oldExpiry<=Date.now()){
+        throw new Error('The cached offline authorization has expired.');
+      }
+      const limit=d.rights_valid_until;
+      let rightsExpiry=Infinity;
+      if(limit!==null&&limit!==undefined&&limit!==''){
+        if(typeof limit!=='string'||
+           !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(limit)){
+          throw new Error('The current rights expiry is malformed; offline access was denied.');
+        }
+        rightsExpiry=Date.parse(limit);
+        if(!Number.isFinite(rightsExpiry)){
+          throw new Error('The current rights expiry cannot be parsed safely.');
+        }
+      }
+      const expires=Math.min(oldExpiry,rightsExpiry);
+      if(expires<=Date.now()){
+        throw new Error('The newly verified offline rights have expired.');
+      }
+      if(expires<oldExpiry){
+        await req('meta','readwrite',String(F.editionId),
+          Object.assign({},cached,{offlineValidUntil:new Date(expires).toISOString()}));
+      }
+    }
     if(!clearOfflineReauthDenied())throw new Error('Offline authorization could not be recorded locally.');
     clearReconnectPending();
     return true;
@@ -117,7 +149,7 @@
   };
   const open=async()=>{
     try{
-      const meta=await req('meta','readonly',String(F.editionId));
+      let meta=await req('meta','readonly',String(F.editionId));
       if(!meta){F.say('No encrypted offline copy exists for this edition.');return;}
       const expiry=Date.parse(meta.offlineValidUntil||'');
       if(!expiry||Date.now()>=expiry){
@@ -135,7 +167,17 @@
       }
       // Online openings must always recheck owner rights; the offline event may have been missed by a closed browser.
       if(!navigator.onLine&&offlineReauthDenied()){F.say('Offline cache was denied after a previous online rights check; reconnect and obtain authorization first.');return;}
-      if(navigator.onLine&&!await reauthorizeAfterReconnect())return;
+      if(navigator.onLine){
+        if(!await reauthorizeAfterReconnect())return;
+        // The REST check can narrow the saved licence. Re-read the committed
+        // metadata and verify it before decrypting the cached object.
+        const fresh=await req('meta','readonly',String(F.editionId));
+        const currentExpiry=Date.parse(fresh?.offlineValidUntil||'');
+        if(!fresh||!Number.isFinite(currentExpiry)||Date.now()>=currentExpiry){
+          throw new Error('The current offline license expiry is invalid or elapsed.');
+        }
+        meta=fresh;
+      }
       const k=await key(),chunks=[];
       let nextOffset=0;
       for(let i=0;i<count;i++){
