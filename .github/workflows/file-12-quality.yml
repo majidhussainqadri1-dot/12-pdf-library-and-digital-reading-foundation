@@ -213,6 +213,8 @@ jobs:
         run: node tests/test-r69-reader-guest-private-requests.cjs
       - name: R70 signed download byte-range RED-first regression
         run: node tests/test-r70-reader-range-integrity.cjs
+      - name: R79 RED-first signed URL continuation after token refresh
+        run: node tests/test-r79-renewal-url-continuation.cjs
       - name: R71 RED-first encrypted offline vault range and SHA-256
         run: node tests/test-r71-offline-vault-integrity.cjs
       - name: R72 offline vault must recheck current rights on online open
