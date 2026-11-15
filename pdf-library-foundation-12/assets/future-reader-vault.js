@@ -40,7 +40,7 @@
       let rightsExpiry=Infinity;
       if(limit!==null&&limit!==undefined&&limit!==''){
         if(typeof limit!=='string'||
-           !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(limit)){
+           !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(limit)){
           throw new Error('The current rights expiry is malformed; offline access was denied.');
         }
         rightsExpiry=Date.parse(limit);
