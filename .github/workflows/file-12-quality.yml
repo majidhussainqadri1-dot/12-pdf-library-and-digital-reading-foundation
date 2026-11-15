@@ -204,6 +204,8 @@ jobs:
         run: node tests/test-r69-reader-guest-private-requests.cjs
       - name: R70 signed download byte-range RED-first regression
         run: node tests/test-r70-reader-range-integrity.cjs
+      - name: R71 RED-first encrypted offline vault range and SHA-256
+        run: node tests/test-r71-offline-vault-integrity.cjs
       - name: Exact candidate version markers
         run: |
           grep -F "Version: 1.1.0-rc.45" pdf-library-foundation-12/pdf-library-digital-reading.php
