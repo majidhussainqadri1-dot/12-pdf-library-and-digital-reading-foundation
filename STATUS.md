@@ -276,3 +276,19 @@ Candidate 1.1.0-rc.34; declared DB/schema/contract 1.1.0 unchanged. Parent R54 4
 **Live Verification Status:** NOT PERFORMED.
 
 **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+---
+
+## Latest 2026-11-15 R79 checkpoint — rc.53 Draft PR #77 — NO_GO
+
+The earlier entries above are historical snapshots, not the newest source candidate. This checkpoint has an exact **source-only** parent: PR #76 (rc.52) at commit `53d24c9d37371cb2619ce39d8b3ebe6be0435459`; its later documentation-only commit `6b707ee420e6ee89dd36eefd5639bb3dcc840321` is the PR #77 base. Source candidate `1.1.0-rc.53` changes only `assets/reader.js` plus the plugin-version entrypoint, with additional source tests, inventory and release evidence. Declared schema/contract remain `1.1.0`; this does not certify the installed database.
+
+**R79 reproduced:** old signed download URL was reused for each later PDF range after server refreshed the delivery grant. RED actual Reader VM run `43710936251` confirmed repeated token churn. Fix binds the current `delivery` to the renewed URL and keeps strict R70 size/SHA/range checks. GREEN source Actions run `43711280690` succeeded **7/7 jobs** for exact code+documentation commit `ad24613279789bacf79c6a364e6394ebc44f5c32`. Later CSV update is documentation-only and should receive its own exact HEAD CI check. No Hostinger staging/live verification has occurred.
+
+Current immutable source evidence includes **15 independently catalogued demonstrated defects**: R64–R76 (13), R78 (1), and R79 (1); all 15 have proposed Draft-only source fixes and **0 Live-verified fixes**. R77 is a read-only audit enhancement, **not** an invented 16th defect. Ten stop-ship categories still apply (5 CRITICAL, 5 HIGH): unmerged stacked PR release, active deployed package/hash, physical DB and migrations, installation-folder compatibility, File26 Book Pack contract and tombstone acknowledgements, CF04 private storage/scanner/restore, licensed originals, real staging acceptance, and independent two-review/Founder GO plus live postdeploy test.
+
+Do **not** treat successful GitHub CI as live completion. The following distinct acceptance sets remain **UNVERIFIED on staging**: 39 historic stage cases, 54 functional/runtime requirements, 10 CF04 stage requirements, 77 V12.3 stage and separately 77 V12.3 live items, and 60 QA15–24 scenarios. Overlaps exist; these are neither 317 independent defects nor validated functionality.
+
+**Mandatory reality:** Repository main HEAD `2b369ef2d609247896e1ab32118f1dc498407f51` (README only); Draft PR #77 candidate rc.53 (unmerged); Deployed Version UNVERIFIED; Physical DB Version UNVERIFIED; Migration State UNVERIFIED; Live Verification Status NOT PERFORMED; release NO_GO.
+
+Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔
