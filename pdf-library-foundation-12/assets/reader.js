@@ -205,6 +205,7 @@
               String(fresh.sha256 || '').toLowerCase() !== digest) {
             download.session = null; download.chunks = [];
             download.loaded = 0;
+            download.pdfHeaderVerified = false;
             throw new Error('Download object or checksum changed during renewal; restart with a new session.');
           }
           validatePdfDelivery(fresh);
@@ -245,6 +246,7 @@
           const hex = [...new Uint8Array(hashBytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
           if (hex.toLowerCase() !== digest) {
             download.session = null; download.chunks = []; download.loaded = 0;
+            download.pdfHeaderVerified = false;
             throw new Error('Download SHA-256 checksum mismatch; restart with a fresh session.');
           }
         }
