@@ -108,7 +108,8 @@
          !Number.isSafeInteger(count)||count<1||count>Math.ceil(MAX_OFFLINE_BYTES/(64*1024))){
         throw new Error('Offline-vault manifest has invalid size, SHA-256 or chunk count.');
       }
-      if(navigator.onLine&&reconnectPending()&&!await reauthorizeAfterReconnect())return;
+      // Online openings must always recheck owner rights; the offline event may have been missed by a closed browser.
+      if(navigator.onLine&&!await reauthorizeAfterReconnect())return;
       const k=await key(),chunks=[];
       let nextOffset=0;
       for(let i=0;i<count;i++){
