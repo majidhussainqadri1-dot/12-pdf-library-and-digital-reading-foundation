@@ -10,7 +10,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const {createHash,webcrypto}=require('node:crypto');
 const reader=fs.readFileSync(path.join(__dirname,'..','pdf-library-foundation-12','assets','reader.js'),'utf8');
-const original=Buffer.from('abcdefghijkl','ascii');
+const original=Buffer.from('%PDF-1.7abcd','ascii');
 const sha=createHash('sha256').update(original).digest('hex');
 const other='a'.repeat(64)===sha?'b'.repeat(64):'a'.repeat(64);
 function grant(hash=sha,url='/signed-1'){

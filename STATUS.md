@@ -292,3 +292,19 @@ Do **not** treat successful GitHub CI as live completion. The following distinct
 **Mandatory reality:** Repository main HEAD `2b369ef2d609247896e1ab32118f1dc498407f51` (README only); Draft PR #77 candidate rc.53 (unmerged); Deployed Version UNVERIFIED; Physical DB Version UNVERIFIED; Migration State UNVERIFIED; Live Verification Status NOT PERFORMED; release NO_GO.
 
 Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔
+
+---
+
+## Latest R80 rc.54 checkpoint — Draft PR #78 (2026-11-15; NO_GO)
+
+Original attached Master Plan V12.3, File12 F12-FR-002 / FR-008 / FR-009 and CEN-01 require genuine PDFs, lawful signed download and unified rights/integrity policy. **R80 is a demonstrated source-only client defect**, not an observed Hostinger incident: signed browser range downloads accepted an HTML blob with a corresponding advertised SHA256, and trusted MIME/unsafe file extension metadata without a PDF original byte check. The RED real-reader JS test `tests/test-r80-reader-pdf-original-integrity.cjs` failed on source parent PR #77 at GitHub Actions `43715968695` with `HTML-disguised original must never be saved`.
+
+The R80 Draft correction in `1.1.0-rc.54` validates `application/pdf` MIME and safe `.pdf` filename on initial **and refreshed** grants and checks the first five original assembled bytes are exactly `%PDF-` before accepting any download. Malformed content causes early session/chunk reset. Existing strict R70 range, R79 renewed URL and <=128MiB full-client-SHA256 remain in place. The original 58-file rc.43 source baseline and rc.44–53 overlays are preserved; new exact two-file rc.54 source delta is `docs/V123-FILE12-RC54-SOURCE-DELTA-OVERLAY.csv`. The synthetic R70/R79 valid fixture now contains a minimal PDF header, and R80 checks forged HTML, wrong MIME, unsafe extension and malicious renewed MIME.
+
+**Defect accounting:** 16 separately reproduced source flaws R64–R76, R78–R80; all 16 have proposed Draft-only source fixes; **0 Live-verified fixes**. R77 was a read-only reality-freeze audit enhancement, not a demonstrated code vulnerability. Existing 10 release blocker categories are unchanged, including source-vs-deployed parity, physical DB/migrations, File26 Book Pack/tombstone owner contracts, CF04 encrypted/scanner storage, lawful originals, real browser/rights staging and independent Founder-reviewed release. No deployed plugin activation, actual source rights/CF04 integration, physical schema, backup/restore, final stage acceptance or Live verification has been performed.
+
+**Latest source QA:** RED run `43715968695`, GREEN test+immutable source run `43716339889` success (exact HEAD `107b01469d69ad52fca6966413c4f058e241813c`). Additional documentation-only commits must still be checked against the final exact Draft HEAD.
+
+**Reality:** GitHub main HEAD `2b369ef2d609247896e1ab32118f1dc498407f51` (README-only); Draft source rc.54 PR #78 open and unmerged; Deployed Version **UNVERIFIED**; Physical DB Version **UNVERIFIED**; Migration State **UNVERIFIED**; Live Verification Status **NOT PERFORMED**. RELEASE **NO_GO**.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**

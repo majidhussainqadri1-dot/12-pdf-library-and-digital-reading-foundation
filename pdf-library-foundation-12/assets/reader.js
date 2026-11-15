@@ -141,7 +141,18 @@
   const progress = root.querySelector('[data-download-progress]');
   const dmStatus = root.querySelector('[data-download-status]');
   const dmChecksum = root.querySelector('[data-download-checksum]');
-  let download = {paused:false,running:false,session:null,chunks:[],next:0,loaded:0};
+  let download = {paused:false,running:false,session:null,chunks:[],next:0,loaded:0,pdfHeaderVerified:false};
+  // A signed range and advertised digest are not a PDF type assertion.
+  // In particular, larger browser downloads do not compute a whole-file SHA-256.
+  const validatePdfDelivery = (delivery) => {
+    if (String(delivery?.mime_type || '').trim().toLowerCase() !== 'application/pdf') {
+      throw new Error('Signed PDF manifest has an invalid MIME type.');
+    }
+    const filename = String(delivery?.filename || '');
+    if (!/^[^\\/\x00-\x1f]{1,255}\.pdf$/i.test(filename)) {
+      throw new Error('Signed PDF manifest filename must use a safe .pdf extension.');
+    }
+  };
   const openDownloadManager = async () => {
     if (!dm) return; dm.hidden=false; const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches; dm.scrollIntoView({behavior:reduced?'auto':'smooth',block:'nearest'});
     if (!download.session) {
@@ -174,6 +185,7 @@
     const digest = String(d?.sha256 || '').toLowerCase();
     const chunkSize = Number(download.session.range_bytes || 2097152);
     try {
+      validatePdfDelivery(d);
       if (!Number.isSafeInteger(total) || total < 1 ||
           !/^[0-9a-f]{64}$/.test(digest) ||
           !Number.isSafeInteger(chunkSize) || chunkSize < 1 || chunkSize > 8 * 1024 * 1024) {
@@ -193,8 +205,10 @@
               String(fresh.sha256 || '').toLowerCase() !== digest) {
             download.session = null; download.chunks = [];
             download.loaded = 0;
+            download.pdfHeaderVerified = false;
             throw new Error('Download object or checksum changed during renewal; restart with a new session.');
           }
+          validatePdfDelivery(fresh);
           download.session = renewed;
           // All later ranges MUST use this currently authorized replacement URL;
           // retaining the first expired delivery would churn grants on every chunk.
@@ -204,11 +218,23 @@
         const blob = await verifyDownloadRange(response, start, end, total);
         download.chunks.push(blob);
         download.loaded += blob.size;
+        if (!download.pdfHeaderVerified && download.loaded >= 5) {
+          // Check the original byte prefix as soon as it is available; do not
+          // wait for a potentially large forged HTML/JS payload to finish.
+          const prefix = new Uint8Array(await new Blob(download.chunks).slice(0,5).arrayBuffer());
+          if (prefix.length !== 5 || String.fromCharCode(...prefix) !== '%PDF-') {
+            download.session = null; download.chunks = []; download.loaded = 0;
+            download.pdfHeaderVerified = false;
+            throw new Error('Signed download PDF header is invalid; local bytes were discarded.');
+          }
+          download.pdfHeaderVerified = true;
+        }
         if (progress) progress.value = Math.floor((download.loaded / total) * 100);
         if (dmStatus) dmStatus.textContent = Math.floor((download.loaded / total) * 100)+'% · '+download.loaded.toLocaleString()+' / '+total.toLocaleString()+' bytes';
       }
       if (download.loaded >= total) {
-        const blob = new Blob(download.chunks, {type:d.mime_type || 'application/pdf'});
+        if (!download.pdfHeaderVerified) throw new Error('Signed PDF header could not be verified.');
+        const blob = new Blob(download.chunks, {type:'application/pdf'});
         if (blob.size !== total) throw new Error('Downloaded byte count does not match the signed manifest.');
         const fullDigestCap = 128 * 1024 * 1024;
         if (total <= fullDigestCap) {
@@ -220,6 +246,7 @@
           const hex = [...new Uint8Array(hashBytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
           if (hex.toLowerCase() !== digest) {
             download.session = null; download.chunks = []; download.loaded = 0;
+            download.pdfHeaderVerified = false;
             throw new Error('Download SHA-256 checksum mismatch; restart with a fresh session.');
           }
         }
