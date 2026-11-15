@@ -22,6 +22,17 @@ This is a **source configuration vulnerability**, *not* verified exposure of a r
 - Expected positive cases: ordinary File12 private root outside public root remains functional; shared under public root and unknown scope fail closed.
 - Source green CI reference `43705676653` applies to exact candidate SHA `98e248fa275cb56d4c65c46d243b3bbf6e089d43`, only when GitHub reports a completed success; after recording source evidence, verify latest branch-head CI separately.
 
+## Supplementary alias attack model and fail-closed correction
+
+The first fix checked `realpath($root)` against public roots. However, if the **configured path itself is an alias inside the public document root** (for example `public_html/books` as a symlink to a directory physically outside public_html), `realpath($root)` resolves outside the served tree and may appear private, while the alias can remain URL-addressable depending on webserver symlink configuration.
+
+- New synthetic executable regression `tests/test-r75-public-symlink-alias.php` creates only temporary folders and a public-path symlink to a private directory.
+- RED GitHub Actions run `43706219178` confirms the original R75 fix failed that test before amendment.
+- Source correction checks **both literal configured storage path and its canonical realpath** against both literal and canonical public `DOCUMENT_ROOT` and `ABSPATH` boundaries. Rejection is conservative for URL-addressable aliases; no webserver permissions are changed.
+- New exact rc.50 source overlay records updated storage SHA `59d2fa02c210cd16f90fd61ce76b1b4b752beb19`, **6913 UTF-8 bytes**, change commit `eada6c03856e48b1edbbfa906ae982ce86967b94`. Previous rc.43–rc.49 original inventory/overlays are intact.
+- This is **another negative test for the same R75 root cause**, not an additional numbered Live incident or a claim of real exposed documents.
+- The final CI for the exact amended branch HEAD is tracked separately from the previous green run. A failed/queued/intermediate run is not a release PASS.
+
 ## Remaining releases/proofs
 Even after this source correction, a real CF04 private root, malware scanner, keys, key rotation, original PDF/OCR processing, offsite backup/restore, 10 STO controls and truly revoked cached consumer index are *not* proven. Physical Hostinger installed package, DB, migration and runtime are unknown.
 
