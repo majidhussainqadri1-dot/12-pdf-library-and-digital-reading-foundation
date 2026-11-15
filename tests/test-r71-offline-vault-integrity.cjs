@@ -98,7 +98,7 @@ async function simulate(kind){
     const start=Number(match[1]),end=Number(match[2]);
     ranges++;
     let body=original.subarray(start,end+1);
-    if(kind==='wrong-digest')body=Buffer.from('X'.repeat(body.length));
+    if(kind==='wrong-digest'){body=Buffer.from(body);body[body.length-1]^=1;} // keep the PDF header intact to isolate SHA failure
     if(kind==='truncated')body=original.subarray(start,end);
     const responseStart=kind==='wrong-content-range'?start+1:start;
     return {
