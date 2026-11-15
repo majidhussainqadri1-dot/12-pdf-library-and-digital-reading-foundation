@@ -2,11 +2,63 @@
   'use strict';
   const F=window.PLDRF24;if(!F)return;const {root}=F;
   const shelves=async()=>{if(!F.future.loggedIn){F.say('Log in to use private Smart Shelves.');return;}try{const d=await F.api('shelves/bootstrap',{method:'POST',body:{},headers:{'Idempotency-Key':F.idempotency('shelf-bootstrap')}}),items=d.items||[],names=items.map(x=>`${x.id}: ${x.name}`).join('\n'),id=Number(prompt(`Choose shelf ID:\n${names}`)||0);if(!id)return;const shelf=items.find(x=>Number(x.id)===id);if(!shelf)throw new Error('Selected Smart Shelf is unavailable; refresh and try again.');const result=await F.api(`shelves/${id}/items`,{method:'POST',body:{edition_id:F.editionId,expected_version:Number(shelf.version||0)},headers:{'Idempotency-Key':F.idempotency('shelf')}});F.say(result.already_present?'This edition is already on that private Smart Shelf.':'Added to private Smart Shelf.');}catch(e){F.say(e.message);}};
-  const insights=async()=>{if(!F.future.loggedIn){F.say('Log in to view private reading insights.');return;}try{const d=await F.api('insights?days=30'),hours=(Number(d.reading_seconds||0)/3600).toFixed(1),list=(d.most_used||[]).map(x=>`<li>${F.escape(x.title)} — ${Math.round(Number(x.seconds||0)/60)} min</li>`).join('');F.openPanel(true);F.setWorkspace(`<h3>Private Reading Insights</h3><p>Last ${d.days} days: ${hours} hours, ${d.documents} documents, ${d.distinct_pages} distinct pages, ${d.completed_documents||0} completed.</p><ul>${list}</ul><p><strong>No public leaderboard, streak pressure, shame mechanics or manipulative gamification.</strong></p>`);}catch(e){F.say(e.message);}};
+  const insights=async()=>{if(!F.future.loggedIn){F.say('Log in to view private reading insights.');return;}try{const d=await F.api('insights?days=30'),hours=(Number(d.reading_seconds||0)/3600).toFixed(1),list=(d.most_used||[]).map(x=>`<li>${F.escape(x.title)} — ${Math.round(Number(x.seconds||0)/60)} min</li>`).join('');F.openPanel(true);F.setWorkspace(`<h3>Private Reading Insights</h3><p>Last ${F.escape(d.days)} days: ${hours} hours, ${F.escape(d.documents)} documents, ${F.escape(d.distinct_pages)} distinct pages, ${F.escape(d.completed_documents||0)} completed.</p><ul>${list}</ul><p><strong>No public leaderboard, streak pressure, shame mechanics or manipulative gamification.</strong></p>`);}catch(e){F.say(e.message);}};
   const room=async()=>{if(!F.future.loggedIn){F.say('Log in to create a scholarly reading room.');return;}try{const d=await F.api('reading-room',{method:'POST',body:{edition_id:F.editionId,page:F.page(),anchor:F.lastSelection?{type:'TextQuoteSelector',exact:F.lastSelection.slice(0,300)}:{}},headers:{'Idempotency-Key':F.idempotency('room')}});F.openPanel(true);F.setWorkspace(`<h3>Scholarly Reading Room</h3><p>Status: ${F.escape(d.status)}.</p><p>File 12 stores only document/page anchor context. Messages and community data remain with the communication owner.</p>${d.provider_ref?`<p>Provider reference: <code>${F.escape(d.provider_ref)}</code></p>`:''}`);}catch(e){F.say(e.message);}};
-  const context=async()=>{let s=F.lastSelection||window.getSelection()?.toString().trim()||'';if(!s)s=prompt('Enter a remedy, author, concept, or selected term:')||'';if(!s.trim())return;try{const d=await F.api(`context/${F.editionId}?page=${F.page()}&selection=${encodeURIComponent(s)}`);F.openPanel(true);if(F.contextBox)F.contextBox.hidden=false;if(!d.items?.length){F.contextBox.innerHTML='<h3>Knowledge context</h3><p>No companion canonical context provider returned a result.</p>';return;}const ul=document.createElement('ul');d.items.forEach(x=>{const li=document.createElement('li'),a=document.createElement('a');a.href=x.url;a.target='_blank';a.rel='noopener';a.textContent=`${x.title} — ${x.owner}`;li.appendChild(a);if(x.summary){const p=document.createElement('p');p.textContent=x.summary;li.appendChild(p);}ul.appendChild(li);});F.contextBox.replaceChildren(Object.assign(document.createElement('h3'),{textContent:'Knowledge context'}),ul);}catch(e){F.say(e.message);}};
+  // Context providers are not URL authorities. File12 can only link to the
+  // current canonical WordPress origin; javascript:, data: and external
+  // providers are never allowed to become clickable reading links.
+  const contextUrl=raw=>{
+    if(typeof raw!=='string'||raw.length>2048||!raw.trim())return '';
+    const origin=window.location?.origin||'';
+    if(!/^https?:\/\/[^/]+$/i.test(origin))return '';
+    try{
+      const parsed=new URL(raw,origin+'/');
+      if((parsed.protocol!=='https:'&&parsed.protocol!=='http:')||
+         parsed.origin!==origin||parsed.username||parsed.password)return '';
+      return parsed.href;
+    }catch(_){return '';}
+  };
+  const context=async()=>{
+    let selected=F.lastSelection||window.getSelection()?.toString().trim()||'';
+    if(!selected)selected=prompt('Enter a remedy, author, concept, or selected term:')||'';
+    if(!selected.trim())return;
+    try{
+      const d=await F.api('context/'+F.editionId+'?page='+F.page()+
+        '&selection='+encodeURIComponent(selected));
+      F.openPanel(true);
+      if(!F.contextBox){F.say('Knowledge context panel is unavailable.');return;}
+      F.contextBox.hidden=false;
+      const items=Array.isArray(d.items)?d.items:[];
+      if(!items.length){
+        F.contextBox.innerHTML='<h3>Knowledge context</h3><p>No companion canonical context provider returned a result.</p>';
+        return;
+      }
+      const ul=document.createElement('ul');
+      items.slice(0,100).forEach(item=>{
+        const li=document.createElement('li');
+        const target=contextUrl(item?.url);
+        const title=String(item?.title??'Untitled')+' — '+String(item?.owner??'Unknown source');
+        if(target){
+          const a=document.createElement('a');
+          a.href=target;a.target='_blank';a.rel='noopener noreferrer';
+          a.textContent=title;li.appendChild(a);
+        }else{
+          const label=document.createElement('span');
+          label.textContent=title+' (unverified link unavailable)';
+          li.appendChild(label);
+        }
+        if(item?.summary){
+          const p=document.createElement('p');p.textContent=String(item.summary);
+          li.appendChild(p);
+        }
+        ul.appendChild(li);
+      });
+      const heading=document.createElement('h3');heading.textContent='Knowledge context';
+      F.contextBox.replaceChildren(heading,ul);
+    }catch(error){F.say(error.message);}
+  };
   const derive=async()=>{let text=F.lastSelection||window.getSelection()?.toString().trim()||'';if(!text){if(!F.reflowData)await F.loadReflow(F.page());text=F.reflowBox?.querySelector(`[data-reflow-page="${F.page()}"] .pldr-f24-reflow-text`)?.textContent?.slice(0,1200)||'';}if(!text.trim()){F.say('Select or load text before translation/transliteration.');return;}const mode=prompt('Type translate or transliterate:','translate');if(!mode)return;const target=prompt('Target language/script (for example ur, en, ar, Roman Urdu):','ur')||'';try{const d=await F.api('derive-text',{method:'POST',body:{edition_id:F.editionId,page:F.page(),text:text.slice(0,5000),mode,target},headers:{'Idempotency-Key':F.idempotency('derive')}});F.openPanel(true);F.setWorkspace(`<h3>Derived ${F.escape(d.mode)} overlay</h3><p><strong>Provider:</strong> ${F.escape(d.provider)} · <strong>Derived, not authorial text.</strong></p><div class="pldr-f24-derived">${F.escape(d.text)}</div>`);}catch(e){F.say(e.message);}};
-  const a11y=async()=>{try{const d=await F.api(`accessibility/${F.editionId}`);F.openPanel(true);F.setWorkspace(`<h3>Accessibility Quality Inspector</h3><p>Score: <strong>${d.score}</strong> · status: <strong>${F.escape(d.status)}</strong>${d.verified?' · verified':''}</p><ul>${(d.findings||[]).map(x=>`<li>${F.escape(x)}</li>`).join('')}</ul><p>Public badge allowed: ${d.public_badge_allowed?'yes':'no'}.</p>`);}catch(e){F.say(e.message);}};
+  const a11y=async()=>{try{const d=await F.api(`accessibility/${F.editionId}`);F.openPanel(true);F.setWorkspace(`<h3>Accessibility Quality Inspector</h3><p>Score: <strong>${F.escape(d.score)}</strong> · status: <strong>${F.escape(d.status)}</strong>${d.verified?' · verified':''}</p><ul>${(d.findings||[]).map(x=>`<li>${F.escape(x)}</li>`).join('')}</ul><p>Public badge allowed: ${d.public_badge_allowed?'yes':'no'}.</p>`);}catch(e){F.say(e.message);}};
 
   const saveHandoff=async()=>{if(!F.future.loggedIn)return;try{const d=await F.api(`handoff/${F.editionId}`,{method:'POST',body:{expected_version:F.sessionVersion,context:{page:F.page(),zoom:F.zoom(),layout:F.layout,anchor:{selection:F.lastSelection.slice(0,300)},device:navigator.userAgent.slice(0,80)}},headers:{'Idempotency-Key':F.idempotency('handoff')}});F.sessionVersion=Number(d.version||F.sessionVersion);}catch(e){if(e.message.includes('newer')){try{const d=await F.api(`handoff/${F.editionId}`);F.sessionVersion=Number(d.version||0);}catch(_){}}}};
   const restoreHandoff=async()=>{if(!F.future.loggedIn)return;try{const d=await F.api(`handoff/${F.editionId}`);if(!d?.version)return;F.sessionVersion=Number(d.version);if(Number(d.page_number)>0&&F.pageInput){F.pageInput.value=String(d.page_number);F.pageInput.dispatchEvent(new Event('change',{bubbles:true}));}if(d.layout_mode){const s=root.querySelector('[data-f24-layout]');if(s)s.value=d.layout_mode;F.applyLayout(d.layout_mode,false);}if(d.anchor_json){try{const a=JSON.parse(d.anchor_json);F.lastSelection=a.selection||'';}catch(_){}}}catch(_){} };
