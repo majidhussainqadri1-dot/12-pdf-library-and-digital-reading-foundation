@@ -85,10 +85,7 @@
       });
       clearReconnectPending();
       F.say('Encrypted offline vault stored with a non-extractable WebCrypto key; original file SHA-256 verified.');
-    }catch(error){
-      await clearEdition(false);
-      F.say(error.message||'Encrypted offline vault failed.');
-    }finally{
+    }catch(error){await clearEdition(false);F.say(error.message||'Encrypted offline vault failed.');}finally{
       for(const part of plaintext){try{new Uint8Array(part).fill(0);}catch(_){}}
       plaintext.length=0;
     }
@@ -139,7 +136,7 @@
       F.say('Opened verified encrypted offline copy. Local authorization expires '+new Date(expiry).toLocaleString()+'.');
     }catch(error){
       await clearEdition(false);
-      F.say((error.message||'Encrypted offline vault could not be opened.')+' The damaged or incomplete local copy was purged.');
+      F.say((error.message||'Encrypted offline vault could not be opened.')+' The damaged/incomplete local copy was purged.');
     }
   };
   const show=()=>{F.openPanel(true);F.setWorkspace('<h3>Encrypted Offline Reading Vault</h3><p>Eligible content is captured only after server authorization. Browser chunks are AES-GCM encrypted with a non-extractable CryptoKey. Local expiry is enforced, server refresh reauthorizes rights, and logout/explicit purge removes local material.</p><div><button type="button" data-vault-store>Store encrypted offline</button> <button type="button" data-vault-open>Open offline copy</button> <button type="button" data-vault-clear>Clear offline copy</button></div>');F.workspace.querySelector('[data-vault-store]')?.addEventListener('click',store);F.workspace.querySelector('[data-vault-open]')?.addEventListener('click',open);F.workspace.querySelector('[data-vault-clear]')?.addEventListener('click',()=>clearEdition(true));};
