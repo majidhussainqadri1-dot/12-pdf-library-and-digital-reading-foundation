@@ -148,13 +148,92 @@
       try { download.session=await api('downloads/session',{method:'POST',body:{edition_id:cfg.editionId},headers:{'Idempotency-Key':crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`}}); dmChecksum.textContent=download.session.checksum; dmStatus.textContent='Ready. Range-resumable access will be revalidated on every chunk.'; } catch(e){dmStatus.textContent=e.message;}
     }
   };
+  // Accept only the exact signed byte range; a generic 2xx response is not
+  // a substitute for an authenticated HTTP 206 Content-Range response.
+  const verifyDownloadRange = async (response, start, end, total) => {
+    if (response.status !== 206) {
+      throw new Error('Download range response must be HTTP 206 Partial Content.');
+    }
+    const raw = response.headers?.get?.('Content-Range') || '';
+    const matched = /^bytes ([0-9]+)-([0-9]+)\/([0-9]+)$/.exec(raw.trim());
+    if (!matched || matched[1] !== String(start) ||
+        matched[2] !== String(end) || matched[3] !== String(total)) {
+      throw new Error('Download Content-Range does not match the requested object bytes.');
+    }
+    const blob = await response.blob();
+    if (blob.size !== end - start + 1) {
+      throw new Error('Download range length mismatch: response is incomplete or unexpected.');
+    }
+    return blob;
+  };
   const runDownload = async () => {
-    if(download.running||!download.session)return;download.running=true;download.paused=false;
-    const d=download.session.delivery;const chunkSize=download.session.range_bytes||2097152;const total=d.size;
-    try{
-      while(download.loaded<total&&!download.paused){const start=download.loaded;const end=Math.min(total-1,start+chunkSize-1);let response=await fetch(d.url,{headers:{Range:`bytes=${start}-${end}`},credentials:'same-origin'});if(response.status===410||response.status===403){download.session=await api('downloads/session',{method:'POST',body:{edition_id:cfg.editionId},headers:{'Idempotency-Key':crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`}});response=await fetch(download.session.delivery.url,{headers:{Range:`bytes=${start}-${end}`},credentials:'same-origin'});}if(!(response.ok||response.status===206))throw new Error(`Download range failed (${response.status})`);const blob=await response.blob();download.chunks.push(blob);download.loaded+=blob.size;if(progress)progress.value=Math.floor((download.loaded/total)*100);dmStatus.textContent=`${Math.floor((download.loaded/total)*100)}% · ${download.loaded.toLocaleString()} / ${total.toLocaleString()} bytes`;}
-      if(download.loaded>=total){const blob=new Blob(download.chunks,{type:d.mime_type||'application/pdf'});if(blob.size!==total)throw new Error('Downloaded byte count does not match the signed manifest.');if(total<=128*1024*1024&&crypto.subtle){dmStatus.textContent='Verifying SHA-256 checksum…';const digest=await crypto.subtle.digest('SHA-256',await blob.arrayBuffer());const hex=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');if(hex.toLowerCase()!==d.sha256.toLowerCase())throw new Error('Download checksum mismatch.');}const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=d.filename||'document.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);dmStatus.textContent=total<=128*1024*1024?'Download complete; SHA-256 verified.':'Download complete; server-side object integrity and authenticated ranges verified. Expected checksum is shown below.';download.running=false;}
-    }catch(e){download.running=false;dmStatus.textContent=e.message;}
+    if (download.running || !download.session) return;
+    download.running = true; download.paused = false;
+    const d = download.session.delivery;
+    const total = Number(d?.size);
+    const digest = String(d?.sha256 || '').toLowerCase();
+    const chunkSize = Number(download.session.range_bytes || 2097152);
+    try {
+      if (!Number.isSafeInteger(total) || total < 1 ||
+          !/^[0-9a-f]{64}$/.test(digest) ||
+          !Number.isSafeInteger(chunkSize) || chunkSize < 1 || chunkSize > 8 * 1024 * 1024) {
+        throw new Error('Invalid signed object manifest or download chunk size.');
+      }
+      while (download.loaded < total && !download.paused) {
+        const start = download.loaded;
+        const end = Math.min(total - 1, start + chunkSize - 1);
+        const range = {Range:'bytes='+start+'-'+end};
+        let response = await fetch(d.url, {headers:range,credentials:'same-origin'});
+        if (response.status === 410 || response.status === 403) {
+          const renewed = await api('downloads/session', {method:'POST',
+            body:{edition_id:cfg.editionId},
+            headers:{'Idempotency-Key':crypto.randomUUID?.() || (Date.now()+'-'+Math.random())}});
+          const fresh = renewed?.delivery;
+          if (!fresh || Number(fresh.size) !== total ||
+              String(fresh.sha256 || '').toLowerCase() !== digest) {
+            download.session = null; download.chunks = [];
+            download.loaded = 0;
+            throw new Error('Download object or checksum changed during renewal; restart with a new session.');
+          }
+          download.session = renewed;
+          response = await fetch(fresh.url, {headers:range,credentials:'same-origin'});
+        }
+        const blob = await verifyDownloadRange(response, start, end, total);
+        download.chunks.push(blob);
+        download.loaded += blob.size;
+        if (progress) progress.value = Math.floor((download.loaded / total) * 100);
+        if (dmStatus) dmStatus.textContent = Math.floor((download.loaded / total) * 100)+'% · '+download.loaded.toLocaleString()+' / '+total.toLocaleString()+' bytes';
+      }
+      if (download.loaded >= total) {
+        const blob = new Blob(download.chunks, {type:d.mime_type || 'application/pdf'});
+        if (blob.size !== total) throw new Error('Downloaded byte count does not match the signed manifest.');
+        const fullDigestCap = 128 * 1024 * 1024;
+        if (total <= fullDigestCap) {
+          if (!crypto?.subtle) {
+            throw new Error('Browser SHA-256 verification is unavailable; download was not accepted.');
+          }
+          if (dmStatus) dmStatus.textContent = 'Verifying SHA-256 checksum…';
+          const hashBytes = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+          const hex = [...new Uint8Array(hashBytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
+          if (hex.toLowerCase() !== digest) {
+            download.session = null; download.chunks = []; download.loaded = 0;
+            throw new Error('Download SHA-256 checksum mismatch; restart with a fresh session.');
+          }
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = d.filename || 'document.pdf';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),30000);
+        if (dmStatus) dmStatus.textContent = total <= fullDigestCap
+          ? 'Download complete; byte ranges and full SHA-256 verified.'
+          : 'Download complete; authenticated byte ranges and byte count checked. Full client SHA-256 was not verified for this large file.';
+      }
+    } catch (error) {
+      if (dmStatus) dmStatus.textContent = error.message;
+    } finally {
+      download.running = false;
+    }
   };
   root.querySelector('[data-download-start]')?.addEventListener('click',runDownload);
   root.querySelector('[data-download-pause]')?.addEventListener('click',()=>{download.paused=true;dmStatus.textContent='Paused after the current authenticated range.';});
