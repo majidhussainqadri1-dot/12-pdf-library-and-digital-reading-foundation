@@ -154,6 +154,11 @@ jobs:
         run: bash -n scripts/file12-live-reality-freeze-readonly.sh
       - name: R56 read-only evidence source safety tests
         run: php tests/test-r56-live-freeze-readonly.php
+      - name: R77 full read-only deployed schema-state coverage
+        run: |
+          bash -n scripts/file12-live-reality-freeze-readonly.sh
+          php tests/test-r77-readonly-schema-freeze.php
+          bash tests/test-r77-readonly-collector-synthetic.sh
       - name: R57 source-only 39 staging gate evidence ledger
         run: php tests/test-r57-39-gates-ledger.php
       - name: R58 original V12.1 54 requirements identity and evidence ledger
