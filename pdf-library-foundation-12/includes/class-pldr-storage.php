@@ -47,14 +47,25 @@ final class PLDR_Storage {
             defined('ABSPATH') ? (string) ABSPATH : '',
         ) as $candidate) {
             if ('' === trim($candidate)) continue;
+            // Preserve the literal served filesystem path in addition to the
+            // resolved path. A symlink *inside* the public tree pointing out
+            // to a private directory must still be denied: its alias may be
+            // directly addressable through the web server.
+            $literal = rtrim($candidate, DIRECTORY_SEPARATOR);
             $canonical = realpath($candidate);
-            if (false !== $canonical && !in_array($canonical, $public_roots, true)) {
-                $public_roots[] = $canonical;
+            foreach (array($literal, $canonical) as $public_root) {
+                if (false !== $public_root && '' !== $public_root &&
+                    !in_array($public_root, $public_roots, true)) {
+                    $public_roots[] = $public_root;
+                }
             }
         }
         foreach ($public_roots as $public_root) {
+            $boundary = rtrim($public_root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
             if ($real === $public_root ||
-                str_starts_with($real, rtrim($public_root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)) {
+                str_starts_with($real, $boundary) ||
+                $root === $public_root ||
+                str_starts_with($root, $boundary)) {
                 return new WP_Error('pldr_storage_public',
                     'Shared and File 12 object storage must reside outside the public document and WordPress roots.');
             }
