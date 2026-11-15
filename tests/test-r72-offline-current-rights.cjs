@@ -54,16 +54,16 @@ async function simulate({online,authorized,retryOffline=false}){
     keys:[['device-key',k]],
     chunks:[['700:0',{iv:Array.from(iv),cipher,offset:0,aadVersion:1}]],
     meta:[['700',{editionId,size:bytes.length,sha256:sha,chunks:1,mime:'application/pdf',
-      offlineValidUntil:'2099-01-01T00:00:00Z',aadVersion:1}]]
+      offlineValidUntil:'2099-01-01T00:00:00Z',aadVersion:1,actorId:17}]]
   });
   const handlers={},messages=[];
   let authCalls=0,opens=0;
   const F={
-    editionId,future:{loggedIn:true},
+    editionId,future:{loggedIn:true,userId:17},
     api:async endpoint=>{
       assert.equal(endpoint,'offline-authorization/'+editionId);
       authCalls++;
-      return {authorized,edition_id:editionId,rights_valid_until:null,checked_at:'2026-11-15T08:00:00Z'};
+      return {authorized,actor_id:17,edition_id:editionId,rights_valid_until:null,checked_at:'2026-11-15T08:00:00Z'};
     },
     say:s=>messages.push(String(s)),
     openPanel(){},
