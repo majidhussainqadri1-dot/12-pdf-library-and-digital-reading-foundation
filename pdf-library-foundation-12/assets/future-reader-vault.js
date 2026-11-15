@@ -14,8 +14,131 @@
   const markReconnectPending=()=>{try{localStorage.setItem('pldrOfflineReconnectReauth','1');}catch(_){}};
   const clearReconnectPending=()=>{try{localStorage.removeItem('pldrOfflineReconnectReauth');}catch(_){}};
   const reauthorizeAfterReconnect=async()=>{if(!F.future.loggedIn||!navigator.onLine)return false;try{const d=await F.api(`offline-authorization/${F.editionId}`);if(!d?.authorized)throw new Error('Offline authorization is no longer valid.');clearReconnectPending();return true;}catch(e){F.say(`${e.message||'Offline authorization could not be revalidated after reconnect.'} The encrypted local copy was retained but will not be opened until server authorization succeeds or it expires.`);return false;}};
-  const store=async()=>{if(!window.crypto?.subtle||!window.indexedDB){F.say('Encrypted offline vault is unavailable in this browser.');return;}if(!F.future.loggedIn){F.say('Log in before using encrypted offline reading.');return;}F.say('Requesting rights-aware offline grant…');try{const grant=await F.api('offline-grant',{method:'POST',body:{edition_id:F.editionId},headers:{'Idempotency-Key':F.idempotency('offline')}}),k=await key();if(!await clearEdition(false))throw new Error('Existing offline-vault data could not be cleared safely.');const chunkSize=2*1024*1024;let offset=0,index=0;while(offset<grant.size){const end=Math.min(grant.size-1,offset+chunkSize-1),r=await fetch(grant.url,{headers:{Range:`bytes=${offset}-${end}`},credentials:'same-origin'});if(r.status===410||r.status===403)throw new Error('Offline grant expired during capture; restart to revalidate current rights.');if(!(r.ok||r.status===206))throw new Error(`Offline range failed (${r.status})`);const plain=await r.arrayBuffer(),iv=crypto.getRandomValues(new Uint8Array(12)),cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:aad(index,offset)},k,plain);await req('chunks','readwrite',`${F.editionId}:${index}`,{iv:Array.from(iv),cipher,offset,aadVersion:1});offset+=plain.byteLength;index++;F.say(`Encrypted offline vault: ${Math.floor((offset/grant.size)*100)}%`);}await req('meta','readwrite',String(F.editionId),{editionId:F.editionId,size:grant.size,sha256:grant.sha256,filename:grant.filename,mime:grant.mime_type,chunks:index,offlineValidUntil:grant.offline_valid_until,storedAt:Date.now(),aadVersion:1,policy:'local expiry enforced; AES-GCM chunks are bound to edition/index/offset; reconnect/recapture requires server reauthorization; purge on logout/explicit clear'});clearReconnectPending();F.say('Encrypted offline vault stored with a non-extractable WebCrypto key after committed IndexedDB writes.');}catch(e){await clearEdition(false);F.say(e.message||'Encrypted offline vault failed.');}};
-  const open=async()=>{try{const meta=await req('meta','readonly',String(F.editionId));if(!meta){F.say('No encrypted offline copy exists for this edition.');return;}const expiry=Date.parse(meta.offlineValidUntil||'');if(!expiry||Date.now()>=expiry){await clearEdition(false);F.say('Offline-vault authorization expired and the local copy was purged.');return;}if(Number(meta.aadVersion)!==1){await clearEdition(false);F.say('This offline-vault copy uses an obsolete integrity format and was purged; store it again.');return;}if(navigator.onLine&&reconnectPending()&&!await reauthorizeAfterReconnect())return;const k=await key(),chunks=[];for(let i=0;i<meta.chunks;i++){const row=await req('chunks','readonly',`${F.editionId}:${i}`);if(!row||Number(row.aadVersion)!==1)throw new Error('Offline vault is incomplete or uses an obsolete integrity format.');chunks.push(await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(row.iv),additionalData:aad(i,Number(row.offset||0))},k,row.cipher));}const blob=new Blob(chunks,{type:meta.mime||'application/pdf'});if(blob.size!==Number(meta.size))throw new Error('Offline-vault byte count mismatch.');const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),1200000);F.say(`Opened encrypted offline copy. Local authorization expires ${new Date(expiry).toLocaleString()}.`);}catch(e){await clearEdition(false);F.say(`${e.message||'Encrypted offline vault could not be opened.'} The damaged/incomplete local copy was purged.`);}};
+  // Offline reading is intentionally bounded while the browser's native
+  // SHA-256 API requires a complete ArrayBuffer. A larger vault must use a
+  // separately audited incremental digest, not silently skip verification.
+  const MAX_OFFLINE_BYTES=128*1024*1024;
+  const validDigest=value=>typeof value==='string'&&/^[a-f0-9]{64}$/i.test(value);
+  const digestBlob=async blob=>{
+    const result=await crypto.subtle.digest('SHA-256',await blob.arrayBuffer());
+    return [...new Uint8Array(result)].map(x=>x.toString(16).padStart(2,'0')).join('');
+  };
+  const verifyOfflineRange=async (response,start,end,total)=>{
+    if(response.status!==206)throw new Error('Offline range must return HTTP 206 Partial Content.');
+    const value=response.headers?.get?.('Content-Range')||'';
+    const match=/^bytes ([0-9]+)-([0-9]+)\/([0-9]+)$/.exec(value.trim());
+    if(!match||match[1]!==String(start)||match[2]!==String(end)||match[3]!==String(total)){
+      throw new Error('Offline Content-Range does not match the requested source bytes.');
+    }
+    const bytes=await response.arrayBuffer();
+    if(bytes.byteLength!==end-start+1)throw new Error('Offline range byte length mismatch.');
+    return bytes;
+  };
+  const store=async()=>{
+    if(!window.crypto?.subtle||!window.indexedDB){
+      F.say('Encrypted offline vault is unavailable in this browser.');return;
+    }
+    if(!F.future.loggedIn){F.say('Log in before using encrypted offline reading.');return;}
+    F.say('Requesting rights-aware offline grant…');
+    const plaintext=[];
+    try{
+      const grant=await F.api('offline-grant',{method:'POST',body:{edition_id:F.editionId},
+        headers:{'Idempotency-Key':F.idempotency('offline')}});
+      const size=Number(grant?.size);
+      const expectedHash=String(grant?.sha256||'').toLowerCase();
+      const expiry=Date.parse(grant?.offline_valid_until||'');
+      if(!Number.isSafeInteger(size)||size<1||size>MAX_OFFLINE_BYTES||
+         !validDigest(expectedHash)||!Number.isFinite(expiry)||expiry<=Date.now()||
+         typeof grant?.url!=='string'||!grant.url){
+        throw new Error('Invalid offline manifest, SHA-256, expiry or size; local offline capture is limited to 128 MiB.');
+      }
+      const k=await key();
+      if(!await clearEdition(false))throw new Error('Existing offline-vault data could not be cleared safely.');
+      const chunkSize=2*1024*1024;
+      let offset=0,index=0;
+      while(offset<size){
+        const end=Math.min(size-1,offset+chunkSize-1);
+        const response=await fetch(grant.url,{headers:{Range:'bytes='+offset+'-'+end},credentials:'same-origin'});
+        if(response.status===410||response.status===403){
+          throw new Error('Offline grant expired during capture; restart to revalidate current rights.');
+        }
+        const plain=await verifyOfflineRange(response,offset,end,size);
+        plaintext.push(plain);
+        const iv=crypto.getRandomValues(new Uint8Array(12));
+        const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv,
+          additionalData:aad(index,offset)},k,plain);
+        await req('chunks','readwrite',F.editionId+':'+index,{
+          iv:Array.from(iv),cipher,offset,aadVersion:1
+        });
+        offset+=plain.byteLength;index++;
+        F.say('Encrypted offline vault: '+Math.floor((offset/size)*100)+'%');
+      }
+      const complete=new Blob(plaintext,{type:grant.mime_type||'application/pdf'});
+      if(complete.size!==size||await digestBlob(complete)!==expectedHash){
+        throw new Error('Offline SHA-256 checksum mismatch: captured bytes differ from the authorized PDF.');
+      }
+      await req('meta','readwrite',String(F.editionId),{
+        editionId:F.editionId,size,sha256:expectedHash,filename:grant.filename,
+        mime:grant.mime_type,chunks:index,offlineValidUntil:grant.offline_valid_until,
+        storedAt:Date.now(),aadVersion:1,
+        policy:'128 MiB max; exact ranges and full SHA-256 verified; encrypted non-extractable WebCrypto key; expiry and reconnect authorization'
+      });
+      clearReconnectPending();
+      F.say('Encrypted offline vault stored with a non-extractable WebCrypto key; original file SHA-256 verified.');
+    }catch(error){await clearEdition(false);F.say(error.message||'Encrypted offline vault failed.');}finally{
+      for(const part of plaintext){try{new Uint8Array(part).fill(0);}catch(_){}}
+      plaintext.length=0;
+    }
+  };
+  const open=async()=>{
+    try{
+      const meta=await req('meta','readonly',String(F.editionId));
+      if(!meta){F.say('No encrypted offline copy exists for this edition.');return;}
+      const expiry=Date.parse(meta.offlineValidUntil||'');
+      if(!expiry||Date.now()>=expiry){
+        await clearEdition(false);
+        F.say('Offline-vault authorization expired and the local copy was purged.');return;
+      }
+      if(Number(meta.aadVersion)!==1){
+        await clearEdition(false);
+        F.say('This offline-vault copy uses an obsolete integrity format and was purged; store it again.');return;
+      }
+      const size=Number(meta.size),sha=String(meta.sha256||'').toLowerCase(),count=Number(meta.chunks);
+      if(!Number.isSafeInteger(size)||size<1||size>MAX_OFFLINE_BYTES||!validDigest(sha)||
+         !Number.isSafeInteger(count)||count<1||count>Math.ceil(MAX_OFFLINE_BYTES/(64*1024))){
+        throw new Error('Offline-vault manifest has invalid size, SHA-256 or chunk count.');
+      }
+      if(navigator.onLine&&reconnectPending()&&!await reauthorizeAfterReconnect())return;
+      const k=await key(),chunks=[];
+      let nextOffset=0;
+      for(let i=0;i<count;i++){
+        const row=await req('chunks','readonly',F.editionId+':'+i);
+        if(!row||Number(row.aadVersion)!==1||Number(row.offset)!==nextOffset){
+          throw new Error('Offline vault contains an incomplete, reordered or obsolete encrypted chunk.');
+        }
+        const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(row.iv),
+          additionalData:aad(i,nextOffset)},k,row.cipher);
+        if(!plain.byteLength||plain.byteLength>2*1024*1024){
+          throw new Error('Offline decrypted chunk length is invalid.');
+        }
+        chunks.push(plain);nextOffset+=plain.byteLength;
+      }
+      const blob=new Blob(chunks,{type:meta.mime||'application/pdf'});
+      if(blob.size!==size||nextOffset!==size){
+        throw new Error('Offline-vault byte count mismatch.');
+      }
+      if(await digestBlob(blob)!==sha){
+        throw new Error('Offline-vault SHA-256 checksum mismatch; the original PDF cannot be trusted.');
+      }
+      const url=URL.createObjectURL(blob);
+      window.open(url,'_blank','noopener');
+      setTimeout(()=>URL.revokeObjectURL(url),1200000);
+      F.say('Opened verified encrypted offline copy. Local authorization expires '+new Date(expiry).toLocaleString()+'.');
+    }catch(error){
+      await clearEdition(false);
+      F.say((error.message||'Encrypted offline vault could not be opened.')+' The damaged/incomplete local copy was purged.');
+    }
+  };
   const show=()=>{F.openPanel(true);F.setWorkspace('<h3>Encrypted Offline Reading Vault</h3><p>Eligible content is captured only after server authorization. Browser chunks are AES-GCM encrypted with a non-extractable CryptoKey. Local expiry is enforced, server refresh reauthorizes rights, and logout/explicit purge removes local material.</p><div><button type="button" data-vault-store>Store encrypted offline</button> <button type="button" data-vault-open>Open offline copy</button> <button type="button" data-vault-clear>Clear offline copy</button></div>');F.workspace.querySelector('[data-vault-store]')?.addEventListener('click',store);F.workspace.querySelector('[data-vault-open]')?.addEventListener('click',open);F.workspace.querySelector('[data-vault-clear]')?.addEventListener('click',()=>clearEdition(true));};
   F.root.addEventListener('click',e=>{const b=e.target.closest('button[data-f24-action]');if(b?.dataset.f24Action==='offline')show();});
   window.addEventListener('offline',markReconnectPending);
