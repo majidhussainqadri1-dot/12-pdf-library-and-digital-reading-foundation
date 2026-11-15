@@ -79,6 +79,21 @@
   // separately audited incremental digest, not silently skip verification.
   const MAX_OFFLINE_BYTES=128*1024*1024;
   const validDigest=value=>typeof value==='string'&&/^[a-f0-9]{64}$/i.test(value);
+  // WebCrypto proves a byte identity, not that the ciphertext is a PDF.
+  // Never create origin-bearing HTML/JS Blob URLs from a trusted checksum.
+  // The canonical CF04 PDF structural scanner remains a separate release gate.
+  const validPdfMime=value=>typeof value==='string'&&
+    /^application\/pdf(?:\s*;[^\r\n]*)?$/i.test(value.trim());
+  const hasPdfHeader=part=>{
+    const bytes=new Uint8Array(part);
+    if(bytes.length<5)return false;
+    const limit=Math.min(1024,bytes.length-5);
+    for(let offset=0;offset<=limit;offset++){
+      if(bytes[offset]===37&&bytes[offset+1]===80&&bytes[offset+2]===68&&
+         bytes[offset+3]===70&&bytes[offset+4]===45)return true;
+    }
+    return false;
+  };
   const digestBlob=async blob=>{
     const result=await crypto.subtle.digest('SHA-256',await blob.arrayBuffer());
     return [...new Uint8Array(result)].map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -107,6 +122,9 @@
       if(!validActor()||Number(grant?.actor_id)!==currentActor){
         throw new Error('Offline grant actor identity does not match the authenticated WordPress account.');
       }
+      if(!validPdfMime(grant?.mime_type)){
+        throw new Error('Offline source was not verified as PDF media; HTML and other formats are rejected.');
+      }
       const size=Number(grant?.size);
       const expectedHash=String(grant?.sha256||'').toLowerCase();
       const expiry=Date.parse(grant?.offline_valid_until||'');
@@ -126,6 +144,9 @@
           throw new Error('Offline grant expired during capture; restart to revalidate current rights.');
         }
         const plain=await verifyOfflineRange(response,offset,end,size);
+        if(offset===0&&!hasPdfHeader(plain)){
+          throw new Error('Offline source bytes lack the required PDF header; the content is not safe to open as a PDF.');
+        }
         plaintext.push(plain);
         const iv=crypto.getRandomValues(new Uint8Array(12));
         const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv,
@@ -136,13 +157,13 @@
         offset+=plain.byteLength;index++;
         F.say('Encrypted offline vault: '+Math.floor((offset/size)*100)+'%');
       }
-      const complete=new Blob(plaintext,{type:grant.mime_type||'application/pdf'});
+      const complete=new Blob(plaintext,{type:'application/pdf'});
       if(complete.size!==size||await digestBlob(complete)!==expectedHash){
         throw new Error('Offline SHA-256 checksum mismatch: captured bytes differ from the authorized PDF.');
       }
       await req('meta','readwrite',String(F.editionId),{
         editionId:F.editionId,actorId:currentActor,size,sha256:expectedHash,filename:grant.filename,
-        mime:grant.mime_type,chunks:index,offlineValidUntil:grant.offline_valid_until,
+        mime:'application/pdf',chunks:index,offlineValidUntil:grant.offline_valid_until,
         storedAt:Date.now(),aadVersion:1,
         policy:'128 MiB max; exact ranges and full SHA-256 verified; encrypted non-extractable WebCrypto key; expiry and reconnect authorization'
       });
@@ -168,6 +189,9 @@
       if(Number(meta.aadVersion)!==1){
         await clearEdition(false);
         F.say('This offline-vault copy uses an obsolete integrity format and was purged; store it again.');return;
+      }
+      if(!validPdfMime(meta.mime)){
+        throw new Error('Cached content media type is not PDF; unsafe legacy offline data was rejected.');
       }
       const size=Number(meta.size),sha=String(meta.sha256||'').toLowerCase(),count=Number(meta.chunks);
       if(!Number.isSafeInteger(size)||size<1||size>MAX_OFFLINE_BYTES||!validDigest(sha)||
@@ -197,12 +221,15 @@
         }
         const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(row.iv),
           additionalData:aad(i,nextOffset)},k,row.cipher);
+        if(i===0&&!hasPdfHeader(plain)){
+          throw new Error('Decrypted offline bytes do not begin with a valid PDF header.');
+        }
         if(!plain.byteLength||plain.byteLength>2*1024*1024){
           throw new Error('Offline decrypted chunk length is invalid.');
         }
         chunks.push(plain);nextOffset+=plain.byteLength;
       }
-      const blob=new Blob(chunks,{type:meta.mime||'application/pdf'});
+      const blob=new Blob(chunks,{type:'application/pdf'});
       if(blob.size!==size||nextOffset!==size){
         throw new Error('Offline-vault byte count mismatch.');
       }
