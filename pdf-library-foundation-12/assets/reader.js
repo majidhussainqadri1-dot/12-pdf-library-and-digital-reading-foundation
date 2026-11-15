@@ -169,7 +169,7 @@
   const runDownload = async () => {
     if (download.running || !download.session) return;
     download.running = true; download.paused = false;
-    const d = download.session.delivery;
+    let d = download.session.delivery;
     const total = Number(d?.size);
     const digest = String(d?.sha256 || '').toLowerCase();
     const chunkSize = Number(download.session.range_bytes || 2097152);
@@ -196,7 +196,10 @@
             throw new Error('Download object or checksum changed during renewal; restart with a new session.');
           }
           download.session = renewed;
-          response = await fetch(fresh.url, {headers:range,credentials:'same-origin'});
+          // All later ranges MUST use this currently authorized replacement URL;
+          // retaining the first expired delivery would churn grants on every chunk.
+          d = fresh;
+          response = await fetch(d.url, {headers:range,credentials:'same-origin'});
         }
         const blob = await verifyDownloadRange(response, start, end, total);
         download.chunks.push(blob);
