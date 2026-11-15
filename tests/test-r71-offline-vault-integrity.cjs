@@ -69,13 +69,14 @@ async function simulate(kind){
   const messages=[];
   let ranges=0;
   const F={
-    editionId:700, future:{loggedIn:true},
+    editionId:700, future:{loggedIn:true,userId:17},
     api:async name=>{
       if(name!=='offline-grant')throw new Error('Unexpected endpoint '+name);
       return {
         url:'/synthetic-offline',
         size:original.length,
         sha256:kind==='missing-hash'?'':expectedHash,
+        actor_id:17,
         filename:'licensed-synthetic.pdf',mime_type:'application/pdf',
         offline_valid_until:'2099-01-01T00:00:00Z'
       };
